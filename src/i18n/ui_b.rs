@@ -81,15 +81,20 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     (" Consigne : {guidance}.", " Guidance: {guidance}.", " Hinweis: {guidance}."),
     ("Marquer à détruire", "Mark for destruction", "Zur Vernichtung markieren"),
     (
-        "Ce disque est verrouillé par un mot de passe ATA que SecMet ne contourne jamais. Sans ce \
-         mot de passe, vous pouvez le sortir du circuit de réemploi : le certificat et le lot \
-         porteront « destruction physique requise ».",
-        "This disk is locked by an ATA password that SecMet never bypasses. Without that password, \
-         you can withdraw it from reuse: the certificate and the batch will state \
-         \"physical destruction required\".",
-        "Dieser Datenträger ist durch ein ATA-Passwort gesperrt, das SecMet niemals umgeht. Ohne \
-         dieses Passwort können Sie ihn aus der Wiederverwendung nehmen: Zertifikat und Charge \
-         tragen dann „physische Vernichtung erforderlich“.",
+        "Ce disque est verrouillé par un mot de passe ATA que SecMet ne contourne jamais. Si vous \
+         connaissez le mot de passe du propriétaire, fermez ce dialogue, utilisez le bouton \
+         « Déverrouiller » puis relancez l'effacement. Sans ce mot de passe, vous pouvez le sortir \
+         du circuit de réemploi : le certificat et le lot porteront « destruction physique \
+         requise ».",
+        "This disk is locked by an ATA password that SecMet never bypasses. If you know the \
+         owner's password, close this dialog, use the \"Unlock\" button, then run the erasure \
+         again. Without that password, you can withdraw it from reuse: the certificate and the \
+         batch will state \"physical destruction required\".",
+        "Dieser Datenträger ist durch ein ATA-Passwort gesperrt, das SecMet niemals umgeht. Wenn \
+         Sie das Passwort des Eigentümers kennen, schließen Sie diesen Dialog, verwenden Sie die \
+         Schaltfläche „Entsperren“ und starten Sie die Löschung erneut. Ohne dieses Passwort \
+         können Sie ihn aus der Wiederverwendung nehmen: Zertifikat und Charge tragen dann \
+         „physische Vernichtung erforderlich“.",
     ),
     (
         " — destruction physique recommandée après effacement (état du disque)",

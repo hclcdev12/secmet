@@ -757,13 +757,16 @@ pub(super) fn launch_erase_operations_with_passes(
                         // Sans mot de passe, SecMet ne contourne jamais un
                         // verrou ATA : l'opérateur peut sortir le disque du
                         // circuit, le certificat et le lot le porteront.
-                        let message = format!(
+                        let message =
+                            format!(
                             "{}\n\n{}",
                             error.message,
                             tr("Ce disque est verrouillé par un mot de passe ATA que SecMet ne \
-                                contourne jamais. Sans ce mot de passe, vous pouvez le sortir du \
-                                circuit de réemploi : le certificat et le lot porteront « destruction \
-                                physique requise ».")
+                                contourne jamais. Si vous connaissez le mot de passe du \
+                                propriétaire, fermez ce dialogue, utilisez le bouton \
+                                « Déverrouiller » puis relancez l'effacement. Sans ce mot de \
+                                passe, vous pouvez le sortir du circuit de réemploi : le \
+                                certificat et le lot porteront « destruction physique requise ».")
                         );
                         let job_states = job_states_clone.clone();
                         let badge_button = widget.status_badge.clone();
