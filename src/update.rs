@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 /// par une version signée avec l'ancienne, qui reste listée.
 pub const RELEASE_PUBLIC_KEYS: &[&str] =
     &["bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5"];
-/// Adresse par défaut de `latest.json` : dernière release du dépôt public.
+/// Adresse par défaut de `latest.json` : dernière release du dépôt du code
+/// (depuis 0.3.5 ; l'ancien canal `secmet-releases` y renvoie par `moved_to`).
 pub const DEFAULT_URL: &str =
-    "https://github.com/hclcdev12/secmet-releases/releases/latest/download/latest.json";
+    "https://github.com/hclcdev12/secmet/releases/latest/download/latest.json";
 /// Variable d'environnement remplaçant l'adresse du canal.
 pub const URL_ENV: &str = "SECMET_UPDATE_URL";
 /// Version installée.
@@ -214,8 +215,7 @@ mod tests {
             published_at: "2026-11-15".into(),
             notes: BTreeMap::from([("en".to_string(), "Fixes.".to_string())]),
             sha256sums_url:
-                "https://github.com/hclcdev12/secmet-releases/releases/download/v9.9.9/SHA256SUMS"
-                    .into(),
+                "https://github.com/hclcdev12/secmet/releases/download/v9.9.9/SHA256SUMS".into(),
             moved_to: None,
         }
     }
@@ -277,7 +277,7 @@ mod tests {
         let l = latest("9.9.9");
         assert_eq!(
             release_page_url(&l),
-            "https://github.com/hclcdev12/secmet-releases/releases/tag/v9.9.9"
+            "https://github.com/hclcdev12/secmet/releases/tag/v9.9.9"
         );
         assert_eq!(notes_for(&l, "de"), Some("Fixes."));
         let mut empty = l.clone();

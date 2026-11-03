@@ -16,4 +16,4 @@ Index des annexes associées au Cahier des charges (document interne) (document 
 | [K](Annexe_K_presentation_produit.md) | Présentation du produit | Vulgarisation SecMet |
 | [L](Annexe_L_validation_testdisk.md) | Validation TestDisk | Contrôle optionnel post-effacement |
 | [M](Annexe_M_cle_live_lots.md) | Clé live et lots persistants | Mise en production : clé USB SecMet, lots multi-machines (spécification, non implémentée) |
-| [N](Annexe_N_mises_a_jour.md) | Mises à jour et publication | Mises à jour signées, `secmet-releases`, `make release` (spécification, non implémentée) |
+| [N](Annexe_N_mises_a_jour.md) | Mises à jour et publication | Mises à jour signées, releases GitHub du dépôt, `make release` (spécification, non implémentée) |

@@ -1,6 +1,6 @@
 # Contexte développeur SecMet
 
-Notes courtes pour travailler sur le dépôt (v0.3.5).
+Notes courtes pour travailler sur le dépôt (v0.3.6).
 
 ## Workspace Cargo
 
@@ -69,7 +69,7 @@ make rpm        # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
 make appimage   # dist/SecMet_<version>_x86_64.AppImage, assemblée dans un conteneur Ubuntu 24.04
 make live       # dist/live/ : image de la clé USB SecMet (conteneur privilégié) ; make live-key DEV=/dev/sdX l'écrit
 make release    # dist/release/<version>/ : les 4 paquets fumés en conteneurs + SHA256SUMS(.sig) + latest.json signés
-make publish    # idem, puis release GitHub sur secmet-releases (confirmation demandée)
+make publish    # idem, puis release GitHub sur ce dépôt (confirmation demandée) ; le push d'un tag vX.Y.Z suffit (package.yml)
 ```
 
 L'AppImage **doit** être assemblée dans le conteneur (`packaging/appimage.Containerfile`) : les bibliothèques GTK embarquées sont liées à la glibc de la machine de construction, et le banc est en glibc 2.39. Voir [Annexe H](Annexes/Annexe_H_deploiement_banc.md).
@@ -83,7 +83,7 @@ La CI GitHub Actions (`ci.yml`, `fuzz.yml`, `package.yml`) rejoue fmt, clippy, t
 ## Mise en production (spécifiée, non implémentée)
 
 - [Annexe M](Annexes/Annexe_M_cle_live_lots.md) : clé USB SecMet, partition de données `SECMET-DATA`, lots persistants sur plusieurs laptops, manifeste de lot signé.
-- [Annexe N](Annexes/Annexe_N_mises_a_jour.md) : mises à jour signées (clé de version hors ligne), dépôt public `hclcdev12/secmet-releases`, chaîne `make release` locale (pas de CI payante). **Réalisé** : `packaging/release.sh`, module `secmet-attest::release`, binaire `secmet-release` (`keygen`, `sign`, `verify`), vérification dans l'application (`src/update.rs`, point jaune, section Mises à jour). **Décision** : pas de bouton Installer (l'application annonce, l'installation reste manuelle). **À faire** : versions sur la clé live (annexe M).
+- [Annexe N](Annexes/Annexe_N_mises_a_jour.md) : mises à jour signées (clé de version hors ligne), releases GitHub du dépôt du code `hclcdev12/secmet` (depuis 0.3.5 ; `secmet-releases` y renvoie par `moved_to`), publiées par `package.yml` sur tag ou par `make release` en local. **Réalisé** : `packaging/release.sh`, module `secmet-attest::release`, binaire `secmet-release` (`keygen`, `sign`, `verify`), vérification dans l'application (`src/update.rs`, point jaune, section Mises à jour). **Décision** : pas de bouton Installer (l'application annonce, l'installation reste manuelle). **À faire** : versions sur la clé live (annexe M).
 
 ## Banc de test
 

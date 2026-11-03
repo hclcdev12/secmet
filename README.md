@@ -1,6 +1,6 @@
 # SecMet
 
-Application **Rust** (GTK4, v0.3.5) pour l'effacement sécurisé de disques sous Linux, conforme **NIST SP 800-88** : commandes firmware ATA/NVMe (sanitize, Security Erase, Format NVM) et écriture hôte vérifiée, réalisées nativement par un helper privilégié (aucun `hdparm`, `nvme-cli`, `smartctl`, `shred`, `lsblk` ni `blkid`). Pensée pour un usage en **atelier / banc de nettoyage** : détection des disques branchés, sélection multiple, effacements en parallèle avec suivi de progression.
+Application **Rust** (GTK4, v0.3.6) pour l'effacement sécurisé de disques sous Linux, conforme **NIST SP 800-88** : commandes firmware ATA/NVMe (sanitize, Security Erase, Format NVM) et écriture hôte vérifiée, réalisées nativement par un helper privilégié (aucun `hdparm`, `nvme-cli`, `smartctl`, `shred`, `lsblk` ni `blkid`). Pensée pour un usage en **atelier / banc de nettoyage** : détection des disques branchés, sélection multiple, effacements en parallèle avec suivi de progression.
 
 > **Attention** — Cette application détruit définitivement les données des disques sélectionnés. Vérifiez toujours les cibles avant de lancer une suppression. Le disque système est protégé, mais une erreur d'identification reste possible sur d'autres supports.
 
@@ -222,7 +222,7 @@ Après installation ou mise à jour de la policy Polkit : `make dev` puis `make 
 | `make run` | Lance l'app installée sous `PREFIX` |
 | `make build` | Compile en release sans installation |
 | `make release` | Chaîne de publication : contrôles, 4 paquets construits et fumés en conteneurs, `SHA256SUMS` et `latest.json` signés avec la clé de version ; rien n'est publié |
-| `make publish` | Comme `make release`, puis publication de la release sur `secmet-releases` après confirmation |
+| `make publish` | Comme `make release`, puis publication de la release GitHub (ce dépôt) après confirmation ; en pratique, le push d'un tag `vX.Y.Z` fait la même chose par `package.yml` |
 | `make test` | Tests unitaires Rust |
 | `make deb` | Construit le paquet `.deb` (`SECMET_DEB_DISTRO=ubuntu22.04` ajoute un suffixe de version) |
 | `make install-deb` | Installe le dernier `.deb` de `dist/` via apt |
@@ -241,7 +241,7 @@ Après installation ou mise à jour de la policy Polkit : `make dev` puis `make 
 |----------|-------------|---------|
 | `ci.yml` | push / PR sur `main` et `I/O_SecMet` | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, shellcheck des scripts, compilation des cibles de fuzz |
 | `fuzz.yml` | push / PR touchant `crates/` ou `fuzz/` (60 s par cible), hebdomadaire (30 min), manuel (durée au choix) | cargo-fuzz (nightly, libFuzzer) sur neuf décodeurs purs : sense ATA, IDENTIFY, SMART, NVMe, trames IPC, QR et JSON d'attestation, mountinfo, canaris ; entrées fautives publiées en artefact |
-| `package.yml` | push sur `main` et `I/O_SecMet`, tags `v*`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `0.3.5~ubuntu22.04`, publiée sous `secmet_0.3.5.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; release GitHub avec `SHA256SUMS` sur un tag |
+| `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `0.3.5~ubuntu22.04`, publiée sous `secmet_0.3.5.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; release GitHub avec `SHA256SUMS` sur un tag |
 
 ## Publication d'une version
 
@@ -251,7 +251,7 @@ La publication ne dépend pas de ces workflows : elle tourne sur le poste du res
 secmet-release keygen ~/.config/secmet/release-key.hex   # une fois ; sauvegarder la clé hors ligne
 git tag -a v0.3.2 -m "SecMet 0.3.2" && git push origin main v0.3.2
 make release      # dist/release/0.3.2/ : paquets, SHA256SUMS, SHA256SUMS.sig, latest.json
-make publish      # release v0.3.2 sur https://github.com/hclcdev12/secmet-releases (confirmation)
+make publish      # release GitHub sur https://github.com/hclcdev12/secmet (confirmation)
 secmet-release verify dist/release/0.3.2 --trust <clé publique ou key_id>
 ```
 

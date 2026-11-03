@@ -45,7 +45,7 @@ build: ## Compile en mode release uniquement
 release: ## Chaîne de publication : contrôles, paquets en conteneurs, fumée, signature (rien n'est publié)
 	@./packaging/release.sh
 
-publish: ## Comme release, puis publication sur secmet-releases (confirmation demandée)
+publish: ## Comme release, puis publication de la release GitHub (confirmation demandée)
 	@./packaging/release.sh --publish
 
 clean: ## Nettoie les artefacts de build

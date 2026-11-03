@@ -2,7 +2,7 @@
 
 > Annexe du Cahier des charges SecMet (document interne) — v0.3.1
 >
-> **Statut** : spécification validée et **réalisée** pour l'application : chaîne `make release` / `make publish`, binaire `secmet-release`, dépôt `secmet-releases` (§N.3, §N.7), vérification dans l'application avec point jaune, version annoncée et lien vers la page de téléchargement (§N.2). **Décision révisée (2026-11-03)** : bouton **Installer la mise à jour** pour les paquets `.deb` et `.rpm` (§N.5), afin que les testeurs se mettent à jour depuis l'application ; l'AppImage reste manuelle. **Réalisé (0.3.4)** : versions sur la clé live (§N.6).
+> **Statut** : spécification validée et **réalisée** pour l'application : chaîne `make release` / `make publish`, binaire `secmet-release`, releases GitHub du dépôt du code (§N.3, §N.7 ; `secmet-releases` jusqu'à 0.3.5), vérification dans l'application avec point jaune, version annoncée et lien vers la page de téléchargement (§N.2). **Décision révisée (2026-11-03)** : bouton **Installer la mise à jour** pour les paquets `.deb` et `.rpm` (§N.5), afin que les testeurs se mettent à jour depuis l'application ; l'AppImage reste manuelle. **Réalisé (0.3.4)** : versions sur la clé live (§N.6).
 
 ---
 
@@ -32,7 +32,7 @@
 
 | Phase | Emplacement |
 |-------|-------------|
-| Développement | Dépôt public **`hclcdev12/secmet-releases`** (le dépôt du code reste privé) |
+| Développement | Releases GitHub du dépôt du code **`hclcdev12/secmet`** (public, GPL-3.0-or-later). Jusqu'à la 0.3.5 le canal était `hclcdev12/secmet-releases` ; sa dernière release ne contient qu'un `latest.json` signé dont `sha256sums_url` et `moved_to` renvoient vers `secmet`, ce qui fait basculer les installations existantes (vérifié sur le banc le 3 novembre 2026 : 0.3.4 → 0.3.5 par le pointeur). |
 | Production | Dépôt public de l'entreprise (code ou releases), à décider au lancement |
 
 Chaque release contient :
@@ -116,7 +116,7 @@ Script : `packaging/release.sh` (`make release`, `make publish`). Il refuse un a
 2. Construction en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 42, AppImage (Ubuntu 24.04).
 3. Installation et contrôle de chaque paquet dans son conteneur (binaires présents, helper refusant d'être lancé hors protocole, TestDisk embarqué, policy PolicyKit) ; contrôle de la glibc requise par l'AppImage (≤ 2.39).
 4. `secmet-release sign` : `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version, puis `secmet-release verify` avec la clé publique.
-5. `--publish` seulement : `gh release create vX.Y.Z` sur `secmet-releases` avec les 7 fichiers, après confirmation explicite (`oui`). Une release déjà existante est refusée.
+5. `--publish` seulement : `gh release create vX.Y.Z` sur le dépôt avec les 7 fichiers, après confirmation explicite (`oui`). Une release déjà existante est refusée.
 
 Sortie : `dist/release/<version>/`, avec les journaux de construction sous `logs/`. Le tag (`git tag -a vX.Y.Z`) et le push du code restent des gestes explicites du responsable des versions.
 
@@ -128,7 +128,7 @@ Outil `secmet-release` (crate `secmet-attest`, non livré dans les paquets) :
 | `sign <dossier> --key … --version … --date … --sums-url …` | Écrit `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json` |
 | `verify <dossier> [--trust …]` | Vérifie les deux signatures, l'empreinte de chaque fichier et la cohérence de la version ; code 0 seulement avec une clé de confiance |
 
-Prérequis GitHub : une release exige un tag, donc au moins un commit dans `secmet-releases` (un `README` suffit).
+Prérequis GitHub : une release exige un tag, donc le tag `vX.Y.Z` doit exister sur le dépôt ; `package.yml` (GitHub Actions, gratuit sur un dépôt public) construit, signe et publie à chaque push de tag, `make release` restant la voie locale.
 
 ### Intégration continue
 
@@ -155,7 +155,7 @@ La vérification ne transmet que l'adresse IP de l'atelier et la version utilis�
 
 | Bloc | Charge |
 |------|--------|
-| `make release`, dépôt `secmet-releases`, `latest.json` signé | 1 à 2 j |
+| `make release`, releases GitHub, `latest.json` signé | 1 à 2 j |
 | Vérification en arrière-plan, point jaune, section Mises à jour | 1 à 2 j |
 | ~~Téléchargement et installation depuis l'application~~ | abandonné (pas de bouton Installer) |
 | Clé live : versions sur la partition de données, service de démarrage, retour arrière | 2 à 3 j |

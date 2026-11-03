@@ -9,7 +9,7 @@
 #                              [--notes <fr.md>] [--notes-en <en.md>] [--notes-de <de.md>]
 #
 # env   : SECMET_RELEASE_KEY    clé privée de version (défaut ~/.config/secmet/release-key.hex)
-#         SECMET_RELEASES_REPO  dépôt GitHub des releases (défaut hclcdev12/secmet-releases)
+#         SECMET_RELEASES_REPO  dépôt GitHub des releases (défaut hclcdev12/secmet)
 #         SECMET_RELEASES_URL   base des téléchargements (défaut https://github.com/<repo>/releases/download)
 #         SECMET_ENGINE         podman ou docker (détecté)
 #
@@ -41,7 +41,7 @@ done
 
 VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
 TAG="v$VERSION"
-REPO="${SECMET_RELEASES_REPO:-hclcdev12/secmet-releases}"
+REPO="${SECMET_RELEASES_REPO:-hclcdev12/secmet}"
 BASE_URL="${SECMET_RELEASES_URL:-https://github.com/$REPO/releases/download}"
 KEY="${SECMET_RELEASE_KEY:-$HOME/.config/secmet/release-key.hex}"
 OUT_DIR="$ROOT_DIR/dist/release/$VERSION"
