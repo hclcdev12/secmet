@@ -82,7 +82,7 @@ in_chroot apt-get install -y -qq --no-install-recommends \
     systemd systemd-sysv systemd-timesyncd dbus dbus-user-session udev kmod \
     locales console-setup keyboard-configuration kbd tzdata \
     sudo policykit-1 udisks2 gvfs gvfs-backends \
-    network-manager network-manager-gnome iproute2 iputils-ping ca-certificates \
+    network-manager network-manager-gnome wpasupplicant iproute2 iputils-ping ca-certificates \
     xserver-xorg xserver-xorg-video-all xserver-xorg-input-all xinit x11-xserver-utils \
     lightdm lightdm-gtk-greeter \
     xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings xfce4-power-manager \
@@ -170,6 +170,10 @@ step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
 in_chroot apt-get clean
 rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/tmp/"* "$ROOTFS/usr/sbin/policy-rc.d"
+# debootstrap copie le resolv.conf de la machine de construction dans le
+# chroot (serveurs DNS et domaine de recherche internes) : retiré, c'est
+# NetworkManager qui écrit /etc/resolv.conf au démarrage de la clé.
+rm -f "$ROOTFS/etc/resolv.conf"
 unmount_all
 trap - EXIT
 
