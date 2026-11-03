@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
+<policyconfig>
+  <action id="com.secmet.pkexec.helper">
+    <description>SecMet privileged helper</description>
+    <description xml:lang="fr">Helper privilégié SecMet</description>
+    <description xml:lang="de">Privilegierter SecMet-Helfer</description>
+    <message>Authentication is required to perform disk operations</message>
+    <message xml:lang="fr">Authentification requise pour les opérations sur les disques</message>
+    <message xml:lang="de">Authentifizierung für Datenträgeroperationen erforderlich</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/secmet-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

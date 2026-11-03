@@ -1,0 +1,19 @@
+<?xml version="1.1" encoding="UTF-8"?>
+<!-- Clé SecMet : rien ne doit interrompre ni masquer un effacement en cours.
+     Pas d'extinction d'écran, pas de veille d'inactivité, fermer le capot
+     ne fait rien, pas de verrouillage au réveil (la veille volontaire de
+     « Dé-frozen » passe par logind et revient sur le bureau tel quel). -->
+<channel name="xfce4-power-manager" version="1.0">
+  <property name="xfce4-power-manager" type="empty">
+    <property name="lock-screen-suspend-hibernate" type="bool" value="false"/>
+    <property name="logind-handle-lid-switch" type="bool" value="false"/>
+    <property name="lid-action-on-ac" type="uint" value="0"/>
+    <property name="lid-action-on-battery" type="uint" value="0"/>
+    <property name="inactivity-on-ac" type="uint" value="14"/>
+    <property name="inactivity-on-battery" type="uint" value="14"/>
+    <property name="dpms-enabled" type="bool" value="false"/>
+    <property name="blank-on-ac" type="uint" value="0"/>
+    <property name="blank-on-battery" type="uint" value="0"/>
+    <property name="show-tray-icon" type="bool" value="true"/>
+  </property>
+</channel>

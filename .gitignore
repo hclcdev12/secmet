@@ -1,0 +1,45 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Build artefacts
+/debug/
+/release/
+/dist/
+/.exec-test/
+/packaging/stage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Outils d'assemblage AppImage (telecharges par build_appimage.sh)
+/packaging/tools/
+/packaging/appimage_stage/
+/target-appimage/
+
+# Fuzzing (cargo-fuzz) et construction RPM
+/fuzz/target/
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/coverage/
+/packaging/rpm_stage/
+/packaging/rpmbuild/
+/target-*/
+
+# Outils locaux
+/.zcode/
+__pycache__/
+.claude/settings.local.json

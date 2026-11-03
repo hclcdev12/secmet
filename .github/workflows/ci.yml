@@ -1,0 +1,100 @@
+name: CI
+
+# Intégration continue : format, clippy strict, tests, audit des dépendances,
+# syntaxe des scripts. Tourne sur main.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: fmt + clippy + tests (Ubuntu 24.04, GTK 4.14)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libgtk-4-dev libglib2.0-dev \
+            policykit-1 testdisk
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy (workspace, toutes cibles, warnings interdits)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
+      - name: Crates sans GTK (helper, device, core, attest) testées seules
+        run: cargo test -p secmet-helper -p secmet-device -p secmet-core -p secmet-attest
+
+      - name: "secmet-verify : options et codes de retour"
+        run: |
+          cargo build --release -p secmet-attest --bin secmet-verify
+          ./target/release/secmet-verify --help >/dev/null
+          if ./target/release/secmet-verify --option-inconnue 2>/dev/null; then
+            echo "une option inconnue doit être refusée" >&2; exit 1
+          fi
+
+  scripts:
+    name: Scripts shell (syntaxe + shellcheck)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntaxe bash
+        run: |
+          for f in scripts/*.sh packaging/*.sh; do bash -n "$f"; done
+      - name: shellcheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck -S warning scripts/*.sh packaging/*.sh
+
+  audit:
+    name: cargo audit (RustSec)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - name: cargo audit
+        run: cargo audit
+
+  fuzz-build:
+    name: Cibles de fuzz compilables
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: cargo check des cibles de fuzz (stable, sans instrumentation)
+        run: cargo check --manifest-path fuzz/Cargo.toml --all-targets

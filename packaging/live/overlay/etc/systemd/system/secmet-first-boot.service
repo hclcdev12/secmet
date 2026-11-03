@@ -1,0 +1,13 @@
+# Clé écrite depuis l'image distribuée : agrandit la partition d'export au
+# premier démarrage (voir /usr/local/bin/secmet-first-boot).
+[Unit]
+Description=SecMet : agrandissement de la partition d'export (premier demarrage)
+After=local-fs.target
+Before=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/secmet-first-boot
+
+[Install]
+WantedBy=multi-user.target

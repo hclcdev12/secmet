@@ -1,0 +1,46 @@
+SecMet — Outil embarqué (fallback)
+==================================
+
+Certains paquets .deb / .rpm / AppImage SecMet incluent une copie du binaire
+testdisk sous /usr/lib/secmet/bin/, utilisée en priorité par secmet-helper
+(le testdisk du système sert de repli). Les accès disque eux-mêmes
+(IDENTIFY, SMART, SANITIZE, SECURITY ERASE, NVMe Format/Sanitize, lecture
+et écriture) sont réalisés nativement par secmet-helper (SG_IO, ioctl NVMe,
+sysfs) : nvme-cli, hdparm et smartmontools ne sont plus embarqués ni requis.
+
+Fichiers concernés
+------------------
+
+  /usr/lib/secmet/bin/testdisk   (si présent)
+  /usr/lib/secmet/lib/*.so       (libs privées de testdisk, dont libntfs-3g,
+                                  libext2fs, libncursesw)
+
+Licences
+--------
+
+testdisk
+  Licence : GNU General Public License, version 2 ou ultérieure (GPL-2.0+)
+  Copyright : Christophe Grenier (CGSecurity) et contributeurs
+  Sources :
+    https://www.cgsecurity.org/wiki/TestDisk
+    Paquet Debian / Ubuntu (.deb, AppImage) : testdisk
+    (https://packages.debian.org/source/stable/testdisk)
+    Paquet Fedora (.rpm) : testdisk
+    (https://src.fedoraproject.org/rpms/testdisk)
+  Texte complet GPL-2.0 : /usr/share/doc/secmet/gpl-2.0.txt
+
+  Les bibliothèques privées copiées sous /usr/lib/secmet/lib/ (libncursesw,
+  libntfs-3g, libext2fs, libselinux, libpcre2, libjpeg, etc.) relèvent des
+  licences de leurs projets respectifs (LGPL/GPL/BSD) et sont redistribuées
+  non modifiées ; les sources sont disponibles via les paquets source de la
+  distribution de construction (Debian/Ubuntu : apt source ; Fedora :
+  dnf download --source) correspondants (ncurses, ntfs-3g, e2fsprogs,
+  libselinux, pcre2, ...).
+
+Relation avec SecMet
+--------------------
+
+SecMet (licence GPL-3.0-or-later) reste un programme distinct. Les binaires ci-dessus sont
+des programmes tiers exécutés par secmet-helper ; leur inclusion dans le
+paquet .deb / .rpm / l'AppImage constitue une redistribution de logiciels tiers,
+pas une œuvre dérivée du code source SecMet.

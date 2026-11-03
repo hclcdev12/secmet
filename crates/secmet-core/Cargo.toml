@@ -1,0 +1,32 @@
+[package]
+name = "secmet-core"
+version = "0.3.5"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.80"
+publish = false
+description = "Moteur de décision NIST SP 800-88 et canaris de validation. Pur : aucune I/O, aucun appel système."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+chacha20 = "0.10"
+sha2 = "0.10"
+thiserror = "2"
+zeroize = "1"
+# Conversion depuis les structures matérielles de secmet-device (optionnelle :
+# la crate reste pure sans elle).
+secmet-device = { path = "../secmet-device", optional = true }
+
+[features]
+device = ["dep:secmet-device"]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

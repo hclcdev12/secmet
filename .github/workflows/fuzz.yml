@@ -1,0 +1,97 @@
+name: Fuzz
+
+# Fuzzing libFuzzer (cargo-fuzz, toolchain nightly) des décodeurs purs :
+# sense ATA, IDENTIFY, SMART, structures NVMe, trames IPC du helper, QR et
+# JSON d'attestation, mountinfo/swaps, classification des canaris.
+#
+# - Pull request et push : 60 s par cible (détection rapide des régressions).
+# - Hebdomadaire et manuel : durée longue (paramétrable).
+# Les entrées qui font planter une cible sont publiées en artefact.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "crates/**"
+      - "fuzz/**"
+      - "Cargo.lock"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "17 3 * * 1" # chaque lundi 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Durée par cible (secondes)"
+        required: false
+        default: "900"
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - ata_sense
+          - ata_identify
+          - ata_smart
+          - nvme_decode
+          - helper_ipc
+          - attest_qr
+          - attest_json
+          - protection_parse
+          - canary_classify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain nightly (sanitizers libFuzzer)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: cargo-fuzz (cargo install, mis en cache)
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: cargo-fuzz
+
+      - name: Cache cargo (fuzz)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+
+      - name: Durée de la campagne
+        id: duration
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "seconds=1800" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "seconds=${{ github.event.inputs.seconds }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "seconds=60" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: cargo fuzz run ${{ matrix.target }}
+        run: |
+          cargo fuzz run ${{ matrix.target }} -- \
+            -max_total_time=${{ steps.duration.outputs.seconds }} \
+            -timeout=10 -rss_limit_mb=2048 -max_len=65536
+
+      - name: Entrées fautives (si plantage)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore

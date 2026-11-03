@@ -1,0 +1,802 @@
+/*
+ * SecMet — styles interface atelier (GTK4)
+ * Base lisible à ~60 cm : body 14px, secondaire 13px, badges 13px
+ *
+ * Contraste clair / sombre :
+ * - textes d'interface via @theme_fg_color (suit le thème GTK)
+ * - accents sémantiques via classes .secmet-theme-dark / .secmet-theme-light
+ *   (GTK ne supporte pas @media prefers-color-scheme)
+ * - pending / spinner : bleu clair (#93c5fd) en sombre, bleu clair (#60a5fa) en clair
+ */
+
+/* ── Police interface (alignée logo SecMet) ─────────────────── */
+window,
+dialog,
+popover,
+label,
+button,
+entry,
+checkbutton,
+headerbar,
+progressbar {
+    font-family: Verdana, sans-serif;
+    font-weight: bold;
+}
+
+/* ── Cartes disques ──────────────────────────────────────────── */
+.disk-card {
+    border-radius: 8px;
+    border: 2px solid alpha(@theme_fg_color, 0.12);
+    padding: 12px 14px;
+    margin-bottom: 4px;
+}
+.disk-card.card-selected {
+    border-color: @theme_selected_bg_color;
+}
+
+/* ── Bannière avertissement ──────────────────────────────────── */
+.intro-row {
+    margin-bottom: 6px;
+}
+.intro-row .warning-banner {
+    margin-bottom: 0;
+}
+/* Conteneur Box (pas Picture) — taille verrouillée côté Rust via pixbuf rasterisé */
+.app-brand-logo-wrap {
+    min-width: 180px;
+    min-height: 44px;
+}
+.warning-banner {
+    border-radius: 6px;
+    padding: 10px 14px;
+    background-color: alpha(#c2410c, 0.12);
+    border: 1px solid #c2410c;
+}
+.host-notice {
+    border-radius: 6px;
+    padding: 8px 12px;
+    background-color: alpha(#b45309, 0.14);
+    border: 1px solid #b45309;
+    font-weight: bold;
+}
+.warning-icon {
+    font-size: 20px;
+    font-weight: bold;
+    color: #c2410c;
+}
+.warning-text {
+    font-size: 14px;
+    font-weight: bold;
+    color: @theme_fg_color;
+}
+/* Clair : brun foncé lisible sur le fond orangé ; sombre : blanc. */
+.secmet-theme-light .warning-text {
+    color: #7c2d12;
+}
+.secmet-theme-dark .warning-text {
+    color: #ffffff;
+}
+.warning-text-secondary {
+    font-size: 13px;
+    color: alpha(@theme_fg_color, 0.85);
+}
+.secmet-theme-light .warning-text-secondary {
+    color: #9a3412;
+}
+.secmet-theme-dark .warning-text-secondary {
+    color: alpha(#fdba74, 0.9);
+}
+
+/* ── Badge SMART (cercle outline + « i ») — accents atelier SecMet ── */
+button.info {
+    min-width: 25px;
+    min-height: 25px;
+    padding: 0;
+    margin-left: 10px;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 13px;
+    font-weight: bold;
+    box-shadow: none;
+}
+/* Clair */
+.secmet-theme-light button.info-good,
+.secmet-theme-light button.info-good:hover,
+.secmet-theme-light button.info-good:active {
+    background: transparent;
+    color: #15803d;
+    border: 1px solid #15803d;
+}
+.secmet-theme-light button.info-good:hover,
+.secmet-theme-light button.info-good:active {
+    background: alpha(#15803d, 0.10);
+}
+.secmet-theme-light button.info-warn,
+.secmet-theme-light button.info-warn:hover,
+.secmet-theme-light button.info-warn:active {
+    background: transparent;
+    color: #c2410c;
+    border: 1px solid #c2410c;
+}
+.secmet-theme-light button.info-warn:hover,
+.secmet-theme-light button.info-warn:active {
+    background: alpha(#c2410c, 0.10);
+}
+.secmet-theme-light button.info-bad,
+.secmet-theme-light button.info-bad:hover,
+.secmet-theme-light button.info-bad:active {
+    background: transparent;
+    color: #b91c1c;
+    border: 1px solid #b91c1c;
+}
+.secmet-theme-light button.info-bad:hover,
+.secmet-theme-light button.info-bad:active {
+    background: alpha(#b91c1c, 0.10);
+}
+.secmet-theme-light button.info-unknown,
+.secmet-theme-light button.info-unknown:hover,
+.secmet-theme-light button.info-unknown:active {
+    background: transparent;
+    color: alpha(@theme_fg_color, 0.55);
+    border: 1px solid alpha(@theme_fg_color, 0.35);
+}
+.secmet-theme-light button.info-unknown:hover,
+.secmet-theme-light button.info-unknown:active {
+    background: alpha(@theme_fg_color, 0.06);
+}
+/* Sombre */
+.secmet-theme-dark button.info-good,
+.secmet-theme-dark button.info-good:hover,
+.secmet-theme-dark button.info-good:active,
+button.info-good,
+button.info-good:hover,
+button.info-good:active {
+    background: transparent;
+    color: #4ade80;
+    border: 1px solid #4ade80;
+}
+.secmet-theme-dark button.info-good:hover,
+.secmet-theme-dark button.info-good:active,
+button.info-good:hover,
+button.info-good:active {
+    background: alpha(#4ade80, 0.12);
+}
+.secmet-theme-dark button.info-warn,
+.secmet-theme-dark button.info-warn:hover,
+.secmet-theme-dark button.info-warn:active,
+button.info-warn,
+button.info-warn:hover,
+button.info-warn:active {
+    background: transparent;
+    color: #fb923c;
+    border: 1px solid #fb923c;
+}
+.secmet-theme-dark button.info-warn:hover,
+.secmet-theme-dark button.info-warn:active,
+button.info-warn:hover,
+button.info-warn:active {
+    background: alpha(#fb923c, 0.12);
+}
+.secmet-theme-dark button.info-bad,
+.secmet-theme-dark button.info-bad:hover,
+.secmet-theme-dark button.info-bad:active,
+button.info-bad,
+button.info-bad:hover,
+button.info-bad:active {
+    background: transparent;
+    color: #f87171;
+    border: 1px solid #f87171;
+}
+.secmet-theme-dark button.info-bad:hover,
+.secmet-theme-dark button.info-bad:active,
+button.info-bad:hover,
+button.info-bad:active {
+    background: alpha(#f87171, 0.12);
+}
+.secmet-theme-dark button.info-unknown,
+.secmet-theme-dark button.info-unknown:hover,
+.secmet-theme-dark button.info-unknown:active,
+button.info-unknown,
+button.info-unknown:hover,
+button.info-unknown:active {
+    background: transparent;
+    color: alpha(@theme_fg_color, 0.65);
+    border: 1px solid alpha(@theme_fg_color, 0.35);
+}
+.secmet-theme-dark button.info-unknown:hover,
+.secmet-theme-dark button.info-unknown:active,
+button.info-unknown:hover,
+button.info-unknown:active {
+    background: alpha(@theme_fg_color, 0.08);
+}
+/* ── Badge statut ────────────────────────────────────────────── */
+button.status-badge {
+    border-radius: 4px;
+    padding: 4px 14px;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 28px;
+}
+button.status-badge.status-idle,
+button.status-badge.status-idle:hover,
+button.status-badge.status-idle:active {
+    background: alpha(@theme_fg_color, 0.08);
+    color: @theme_fg_color;
+    border: 1px solid alpha(@theme_fg_color, 0.25);
+    box-shadow: none;
+}
+button.status-badge.status-pending,
+button.status-badge.status-pending:hover,
+button.status-badge.status-pending:active {
+    background: alpha(@theme_selected_bg_color, 0.55);
+    color: #ffffff;
+    border: 1px solid alpha(@theme_selected_bg_color, 0.8);
+    box-shadow: none;
+}
+button.status-badge.status-running,
+button.status-badge.status-running:hover,
+button.status-badge.status-running:active {
+    background: @theme_selected_bg_color;
+    color: #ffffff;
+    border: none;
+    box-shadow: none;
+}
+button.status-badge.status-done,
+button.status-badge.status-done:hover,
+button.status-badge.status-done:active {
+    background: #15803d;
+    color: #ffffff;
+    border: none;
+    box-shadow: none;
+}
+button.status-badge.status-stopped,
+button.status-badge.status-stopped:hover,
+button.status-badge.status-stopped:active {
+    background: #c2410c;
+    color: #ffffff;
+    border: none;
+    box-shadow: none;
+}
+button.status-badge.status-failed,
+button.status-badge.status-failed:hover,
+button.status-badge.status-failed:active {
+    background: #b91c1c;
+    color: #ffffff;
+    border: none;
+    box-shadow: none;
+}
+
+/* ── Barre de progression ─────────────────────────────────────── */
+progressbar > trough {
+    min-height: 8px;
+}
+progressbar > trough > progress {
+    min-height: 8px;
+    background-color: @theme_selected_bg_color;
+}
+
+/* ── Labels typo ────────────────────────────────────────────── */
+.disk-name {
+    font-weight: bold;
+    font-size: 16px;
+    color: @theme_fg_color;
+}
+.disk-subtitle {
+    font-size: 15px;
+    font-weight: 600;
+    color: alpha(@theme_fg_color, 0.9);
+}
+.progress-text {
+    font-size: 13px;
+    color: @theme_fg_color;
+}
+.total-label {
+    font-size: 13px;
+    color: @theme_fg_color;
+}
+
+/* ── Vérification post-effacement ─────────────────────────────── */
+.verify-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: @theme_fg_color;
+}
+
+/* Clair : accents foncés */
+.secmet-theme-light label.verify-ok {
+    color: #15803d;
+}
+.secmet-theme-light label.verify-warn {
+    color: #c2410c;
+}
+.secmet-theme-light label.verify-fail {
+    color: #b91c1c;
+}
+.secmet-theme-light label.verify-pending {
+    color: #60a5fa;
+}
+
+/* Sombre : accents clairs */
+.secmet-theme-dark label.verify-ok {
+    color: #4ade80;
+}
+.secmet-theme-dark label.verify-warn {
+    color: #fb923c;
+}
+.secmet-theme-dark label.verify-fail {
+    color: #f87171;
+}
+.secmet-theme-dark label.verify-pending {
+    color: #93c5fd;
+}
+
+/* ── Validation TestDisk (statut dans le dialogue) ───────────── */
+.testdisk-disk-list-frame,
+.secmet-section-frame {
+    border-radius: 8px;
+    border: 2px solid alpha(@theme_fg_color, 0.18);
+}
+
+.testdisk-label {
+    font-size: 13px;
+    font-weight: 600;
+}
+label.testdisk-idle {
+    color: alpha(@theme_fg_color, 0.55);
+}
+
+.secmet-theme-light label.testdisk-ok {
+    color: #15803d;
+}
+.secmet-theme-light label.testdisk-warn {
+    color: #c2410c;
+}
+.secmet-theme-light label.testdisk-error {
+    color: #b91c1c;
+}
+.secmet-theme-light label.testdisk-pending {
+    color: #60a5fa;
+}
+
+.secmet-theme-dark label.testdisk-ok {
+    color: #4ade80;
+}
+.secmet-theme-dark label.testdisk-warn {
+    color: #fb923c;
+}
+.secmet-theme-dark label.testdisk-error {
+    color: #f87171;
+}
+.secmet-theme-dark label.testdisk-pending {
+    color: #93c5fd;
+}
+
+/* ── État vide ────────────────────────────────────────────────── */
+.empty-state-error {
+    font-size: 16px;
+    font-weight: bold;
+    color: #b91c1c;
+}
+.secmet-theme-dark .empty-state-error {
+    color: #f87171;
+}
+
+/* ── Cases à cocher sélection disques ───────────────────────── */
+checkbutton.disk-checkbox label {
+    color: @theme_fg_color;
+}
+checkbutton.disk-checkbox check {
+    min-width: 20px;
+    min-height: 20px;
+    border: 2px solid alpha(@theme_fg_color, 0.45);
+    border-radius: 3px;
+    background-color: alpha(@theme_bg_color, 0.25);
+    -gtk-icon-source: none;
+    color: transparent;
+}
+checkbutton.disk-checkbox check:checked {
+    background-color: #ffffff;
+    border-color: alpha(@theme_fg_color, 0.55);
+    color: #000000;
+    -gtk-icon-source: -gtk-icontheme("object-select-symbolic");
+}
+.secmet-theme-dark checkbutton.disk-checkbox check:checked {
+    background-color: #e8e8e8;
+    border-color: alpha(@theme_fg_color, 0.45);
+    color: #000000;
+}
+checkbutton.disk-checkbox check:disabled {
+    border: 2px solid alpha(@theme_fg_color, 0.25);
+    background-color: alpha(@theme_bg_color, 0.15);
+}
+
+/* ── Infos disque SMART — cohérent atelier SecMet ───────────── */
+/* Textes / fonds via @theme_* ; accents = verify-ok/warn/fail/pending */
+
+.secmet-smart-window,
+.secmet-smart-root {
+    background: @theme_bg_color;
+    color: @theme_fg_color;
+}
+
+.secmet-smart-loading {
+    color: alpha(@theme_fg_color, 0.75);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.secmet-smart-paned {
+    background: @theme_bg_color;
+}
+
+.secmet-smart-paned > separator {
+    background: alpha(@theme_fg_color, 0.14);
+    min-width: 1px;
+    min-height: 1px;
+}
+
+.secmet-smart-left {
+    padding: 18px 16px;
+    background: alpha(@theme_fg_color, 0.04);
+    border-right: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.secmet-smart-section-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: alpha(@theme_fg_color, 0.70);
+    letter-spacing: 1.0px;
+    margin-bottom: 8px;
+}
+
+.secmet-smart-health-section {
+    margin-bottom: 0;
+}
+
+.secmet-smart-health-ring-wrap {
+    min-width: 150px;
+    min-height: 150px;
+    margin-bottom: 10px;
+}
+
+.secmet-smart-health-ring-text {
+    padding: 0 4px;
+}
+
+.secmet-smart-health-word {
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+}
+
+.secmet-smart-health-word-md {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.secmet-smart-health-word-sm {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.secmet-smart-health-pct {
+    font-size: 26px;
+    font-weight: bold;
+    line-height: 1.05;
+}
+
+.secmet-smart-health-pct-unit {
+    font-size: 12px;
+    font-weight: 600;
+    color: alpha(@theme_fg_color, 0.75);
+    letter-spacing: 0.3px;
+}
+
+.secmet-smart-temp-section {
+    padding: 14px;
+    background: alpha(@theme_fg_color, 0.05);
+    border-radius: 8px;
+    border: 1px solid alpha(@theme_fg_color, 0.14);
+}
+
+.secmet-smart-temp-val {
+    font-size: 40px;
+    font-weight: bold;
+}
+
+.secmet-smart-temp-unit {
+    font-size: 16px;
+    font-weight: 600;
+    color: alpha(@theme_fg_color, 0.75);
+}
+
+.secmet-smart-temp-bar {
+    min-height: 4px;
+}
+
+.secmet-smart-temp-range-label {
+    font-size: 10px;
+    color: alpha(@theme_fg_color, 0.65);
+    font-weight: 600;
+}
+
+.secmet-smart-di-row {
+    padding: 4px 0;
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.10);
+}
+
+.secmet-smart-di-key {
+    font-size: 11px;
+    color: alpha(@theme_fg_color, 0.68);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.secmet-smart-di-val {
+    font-size: 12px;
+    color: @theme_fg_color;
+    font-weight: bold;
+}
+
+.secmet-smart-right {
+    background: @theme_bg_color;
+}
+
+.secmet-smart-disk-header {
+    padding: 14px 18px;
+    background: alpha(@theme_fg_color, 0.05);
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.secmet-smart-disk-icon {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    background: alpha(@theme_fg_color, 0.06);
+    border-radius: 8px;
+    border: 1px solid alpha(@theme_fg_color, 0.18);
+    color: @theme_selected_bg_color;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.secmet-smart-disk-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: @theme_fg_color;
+}
+
+.secmet-smart-disk-sub {
+    font-size: 13px;
+    color: alpha(@theme_fg_color, 0.85);
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.secmet-smart-status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.4px;
+}
+
+.secmet-theme-light .secmet-smart-status-good {
+    background: alpha(#15803d, 0.12);
+    border: 1px solid #15803d;
+    color: #15803d;
+}
+.secmet-theme-dark .secmet-smart-status-good {
+    background: alpha(#4ade80, 0.14);
+    border: 1px solid #4ade80;
+    color: #4ade80;
+}
+.secmet-theme-light .secmet-smart-status-warn {
+    background: alpha(#c2410c, 0.12);
+    border: 1px solid #c2410c;
+    color: #c2410c;
+}
+.secmet-theme-dark .secmet-smart-status-warn {
+    background: alpha(#fb923c, 0.14);
+    border: 1px solid #fb923c;
+    color: #fb923c;
+}
+.secmet-theme-light .secmet-smart-status-bad {
+    background: alpha(#b91c1c, 0.12);
+    border: 1px solid #b91c1c;
+    color: #b91c1c;
+}
+.secmet-theme-dark .secmet-smart-status-bad {
+    background: alpha(#f87171, 0.14);
+    border: 1px solid #f87171;
+    color: #f87171;
+}
+.secmet-smart-status-unknown {
+    background: alpha(@theme_fg_color, 0.08);
+    border: 1px solid alpha(@theme_fg_color, 0.25);
+    color: alpha(@theme_fg_color, 0.75);
+}
+
+.secmet-smart-quick-grid {
+    background: alpha(@theme_fg_color, 0.10);
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.secmet-smart-qg-cell {
+    background: alpha(@theme_bg_color, 0.92);
+    padding: 9px 14px;
+}
+
+.secmet-smart-qg-label {
+    font-size: 10px;
+    font-weight: bold;
+    color: alpha(@theme_fg_color, 0.68);
+    letter-spacing: 0.5px;
+}
+
+.secmet-smart-qg-value {
+    font-size: 13px;
+    color: @theme_fg_color;
+    font-weight: bold;
+}
+
+.secmet-theme-light .secmet-smart-qg-value-green { color: #15803d; }
+.secmet-theme-dark .secmet-smart-qg-value-green { color: #4ade80; }
+.secmet-theme-light .secmet-smart-qg-value-warn { color: #c2410c; }
+.secmet-theme-dark .secmet-smart-qg-value-warn { color: #fb923c; }
+
+.secmet-smart-features-bar {
+    padding: 8px 18px;
+    background: alpha(@theme_fg_color, 0.04);
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.12);
+}
+
+.secmet-smart-feat-badge {
+    padding: 3px 8px;
+    background: alpha(@theme_fg_color, 0.06);
+    border-radius: 4px;
+    border: 1px solid alpha(@theme_fg_color, 0.14);
+}
+
+.secmet-smart-feat-label {
+    font-size: 11px;
+    color: alpha(@theme_fg_color, 0.80);
+    font-weight: 600;
+}
+
+.secmet-theme-light .secmet-smart-feat-mark-on { color: #15803d; }
+.secmet-theme-dark .secmet-smart-feat-mark-on { color: #4ade80; }
+.secmet-smart-feat-mark-off { color: alpha(@theme_fg_color, 0.40); }
+.secmet-smart-feat-badge-off .secmet-smart-feat-label {
+    color: alpha(@theme_fg_color, 0.45);
+}
+
+.secmet-smart-scroll,
+.secmet-smart-table-wrap {
+    background: @theme_bg_color;
+}
+
+/* Fond/bordure d'en-tête appliqués par cellule (les classes posées sur une
+   seule grille : l'alignement des colonnes est partagé avec les données). */
+.secmet-smart-table-header {
+    background: alpha(@theme_fg_color, 0.06);
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.14);
+}
+
+.secmet-smart-table-head-cell {
+    font-size: 10px;
+    font-weight: bold;
+    color: alpha(@theme_fg_color, 0.72);
+    letter-spacing: 0.4px;
+    padding: 8px 10px;
+}
+
+/* Fond/bordure de ligne appliqués par cellule (une seule grille pour tout le
+   tableau, le zébrage suit donc chaque cellule). */
+.secmet-smart-table-row {
+    background: alpha(@theme_fg_color, 0.03);
+    border-bottom: 1px solid alpha(@theme_fg_color, 0.08);
+}
+
+.secmet-smart-table-row-alt {
+    background: alpha(@theme_fg_color, 0.06);
+}
+
+/* Survol d'une ligne : classe togglée par contrôleur motion sur toutes les
+   cellules de la ligne (une seule grille ⇒ pas de :hover par ligne). */
+.secmet-smart-row-hover {
+    background: alpha(@theme_selected_bg_color, 0.18);
+}
+
+.secmet-smart-table-cell {
+    font-size: 12px;
+    font-weight: 600;
+    color: @theme_fg_color;
+    padding: 5px 10px;
+}
+
+.secmet-smart-td-id {
+    color: alpha(@theme_fg_color, 0.65);
+    font-size: 11px;
+}
+
+.secmet-smart-td-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: @theme_fg_color;
+}
+
+.secmet-smart-dot {
+    font-size: 8px;
+    min-width: 10px;
+}
+
+.secmet-theme-light .secmet-smart-v-good { color: #15803d; font-weight: bold; }
+.secmet-theme-dark .secmet-smart-v-good { color: #4ade80; font-weight: bold; }
+
+.secmet-smart-v-thresh,
+.secmet-smart-v-raw-zero {
+    color: alpha(@theme_fg_color, 0.45);
+}
+
+.secmet-smart-v-raw-data {
+    color: alpha(@theme_fg_color, 0.80);
+}
+
+.secmet-smart-empty {
+    color: alpha(@theme_fg_color, 0.70);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.secmet-smart-statusbar {
+    padding: 6px 14px;
+    background: alpha(@theme_fg_color, 0.05);
+    border-top: 1px solid alpha(@theme_fg_color, 0.12);
+    min-height: 24px;
+}
+
+.secmet-smart-sb-text {
+    font-size: 11px;
+    color: alpha(@theme_fg_color, 0.72);
+    font-weight: 600;
+}
+
+.secmet-smart-sb-dot {
+    font-size: 8px;
+    min-width: 8px;
+}
+
+/* Tones sémantiques (anneau, temp, statusbar) */
+.secmet-theme-light .secmet-smart-tone-ok { color: #15803d; }
+.secmet-theme-dark .secmet-smart-tone-ok { color: #4ade80; }
+.secmet-theme-light .secmet-smart-tone-warn { color: #c2410c; }
+.secmet-theme-dark .secmet-smart-tone-warn { color: #fb923c; }
+.secmet-theme-light .secmet-smart-tone-bad { color: #b91c1c; }
+.secmet-theme-dark .secmet-smart-tone-bad { color: #f87171; }
+.secmet-theme-light .secmet-smart-tone-unknown { color: #525252; }
+.secmet-theme-dark .secmet-smart-tone-unknown { color: #a3a3a3; }
+
+.secmet-theme-light .secmet-smart-tone-ok.secmet-smart-temp-val,
+.secmet-theme-light label.secmet-smart-temp-val.secmet-smart-tone-ok { color: #60a5fa; }
+.secmet-theme-dark .secmet-smart-tone-ok.secmet-smart-temp-val,
+.secmet-theme-dark label.secmet-smart-temp-val.secmet-smart-tone-ok { color: #93c5fd; }
+
+/* Point « mise à jour disponible » sur le bouton Réglages */
+.update-dot {
+  min-width: 9px;
+  min-height: 9px;
+  border-radius: 5px;
+  margin: 3px;
+  background-color: #e6b400;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+/* Bandeau du lot actif (clé USB, annexe M) */
+.lot-banner {
+  border-radius: 6px;
+  padding: 8px 12px;
+  background-color: alpha(#2563eb, 0.14);
+  border: 1px solid #2563eb;
+  font-weight: bold;
+}

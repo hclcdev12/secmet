@@ -1,0 +1,4 @@
+# Clé USB SecMet (Annexe M) : partitions montées par étiquette, sans bloquer
+# le démarrage si elles manquent.
+LABEL=SECMET-DATA  /media/secmet-data    ext4   defaults,noatime,nofail,x-systemd.device-timeout=10  0  2
+LABEL=SECMET-EXP   /media/secmet-export  exfat  defaults,nofail,uid=1000,gid=1000,x-systemd.device-timeout=10  0  0

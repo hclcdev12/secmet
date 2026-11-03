@@ -1,0 +1,15 @@
+# Clé SecMet : installation au démarrage de la version conservée sur la
+# partition de données (voir /usr/local/bin/secmet-app-update).
+[Unit]
+Description=SecMet : mise a jour de l'application depuis la partition de donnees
+After=media-secmet\x2ddata.mount
+Requires=media-secmet\x2ddata.mount
+Before=lightdm.service
+ConditionPathIsMountPoint=/media/secmet-data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/secmet-app-update
+
+[Install]
+WantedBy=multi-user.target

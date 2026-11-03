@@ -1,0 +1,14 @@
+#!/bin/sh
+# Lance SecMet sur la clé : données sur la partition SECMET-DATA, fenêtre
+# maximisée. Sans la partition (clé abîmée), SecMet démarre quand même
+# dans le compte, et le dit à l'opérateur par son bandeau habituel.
+# SecMet garde le thème GTK 4 par défaut (sombre), validé, quel que soit
+# le thème GTK 3 du bureau (Arc-Dark).
+export GTK_THEME=Default:dark
+DATA=/media/secmet-data
+if mountpoint -q "$DATA" && [ -w "$DATA/config" ]; then
+    export SECMET_DATA_DIR="$DATA"
+else
+    zenity --warning --no-wrap --text="La partition de données SECMET-DATA de la clé est introuvable.\nSecMet fonctionne, mais les certificats ne seront pas conservés sur la clé." 2>/dev/null || true
+fi
+exec secmet "$@"

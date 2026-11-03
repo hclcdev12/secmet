@@ -1,0 +1,18 @@
+#!/bin/sh
+# Clé SecMet : copie texte du journal du démarrage courant sur la partition
+# de données (logs/system/<boot-id>.log), écriture séquentielle puis
+# renommage. Appelé par minuterie, avant la veille et à l'extinction.
+# Lecture depuis un autre poste : simple fichier texte.
+DATA=/media/secmet-data
+mountpoint -q "$DATA" || exit 0
+DIR="$DATA/logs/system"
+mkdir -p "$DIR" || exit 0
+BOOT=$(tr -d - < /proc/sys/kernel/random/boot_id)
+if journalctl -b -o short-monotonic --no-pager > "$DIR/$BOOT.tmp" 2>/dev/null; then
+    mv -f "$DIR/$BOOT.tmp" "$DIR/$BOOT.log"
+else
+    rm -f "$DIR/$BOOT.tmp"
+fi
+# Au plus 20 démarrages conservés.
+ls -t "$DIR"/*.log 2>/dev/null | tail -n +21 | xargs -r rm -f
+exit 0

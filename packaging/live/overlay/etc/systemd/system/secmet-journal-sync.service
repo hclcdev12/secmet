@@ -1,0 +1,7 @@
+[Unit]
+Description=Copie du journal systeme SecMet sur la cle (periodique)
+ConditionPathIsMountPoint=/media/secmet-data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/secmet-journal-save

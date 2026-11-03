@@ -1,0 +1,19 @@
+# A l'extinction, ExecStop copie le journal avant le demontage de la
+# partition de donnees (After= : arrete avant le point de montage).
+[Unit]
+Description=Copie finale du journal systeme SecMet sur la cle
+After=media-secmet\x2ddata.mount
+Requires=media-secmet\x2ddata.mount
+# Arrêté après la session graphique (ordre inverse de Before=) : la copie
+# finale contient l'arrêt de lightdm et du gestionnaire utilisateur.
+Before=lightdm.service user@1000.service
+ConditionPathIsMountPoint=/media/secmet-data
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/local/bin/secmet-journal-save
+
+[Install]
+WantedBy=multi-user.target

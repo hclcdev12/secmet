@@ -1,0 +1,86 @@
+[package]
+name = "secmet-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1.0"
+secmet-device = { path = "../crates/secmet-device" }
+secmet-core = { path = "../crates/secmet-core" }
+secmet-helper = { path = "../crates/secmet-helper" }
+secmet-attest = { path = "../crates/secmet-attest" }
+
+# Crate indépendante du workspace racine (exclue dans Cargo.toml).
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "ata_sense"
+path = "fuzz_targets/ata_sense.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ata_identify"
+path = "fuzz_targets/ata_identify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ata_smart"
+path = "fuzz_targets/ata_smart.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nvme_decode"
+path = "fuzz_targets/nvme_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "helper_ipc"
+path = "fuzz_targets/helper_ipc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "attest_qr"
+path = "fuzz_targets/attest_qr.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "attest_json"
+path = "fuzz_targets/attest_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protection_parse"
+path = "fuzz_targets/protection_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "canary_classify"
+path = "fuzz_targets/canary_classify.rs"
+test = false
+doc = false
+bench = false

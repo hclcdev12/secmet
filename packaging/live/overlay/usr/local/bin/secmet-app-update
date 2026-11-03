@@ -1,0 +1,31 @@
+#!/bin/sh
+# Clé SecMet (Annexe N, §N.6) : au démarrage, installe la version de SecMet
+# conservée sur la partition de données par le bouton « Installer la mise
+# à jour » (app/<version>/), si elle est plus récente que celle de l'image
+# et si ses signatures sont valides (clé de version). La précédente version
+# reste comme repli ; en cas d'échec, l'image garde sa version.
+DATA=/media/secmet-data
+STORE="$DATA/app"
+TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+mountpoint -q "$DATA" || exit 0
+[ -d "$STORE" ] || exit 0
+installed=$(dpkg-query -W -f='${Version}' secmet 2>/dev/null | sed 's/~.*//')
+for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,2n -k3,3n -r); do
+    version=$(basename "$dir")
+    deb=$(ls "$dir"/secmet_*.deb 2>/dev/null | head -1)
+    [ -n "$deb" ] || continue
+    if ! dpkg --compare-versions "$version" gt "$installed"; then
+        logger -t secmet-app-update "version $version pas plus récente que $installed : rien à faire"
+        exit 0
+    fi
+    if ! secmet-release verify "$dir" --trust "$TRUST" --file "$(basename "$deb")" >/dev/null 2>&1; then
+        logger -t secmet-app-update "version $version : signature ou empreinte invalide, ignorée"
+        continue
+    fi
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades "$deb" >/tmp/secmet-app-update.log 2>&1; then
+        logger -t secmet-app-update "SecMet $version installée depuis la partition de données"
+        exit 0
+    fi
+    logger -t secmet-app-update "version $version : installation échouée ($(tail -1 /tmp/secmet-app-update.log)), repli"
+done
+exit 0

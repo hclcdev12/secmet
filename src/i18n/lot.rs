@@ -1,0 +1,188 @@
+//! Table de traduction `(fr, en, de)` — lots persistants (annexe M).
+
+pub(super) const TABLE: &[(&str, &str, &str)] = &[
+    ("Lot", "Batch", "Charge"),
+    ("Ouvrir un lot", "Open a batch", "Charge eröffnen"),
+    (
+        "Un lot regroupe les machines traitées successivement avec cette clé. Les certificats de chaque machine y sont enregistrés ; à la clôture, un certificat groupé et un manifeste signé sont produits.",
+        "A batch groups the machines processed one after the other with this key. Each machine's certificates are recorded in it; on closing, a grouped certificate and a signed manifest are produced.",
+        "Eine Charge fasst die nacheinander mit diesem Stick bearbeiteten Rechner zusammen. Die Zertifikate jedes Rechners werden darin erfasst; beim Abschluss entstehen ein Sammelzertifikat und ein signiertes Manifest.",
+    ),
+    ("Opérateur du lot", "Batch operator", "Bediener der Charge"),
+    (
+        "Référence client (facultatif)",
+        "Customer reference (optional)",
+        "Kundenreferenz (optional)",
+    ),
+    ("Sans lot", "No batch", "Ohne Charge"),
+    ("Ouvrir", "Open", "Öffnen"),
+    ("Annuler", "Cancel", "Abbrechen"),
+    (
+        "Indiquez l'opérateur du lot.",
+        "Enter the batch operator.",
+        "Geben Sie den Bediener der Charge an.",
+    ),
+    (
+        "Lot ouvert impossible : {error}",
+        "Could not open the batch: {error}",
+        "Charge konnte nicht eröffnet werden: {error}",
+    ),
+    ("Lot en cours", "Batch in progress", "Laufende Charge"),
+    (
+        "Lot {id} — {operator} — {units}, ouvert le {date}",
+        "Batch {id} — {operator} — {units}, opened on {date}",
+        "Charge {id} — {operator} — {units}, eröffnet am {date}",
+    ),
+    ("{count} machine(s)", "{count} machine(s)", "{count} Rechner"),
+    ("{count} disque(s)", "{count} disk(s)", "{count} Datenträger"),
+    (
+        "{count} session(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : disques à refaire ou à consigner en échec.",
+        "{count} session(s) interrupted (power loss or shutdown during erasure): disks to redo or to record as failed.",
+        "{count} Sitzung(en) unterbrochen (Stromausfall oder Herunterfahren während des Löschens): Datenträger erneut bearbeiten oder als fehlgeschlagen erfassen.",
+    ),
+    (
+        "Un lot regroupe les disques effacés sur ce poste, par sessions successives (brancher, effacer, débrancher, recommencer). Les certificats de chaque disque y sont enregistrés ; à la clôture, un certificat groupé et un manifeste signé sont produits.",
+        "A batch groups the disks erased on this workstation, session after session (plug in, erase, unplug, repeat). Each disk's certificate is recorded in it; on closing, a grouped certificate and a signed manifest are produced.",
+        "Eine Charge fasst die an diesem Arbeitsplatz gelöschten Datenträger zusammen, Sitzung für Sitzung (anschließen, löschen, abziehen, wiederholen). Das Zertifikat jedes Datenträgers wird darin erfasst; beim Abschluss entstehen ein Sammelzertifikat und ein signiertes Manifest.",
+    ),
+    (
+        "Livrables dans l'archive du lot (une clé SECMET-EXP branchée les recevrait aussi).",
+        "Deliverables are in the batch archive (a plugged-in SECMET-EXP key would receive them too).",
+        "Die Ergebnisse liegen im Chargenarchiv (ein angeschlossener SECMET-EXP-Stick erhielte sie ebenfalls).",
+    ),
+    (
+        "Référence : {reference}",
+        "Reference: {reference}",
+        "Referenz: {reference}",
+    ),
+    (
+        "{count} machine(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : à refaire ou à consigner en échec.",
+        "{count} machine(s) interrupted (power loss or shutdown during erasure): to redo or to record as failed.",
+        "{count} Rechner unterbrochen (Stromausfall oder Abschaltung während des Löschens): erneut bearbeiten oder als fehlgeschlagen erfassen.",
+    ),
+    ("Continuer", "Continue", "Fortsetzen"),
+    ("Clôturer", "Close batch", "Charge abschließen"),
+    ("Nouveau lot", "New batch", "Neue Charge"),
+    (
+        "Clôturez d'abord le lot en cours",
+        "Close the current batch first",
+        "Schließen Sie zuerst die laufende Charge ab",
+    ),
+    (
+        "Lot {id} · {operator} · {units}",
+        "Batch {id} · {operator} · {units}",
+        "Charge {id} · {operator} · {units}",
+    ),
+    (
+        "Machine déjà dans le lot",
+        "Machine already in the batch",
+        "Rechner bereits in der Charge",
+    ),
+    (
+        "Cette machine figure déjà dans le lot : entrée n°{n} ({status}), le {date}.",
+        "This machine is already in the batch: entry #{n} ({status}), on {date}.",
+        "Dieser Rechner ist bereits in der Charge: Eintrag Nr. {n} ({status}), am {date}.",
+    ),
+    ("Remplacer", "Replace", "Ersetzen"),
+    ("Ajouter quand même", "Add anyway", "Trotzdem hinzufügen"),
+    ("statut : en cours", "status: in progress", "Status: läuft"),
+    ("statut : terminée", "status: finished", "Status: abgeschlossen"),
+    ("statut : en échec", "status: failed", "Status: fehlgeschlagen"),
+    ("statut : interrompue", "status: interrupted", "Status: unterbrochen"),
+    ("statut : remplacée", "status: replaced", "Status: ersetzt"),
+    (
+        "Certificats du lot en cours de génération…",
+        "Generating the batch certificates…",
+        "Zertifikate der Charge werden erstellt…",
+    ),
+    (
+        "Machine enregistrée au lot {id} ({count} certificat(s))",
+        "Machine recorded in batch {id} ({count} certificate(s))",
+        "Rechner in Charge {id} erfasst ({count} Zertifikat(e))",
+    ),
+    (
+        "Enregistrement au lot impossible : {error}",
+        "Could not record in the batch: {error}",
+        "Erfassung in der Charge nicht möglich: {error}",
+    ),
+    ("Clôturer le lot", "Close the batch", "Charge abschließen"),
+    (
+        "Lot {id} : {units}, {certificates} certificat(s), {failed} en échec, {interrupted} interrompue(s).\n\nLa clôture produit le certificat groupé et le manifeste signé, copie les livrables sur la partition d'export si elle est présente, puis archive le lot. Plus rien ne pourra y être ajouté.",
+        "Batch {id}: {units}, {certificates} certificate(s), {failed} failed, {interrupted} interrupted.\n\nClosing produces the grouped certificate and the signed manifest, copies the deliverables to the export partition if present, then archives the batch. Nothing more can be added to it.",
+        "Charge {id}: {units}, {certificates} Zertifikat(e), {failed} fehlgeschlagen, {interrupted} unterbrochen.\n\nDer Abschluss erzeugt das Sammelzertifikat und das signierte Manifest, kopiert die Ergebnisse auf die Exportpartition, falls vorhanden, und archiviert die Charge. Danach kann nichts mehr hinzugefügt werden.",
+    ),
+    (
+        "Aucun certificat dans ce lot : clôture impossible.",
+        "No certificate in this batch: it cannot be closed.",
+        "Kein Zertifikat in dieser Charge: Abschluss nicht möglich.",
+    ),
+    ("Lot clôturé", "Batch closed", "Charge abgeschlossen"),
+    ("Ouvrir le dossier", "Open folder", "Ordner öffnen"),
+    (
+        "Certificat groupé : {pdf}\nManifeste signé : {manifest}\nArchive : {dir}",
+        "Grouped certificate: {pdf}\nSigned manifest: {manifest}\nArchive: {dir}",
+        "Sammelzertifikat: {pdf}\nSigniertes Manifest: {manifest}\nArchiv: {dir}",
+    ),
+    (
+        "Copié sur la partition d'export : {dir}",
+        "Copied to the export partition: {dir}",
+        "Auf die Exportpartition kopiert: {dir}",
+    ),
+    (
+        "Partition d'export absente (SECMET-EXP) : rien n'a été copié.",
+        "Export partition not found (SECMET-EXP): nothing was copied.",
+        "Exportpartition nicht gefunden (SECMET-EXP): nichts kopiert.",
+    ),
+    (
+        "Copie sur la partition d'export impossible : {error}",
+        "Could not copy to the export partition: {error}",
+        "Kopieren auf die Exportpartition nicht möglich: {error}",
+    ),
+    (
+        "Clôture impossible : {error}",
+        "Could not close the batch: {error}",
+        "Abschluss nicht möglich: {error}",
+    ),
+    (
+        "{file} : empreinte différente du journal du lot",
+        "{file}: digest differs from the batch journal",
+        "{file}: Prüfsumme weicht vom Chargenjournal ab",
+    ),
+    (
+        "{file} : signé par une autre clé ou pour une autre machine, clôture impossible",
+        "{file}: signed by another key or for another machine, cannot close",
+        "{file}: von einem anderen Schlüssel oder für einen anderen Rechner signiert, Abschluss nicht möglich",
+    ),
+    (
+        "Certificats déjà produits",
+        "Certificates already produced",
+        "Zertifikate bereits erstellt",
+    ),
+    (
+        "Les certificats de cette machine ont déjà été produits et enregistrés au lot ({count} fichier(s)). Les régénérer les rendrait différents de ceux du journal du lot.",
+        "This machine's certificates have already been produced and recorded in the batch ({count} file(s)). Regenerating them would make them differ from the batch journal.",
+        "Die Zertifikate dieses Rechners wurden bereits erstellt und in der Charge erfasst ({count} Datei(en)). Eine Neuerstellung würde sie vom Chargenjournal abweichen lassen.",
+    ),
+    ("Fermer", "Close", "Schließen"),
+    (
+        "Certificats régénérés",
+        "Regenerated certificates",
+        "Neu erstellte Zertifikate",
+    ),
+    (
+        "{count} certificat(s) ont été régénérés après leur enregistrement au lot (bouton « Générer le PDF ») :\n{list}\n\nIls sont signés par la clé de ce poste et désignent les mêmes machines. Les enregistrer à nouveau au journal du lot, puis clôturer ?",
+        "{count} certificate(s) were regenerated after being recorded in the batch (\"Generate PDF\" button):\n{list}\n\nThey are signed by this machine's key and refer to the same machines. Record them again in the batch journal, then close?",
+        "{count} Zertifikat(e) wurden nach ihrer Erfassung in der Charge neu erstellt (Schaltfläche „PDF erzeugen“):\n{list}\n\nSie sind mit dem Schlüssel dieses Rechners signiert und bezeichnen dieselben Rechner. Erneut im Chargenjournal erfassen und dann abschließen?",
+    ),
+    ("Clôture du lot", "Closing the batch", "Abschluss der Charge"),
+    (
+        "Clôture en cours : certificat groupé, manifeste signé, copie des livrables…",
+        "Closing in progress: grouped certificate, signed manifest, copying deliverables…",
+        "Abschluss läuft: Sammelzertifikat, signiertes Manifest, Kopie der Ergebnisse…",
+    ),
+    (
+        "Enregistrer et clôturer",
+        "Record and close",
+        "Erfassen und abschließen",
+    ),
+];

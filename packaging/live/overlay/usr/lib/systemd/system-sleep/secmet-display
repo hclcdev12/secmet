@@ -1,0 +1,22 @@
+#!/bin/sh
+# Clé SecMet : au réveil (veille Dé-frozen), rallume l'écran de la session
+# de l'opérateur. Certains portables reviennent de veille écran éteint
+# (DPMS / rétroéclairage) alors que le système tourne. Chaque étape est
+# tracée dans le journal (logger -t secmet-display) pour le diagnostic.
+# Avant la veille : copie du journal sur la clé (si le réveil échoue).
+if [ "$1" = "pre" ]; then /usr/local/bin/secmet-journal-save; exit 0; fi
+[ "$1" = "post" ] || exit 0
+logger -t secmet-display "réveil : $2"
+(
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        if [ -S /tmp/.X11-unix/X0 ]; then
+            out=$(su secmet -c 'export DISPLAY=:0 XAUTHORITY=/home/secmet/.Xauthority; xset dpms force on 2>&1; xrandr --auto 2>&1; xrandr --query 2>&1 | head -3' 2>&1)
+            logger -t secmet-display "essai $i : xset/xrandr : $(echo "$out" | tr '\n' ' ')"
+            [ "$i" -ge 3 ] && exit 0
+        else
+            logger -t secmet-display "essai $i : pas de serveur X"
+        fi
+        sleep 2
+    done
+) &
+exit 0

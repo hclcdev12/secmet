@@ -1,0 +1,10 @@
+[Unit]
+Description=Copie du journal systeme SecMet sur la cle, toutes les minutes
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

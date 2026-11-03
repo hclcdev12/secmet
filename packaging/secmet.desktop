@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SecMet
+Comment=Secure disk wiping tool
+Exec=secmet
+Icon=secmet
+Terminal=false
+Categories=System;Utility;

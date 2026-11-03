@@ -1,0 +1,238 @@
+name: Release
+
+# Construit, signe et publie une version de SecMet dans ce dépôt.
+# Déclenchement : push d'un tag vX.Y.Z (ou à la main avec le tag). Les paquets
+# sont construits et fumés dans des conteneurs Ubuntu 24.04, 22.04 et Fedora 42,
+# l'AppImage sur Ubuntu 24.04 ; le dernier travail signe SHA256SUMS et
+# latest.json avec la clé de version puis crée la release GitHub.
+#
+# Secret du dépôt : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex). Les
+# journaux sont publics : aucune étape n'affiche le secret.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de version déjà poussé (ex. v0.3.6)"
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  SECMET_FORCE_BUILD: "1"
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+permissions:
+  contents: write
+
+jobs:
+  deb:
+    name: .deb ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu24.04
+            version: "24.04"
+          - distro: ubuntu22.04
+            version: "22.04"
+    steps:
+      - name: Dépendances de construction
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config curl ca-certificates git \
+            libgtk-4-dev libglib2.0-dev policykit-1 testdisk \
+            dpkg-dev fakeroot
+
+      - name: Sources au tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.distro }}
+
+      - name: Construction du paquet
+        env:
+          SECMET_DEB_DISTRO: ${{ matrix.distro }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ./packaging/build_deb.sh
+          ls -la dist/
+
+      - name: Installation et fumée
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get install -y ./dist/secmet_*.deb
+          dpkg -s secmet | grep -E '^(Version|Depends)'
+          secmet-verify --help >/dev/null
+          secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
+          test -x /usr/lib/secmet/bin/testdisk
+          test -f /usr/share/polkit-1/actions/secmet.policy
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.distro }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  rpm:
+    name: .rpm Fedora ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["42"]
+    steps:
+      - name: Dépendances de construction
+        run: |
+          dnf install -y \
+            gcc make pkgconf-pkg-config curl ca-certificates git \
+            gtk4-devel glib2-devel polkit testdisk \
+            rpm-build rpmdevtools
+
+      - name: Sources au tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: fedora${{ matrix.version }}
+
+      - name: Construction du paquet
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          ./packaging/build_rpm.sh
+          ls -la dist/
+
+      - name: Installation et fumée
+        run: |
+          dnf install -y dist/secmet-*.rpm
+          rpm -q secmet
+          secmet-verify --help >/dev/null
+          secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
+          test -x /usr/lib/secmet/bin/testdisk
+          test -f /usr/share/polkit-1/actions/secmet.policy
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-fedora${{ matrix.version }}
+          path: dist/*.rpm
+          if-no-files-found: error
+
+  appimage:
+    name: AppImage (conteneur Ubuntu 24.04)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sources au tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Construction (docker)
+        run: |
+          ./packaging/build_appimage.sh
+          ls -la dist/
+
+      - name: Fumée (extraction sans FUSE, glibc requise)
+        run: |
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE"/dist/SecMet_*.AppImage --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/secmet
+          test -x squashfs-root/usr/bin/secmet-helper
+          max=$(objdump -T squashfs-root/usr/lib/libgtk-4.so.1 | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+          echo "glibc max requise par libgtk-4 : $max"
+          test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+  publish:
+    name: Signature et release GitHub
+    needs: [deb, rpm, appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sources au tag (outil de signature)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: publish
+
+      - name: Outil de signature
+        run: cargo build --release -q -p secmet-attest --bin secmet-release
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) -exec mv {} release/ \;
+          for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
+          ls -la release/
+
+      - name: Version du tag et des sources
+        id: version
+        run: |
+          tag="$RELEASE_TAG"
+          version="${tag#v}"
+          cargo_version="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          test "$version" = "$cargo_version" || { echo "tag $tag ≠ Cargo.toml $cargo_version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Signature (SHA256SUMS, latest.json) et vérification
+        env:
+          SECMET_RELEASE_KEY: ${{ secrets.SECMET_RELEASE_KEY }}
+        run: |
+          umask 077
+          keyfile="$(mktemp)"
+          printf '%s\n' "$SECMET_RELEASE_KEY" > "$keyfile"
+          base="https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG"
+          ./target/release/secmet-release sign release --key "$keyfile" \
+            --version "${{ steps.version.outputs.version }}" --date "$(date -u +%F)" \
+            --sums-url "$base/SHA256SUMS"
+          rm -f "$keyfile"
+          pubkey="$(python3 -c "import json;print(json.load(open('release/latest.json'))['public_key'])")"
+          ./target/release/secmet-release verify release --trust "$pubkey"
+          cat release/SHA256SUMS
+
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
+          printf 'SecMet %s\n\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+            "${{ steps.version.outputs.version }}" "$key_id" > notes.md
+          gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --title "SecMet ${{ steps.version.outputs.version }}" \
+            --notes-file notes.md release/*
+          gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name'

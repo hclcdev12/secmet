@@ -1,0 +1,55 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: secmet
+Source: https://github.com/hclcdev12/secmet
+
+Files: *
+Copyright: 2026 SecMet Contributors
+License: GPL-3.0+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 3 can be found in "/usr/share/common-licenses/GPL-3";
+ it is also shipped as /usr/share/doc/secmet/LICENSE.
+
+Files: content/SecMet_icon.svg content/SecMet_logo.svg crates/secmet-attest/resources/secmet_logo.jpg
+Copyright: 2026 SecMet Contributors
+License: SecMet-trademark
+ The name "SecMet" and the SecMet logo identify the official software and
+ are not covered by the GPL. They may be reproduced as-is to distribute or
+ describe the unmodified software; a modified version must be renamed and
+ shipped without them. See content-LICENSE in /usr/share/doc/secmet/.
+
+Files: content/device-hdd.svg
+Copyright: 2019-2024 The Bootstrap Authors
+License: MIT
+ See content/LICENSE in the source tree.
+
+Files: usr/lib/secmet/bin/testdisk usr/lib/secmet/lib/*
+Copyright: Christophe Grenier <grenier@cgsecurity.org> and library authors
+License: GPL-2.0+
+ Bundled only when present on the build machine. See
+ /usr/share/doc/secmet/gpl-2.0.txt and bundled-tools-compliance.txt.
+ Source: https://www.cgsecurity.org/wiki/TestDisk
+
+Files: debian/*
+License: GPL-2.0+
+ This packaging metadata is licensed under the GPL, as is conventional for
+ Debian packaging, like the application itself.
+
+Comment: Runtime dependencies (not shipped in this package)
+ GTK 4 (libgtk-4-1) — LGPL-2.1+
+ PolicyKit — LGPL-2.0+
+ testdisk (recommended, optional) — GPL-2.0+ (invoked as a separate process)
+ .
+ Credits / inspiration (not shipped, no source code included):
+ QDiskInfo — GPL-3.0 — https://github.com/edisionnano/QDiskInfo
+ SMART disk-info UI/logic reimplemented independently in Rust+GTK4.
+ See Annexes/Annexe_J_licences_tierces.md (or THIRD_PARTY_LICENSES.md in the package) for the full list.

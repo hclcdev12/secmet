@@ -1,0 +1,42 @@
+#!/bin/sh
+# Clé SecMet écrite depuis l'image distribuée (secmet-key-<version>.img.xz,
+# Etcher/Rufus/dd) : au premier démarrage, la partition d'export (dernière)
+# est agrandie jusqu'au bout de la clé. Conditions : la table GPT se termine
+# bien avant la fin du disque (image plus petite que la clé) et la partition
+# d'export est vide. Sinon, rien n'est touché. Idempotent.
+set -u
+EXP=$(blkid -L SECMET-EXP 2>/dev/null) || exit 0
+[ -b "$EXP" ] || exit 0
+DISK=$(lsblk -no PKNAME "$EXP" 2>/dev/null | head -1)
+[ -n "$DISK" ] || exit 0
+DISK="/dev/$DISK"
+PARTNO=$(lsblk -no PARTN "$EXP" 2>/dev/null | head -1)
+[ -n "$PARTNO" ] || exit 0
+DISK_SECTORS=$(blockdev --getsz "$DISK")
+END=$(sfdisk -l -o Device,End "$DISK" 2>/dev/null | awk -v d="$EXP" '$1==d {print $2}')
+[ -n "$END" ] || exit 0
+# Marge : moins de 64 Mio libres après l'export → rien à faire.
+GAP=$((DISK_SECTORS - END))
+[ "$GAP" -gt 131072 ] || exit 0
+# Partition d'export non vide → on ne touche à rien.
+MNT=$(mktemp -d)
+if mount -o ro "$EXP" "$MNT" 2>/dev/null; then
+    FILES=$(find "$MNT" -mindepth 1 -not -name 'System Volume Information' -not -path '*/System Volume Information/*' | head -1)
+    umount "$MNT"
+    rmdir "$MNT"
+    [ -z "$FILES" ] || { logger -t secmet-first-boot "export non vide, pas d'agrandissement"; exit 0; }
+else
+    rmdir "$MNT"
+fi
+logger -t secmet-first-boot "agrandissement de la partition d'export ($EXP) : $((GAP / 2048)) Mio libres"
+# En-tête GPT de secours replacé en fin de disque, puis partition étendue.
+sfdisk -q --relocate gpt-bak-std "$DISK" 2>/dev/null || true
+START=$(sfdisk -l -o Device,Start "$DISK" 2>/dev/null | awk -v d="$EXP" '$1==d {print $2}')
+umount "$EXP" 2>/dev/null || true
+printf '%s\n' "start=$START, size=+" | sfdisk -q --force -N "$PARTNO" "$DISK" >/dev/null 2>&1 \
+    || { logger -t secmet-first-boot "sfdisk a échoué"; exit 0; }
+partprobe "$DISK" 2>/dev/null; sleep 2
+mkfs.exfat -q -L SECMET-EXP "$EXP" >/dev/null 2>&1 || { logger -t secmet-first-boot "mkfs.exfat a échoué"; exit 0; }
+mount /media/secmet-export 2>/dev/null || true
+logger -t secmet-first-boot "partition d'export agrandie : $(lsblk -no SIZE "$EXP")"
+exit 0

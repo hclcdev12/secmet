@@ -1,0 +1,15 @@
+// Clé USB SecMet : l'opérateur (session locale active) peut monter des
+// partitions amovibles, gérer le réseau et éteindre le poste sans mot de
+// passe. Les opérations sur disque de SecMet (com.secmet.pkexec.helper)
+// gardent leur mot de passe : règle volontairement absente ici.
+polkit.addRule(function(action, subject) {
+    if (!subject.local || !subject.active || !subject.isInGroup("secmet")) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.id.indexOf("org.freedesktop.udisks2.") === 0 ||
+        action.id.indexOf("org.freedesktop.NetworkManager.") === 0 ||
+        action.id.indexOf("org.freedesktop.login1.") === 0) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

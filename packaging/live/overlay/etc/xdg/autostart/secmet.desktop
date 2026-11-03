@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SecMet
+Comment=Effacement sécurisé et certifié de disques
+Exec=/usr/local/bin/secmet-live
+Icon=secmet
+Terminal=false
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=XFCE;

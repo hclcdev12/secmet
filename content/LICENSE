@@ -1,0 +1,19 @@
+# Licences des assets graphiques — SecMet
+
+## SecMet_icon.svg, SecMet_logo.svg (et `crates/secmet-attest/resources/secmet_logo.jpg`)
+
+Copyright (c) 2026 SecMet Contributors — **tous droits réservés** (marque).
+
+Le nom « SecMet » et le lion du logo identifient le logiciel officiel. Ils ne sont **pas** couverts par la licence GPL du code :
+
+- ils peuvent être reproduits tels quels pour distribuer, décrire ou désigner le logiciel SecMet **non modifié** (paquets, captures d'écran, documentation, certificats produits par le logiciel) ;
+- une version modifiée du logiciel, ou un produit dérivé, doit être **renommée** et distribuée **sans** ce nom ni ce logo ;
+- toute autre utilisation (produit, service, support commercial) nécessite l'accord écrit des auteurs.
+
+## device-hdd.svg
+
+Icône « device-hdd » issue de [Bootstrap Icons](https://icons.getbootstrap.com/icons/device-hdd/).
+
+Copyright (c) 2019-2024 The Bootstrap Authors  
+Licence : MIT  
+https://github.com/twbs/icons/blob/main/LICENSE
