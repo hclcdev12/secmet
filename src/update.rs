@@ -9,6 +9,7 @@
 //! sont dans `ui::update_ui`.
 
 use std::io::Read;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -31,7 +32,14 @@ pub const INSTALLED_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Intervalle minimal entre deux vérifications automatiques.
 pub const CHECK_INTERVAL: Duration = Duration::from_secs(24 * 3600);
 /// Délai réseau total d'une vérification.
-const TIMEOUT: Duration = Duration::from_secs(8);
+/// Délai total d'une vérification (deux hôtes : la page GitHub puis le
+/// serveur de fichiers, chacun avec son délai de connexion).
+const TIMEOUT: Duration = Duration::from_secs(20);
+/// Délai de connexion par adresse. Sans lui, ureq partage le délai total
+/// entre les adresses résolues : sur un réseau qui annonce une route IPv6
+/// sans connectivité réelle, les adresses IPv6 épuisaient le délai avant
+/// l'essai IPv4 (« Network Error », EliteBook 850 G3, 3 novembre 2026).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 /// Taille maximale acceptée pour `latest.json`.
 const MAX_BODY: u64 = 64 * 1024;
 /// Fichier d'état.
@@ -141,19 +149,56 @@ pub fn parse_and_verify(text: &str) -> Result<SignedLatest, String> {
 }
 
 /// Télécharge et vérifie `latest.json` (bloquant, hors du fil GTK).
+/// Adresses IPv4 d'abord, IPv6 ensuite, chaque famille dans l'ordre du
+/// résolveur : la première tentative de connexion est celle qui a le plus
+/// de chances d'aboutir sur un réseau d'atelier.
+pub fn ipv4_first(mut addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    addrs.sort_by_key(|a| a.is_ipv6());
+    addrs
+}
+
+fn resolve_ipv4_first(netloc: &str) -> std::io::Result<Vec<SocketAddr>> {
+    let addrs = std::net::ToSocketAddrs::to_socket_addrs(netloc)?.collect();
+    Ok(ipv4_first(addrs))
+}
+
+/// Client HTTP des vérifications et téléchargements : délai total donné,
+/// délai de connexion par adresse, IPv4 d'abord.
+pub fn agent(timeout: Duration) -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout(timeout)
+        .timeout_connect(CONNECT_TIMEOUT)
+        .resolver(resolve_ipv4_first)
+        .build()
+}
+
+/// Erreur HTTP lisible, avec la cause de transport quand ureq n'en met
+/// pas dans son message (un délai de connexion expiré ne donnait que
+/// « Network Error »).
+pub fn http_error(e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Status(code, _) => format!("HTTP {code}"),
+        ureq::Error::Transport(t) => {
+            let mut text = t.kind().to_string();
+            if let Some(m) = t.message() {
+                text.push_str(&format!(" ({m})"));
+            }
+            let mut source = std::error::Error::source(&t);
+            while let Some(cause) = source {
+                text.push_str(&format!(" : {cause}"));
+                source = cause.source();
+            }
+            text
+        }
+    }
+}
+
 pub fn fetch(url: &str) -> Result<SignedLatest, String> {
-    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).build();
-    let response = agent
+    let response = agent(TIMEOUT)
         .get(url)
         .set("User-Agent", &format!("secmet/{INSTALLED_VERSION}"))
         .call()
-        .map_err(|e| match e {
-            ureq::Error::Status(code, _) => format!("HTTP {code}"),
-            ureq::Error::Transport(t) => match t.message() {
-                Some(m) => format!("{} ({m})", t.kind()),
-                None => t.kind().to_string(),
-            },
-        })?;
+        .map_err(http_error)?;
     let mut text = String::new();
     response
         .into_reader()
@@ -283,6 +328,18 @@ mod tests {
         let mut empty = l.clone();
         empty.notes.clear();
         assert_eq!(notes_for(&empty, "fr"), None);
+    }
+
+    #[test]
+    fn ipv4_addresses_come_first() {
+        let v6a: SocketAddr = "[2a04:4e42::1]:443".parse().unwrap();
+        let v6b: SocketAddr = "[2a04:4e42::2]:443".parse().unwrap();
+        let v4a: SocketAddr = "185.199.108.1:443".parse().unwrap();
+        let v4b: SocketAddr = "185.199.108.2:443".parse().unwrap();
+        assert_eq!(
+            ipv4_first(vec![v6a, v4a, v6b, v4b]),
+            vec![v4a, v4b, v6a, v6b]
+        );
     }
 
     /// Réseau réel : `cargo test -p secmet -- --ignored network`. Tant

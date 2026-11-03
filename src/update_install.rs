@@ -108,15 +108,10 @@ pub fn package_kind() -> Option<PackageKind> {
 }
 
 fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new().timeout(TIMEOUT).build()
+    crate::update::agent(TIMEOUT)
 }
 
-fn http_error(e: ureq::Error) -> String {
-    match e {
-        ureq::Error::Status(code, _) => format!("HTTP {code}"),
-        ureq::Error::Transport(t) => t.kind().to_string(),
-    }
-}
+use crate::update::http_error;
 
 fn get_text(url: &str) -> Result<String, String> {
     let response = agent()
