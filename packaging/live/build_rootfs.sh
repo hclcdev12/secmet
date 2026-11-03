@@ -166,14 +166,25 @@ in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journ
 in_chroot systemctl set-default graphical.target >/dev/null 2>&1 || true
 
 # --- 5. initramfs, nettoyage, sortie ----------------------------------------
+# Micrologiciels sans objet sur un poste x86 (commutateurs et cartes réseau de
+# centre de données, SoC ARM) : retirés avant l'initramfs, qui en embarque une
+# partie. Environ 240 Mo de moins à lire sur la clé à chaque démarrage.
+for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 liquidio ti-connectivity; do
+    rm -rf "$ROOTFS/usr/lib/firmware/$fw"
+done
 step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
 in_chroot apt-get clean
 rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/tmp/"* "$ROOTFS/usr/sbin/policy-rc.d"
 # debootstrap copie le resolv.conf de la machine de construction dans le
 # chroot (serveurs DNS et domaine de recherche internes) : retiré, c'est
-# NetworkManager qui écrit /etc/resolv.conf au démarrage de la clé.
+# NetworkManager qui écrit /etc/resolv.conf au démarrage de la clé
+# (overlay etc/NetworkManager/conf.d/20-secmet-dns.conf : dns=default).
 rm -f "$ROOTFS/etc/resolv.conf"
+# Marqueurs « système à jour » (ConditionNeedsUpdate) : sans eux, chaque
+# démarrage relance ldconfig (10 s sur le chemin critique), la reconstruction
+# du catalogue du journal et systemd-update-done.
+touch "$ROOTFS/etc/.updated" "$ROOTFS/var/.updated"
 unmount_all
 trap - EXIT
 
@@ -182,8 +193,11 @@ mkdir -p "$OUT/efi" "$OUT/bios"
 rm -f "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs
 cp "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)" "$OUT/vmlinuz"
 cp "$(ls -1 "$ROOTFS"/boot/initrd.img-* | sort -V | tail -1)" "$OUT/initrd.img"
+# /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
+# embarqué : la clé démarre sur les copies de la partition système.
+# -wildcards : sans lui, les motifs -e sont pris au pied de la lettre.
 mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp xz -b 1M -Xdict-size 100% -noappend -quiet \
-    -e boot/vmlinuz-* boot/initrd.img-* >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
+    -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
 cp /usr/lib/shim/shimx64.efi.signed "$OUT/efi/shimx64.efi"
 # MokManager : selon la version de shim-signed, signé ou non, ou absent.
 for mm in /usr/lib/shim/mmx64.efi.signed /usr/lib/shim/mmx64.efi; do
