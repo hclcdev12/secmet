@@ -18,7 +18,7 @@ use crate::helper_client::{self, CallError, JobReport, Outcome, Progress};
 use crate::i18n::{tr, trf};
 use crate::logger;
 
-use super::dialogs::show_error_dialog;
+use super::dialogs::{show_condemn_dialog, show_error_dialog};
 use super::disk_list::{disk_trace_subtitle, set_status_badge, update_select_all_state};
 use super::pdf_ui::update_pdf_button_state;
 use super::testdisk_ui::update_testdisk_button_state;
@@ -271,15 +271,69 @@ fn progress_text(p: &Progress) -> String {
 }
 
 /// État du job d'après les motifs exacts du verdict (noms des variantes
-/// `Blocker` du moteur), jamais d'après le texte du message.
+/// `RefusalReason` et `Blocker` du moteur), jamais d'après le texte du message.
 fn job_state_for_error(error: &CallError, reasons: &[String]) -> JobState {
     let has = |name: &str| reasons.iter().any(|r| r == name);
-    if has("SecurityLocked") || has("PasswordAttemptsExpired") {
+    if has("ReadOnlyMedia") {
+        JobState::DestroyRequired
+    } else if has("SecurityLocked") || has("PasswordAttemptsExpired") {
         JobState::BlockedLocked
     } else if has("SecurityFrozen") || error.kind == "security_frozen" {
         JobState::BlockedFrozen
     } else {
         JobState::FailedOther
+    }
+}
+
+/// Sort du support et raisons pour un job jamais lancé, d'après les motifs
+/// du verdict (même lecture que `secmet_core::disposition::classify_unrunnable`).
+fn unrunnable_disposition(reasons: &[String]) -> (&'static str, Vec<String>) {
+    let has = |name: &str| reasons.iter().any(|r| r == name);
+    if has("ReadOnlyMedia") {
+        return ("destroy_required", vec!["ReadOnlyMedia".into()]);
+    }
+    let mut codes = Vec::new();
+    if has("SecurityLocked") || has("PasswordAttemptsExpired") {
+        codes.push("LockedWithoutPassword".to_string());
+    }
+    if has("SecurityLocked")
+        || has("PasswordAttemptsExpired")
+        || has("SanitizeInProgress")
+        || has("SanitizeFailed")
+    {
+        codes.push("Blocked".to_string());
+    }
+    if has("HostsSystem") || has("Mounted") || has("ActiveSwap") || has("VolumeMember") {
+        codes.push("Protected".to_string());
+    }
+    if has("InspectionFailedNoFallback") || has("NoMethodAvailable") {
+        codes.push("NoMethod".to_string());
+    }
+    ("retry", codes)
+}
+
+/// Phrase du verdict final d'un job terminé, pour le dialogue d'échec.
+fn disposition_sentence(report: &JobReport) -> String {
+    let reasons = certificate::reasons_label(&report.disposition_reasons);
+    match report.disposition.as_str() {
+        "destroy_required" => trf(
+            "Destruction physique requise : {reasons}.",
+            &[("reasons", &reasons)],
+        ),
+        "retry" => {
+            let mut text = trf("À relancer : {reasons}.", &[("reasons", &reasons)]);
+            if !report.disposition_guidance.is_empty() {
+                text.push_str(&trf(
+                    " Consigne : {guidance}.",
+                    &[(
+                        "guidance",
+                        &certificate::guidances_label(&report.disposition_guidance),
+                    )],
+                ));
+            }
+            text
+        }
+        _ => String::new(),
     }
 }
 
@@ -591,8 +645,13 @@ pub(super) fn launch_erase_operations_with_passes(
                     match report.outcome {
                         Outcome::Success => {
                             widget.progress_bar.set_fraction(1.0);
+                            let key = if report.disposition == "destroy_recommended" {
+                                "OK — {method} (NIST {level}) · destruction physique recommandée"
+                            } else {
+                                "OK — {method} (NIST {level})"
+                            };
                             widget.progress_text.set_text(&trf(
-                                "OK — {method} (NIST {level})",
+                                key,
                                 &[
                                     (
                                         "method",
@@ -624,17 +683,15 @@ pub(super) fn launch_erase_operations_with_passes(
                         }
                         Outcome::Failed => {
                             widget.progress_text.set_text(&tr("Échec"));
-                            let io_failure = report
-                                .steps
-                                .iter()
-                                .any(|s| s.criterion.as_deref() == Some("SampleReadError"));
-                            let state = if io_failure {
+                            // Le sort vient du moteur : « destruction requise »
+                            // n'est pas relançable, « à relancer » l'est.
+                            let state = if report.disposition == "destroy_required" {
                                 set_status_badge(
                                     &widget.status_badge,
-                                    &tr("ÉCHEC E/S"),
+                                    &tr("À DÉTRUIRE"),
                                     "status-failed",
                                 );
-                                JobState::FailedIo
+                                JobState::DestroyRequired
                             } else {
                                 set_status_badge(
                                     &widget.status_badge,
@@ -649,8 +706,11 @@ pub(super) fn launch_erase_operations_with_passes(
                                 &window_clone,
                                 &trf("Échec effacement {disk}", &[("disk", &disk_name)]),
                                 &trf(
-                                    "Aucune étape du plan n'a abouti.\n\n{detail}",
-                                    &[("detail", &detail)],
+                                    "Aucune étape du plan n'a abouti.\n\n{detail}\n\n{verdict}",
+                                    &[
+                                        ("detail", &detail),
+                                        ("verdict", &disposition_sentence(&report)),
+                                    ],
                                 ),
                             );
                         }
@@ -673,10 +733,17 @@ pub(super) fn launch_erase_operations_with_passes(
                     let badge = match state {
                         JobState::BlockedFrozen => "FROZEN".to_string(),
                         JobState::BlockedLocked => "LOCKED".to_string(),
+                        JobState::DestroyRequired => tr("À DÉTRUIRE"),
                         _ => tr("ÉCHEC"),
                     };
                     set_status_badge(&widget.status_badge, &badge, "status-failed");
-                    certificate::finish_disk_failed(&disk_name, &error.message);
+                    let (disposition, codes) = unrunnable_disposition(&reasons);
+                    certificate::finish_disk_unrunnable(
+                        &disk_name,
+                        &error.message,
+                        disposition,
+                        &codes,
+                    );
                     logger::log_erase_failed(&disk_name, &error.message);
                     logger::log_disk_result(&disk_name, false, &error.message);
                     update_job_state(&job_states_clone, &disk_name, state, &error.message);
@@ -685,11 +752,49 @@ pub(super) fn launch_erase_operations_with_passes(
                         &tr("Vérification : non effectuée"),
                         "verify-fail",
                     );
-                    show_error_dialog(
-                        &window_clone,
-                        &trf("Effacement impossible : {disk}", &[("disk", &disk_name)]),
-                        &error.message,
-                    );
+                    let title = trf("Effacement impossible : {disk}", &[("disk", &disk_name)]);
+                    if state == JobState::BlockedLocked {
+                        // Sans mot de passe, SecMet ne contourne jamais un
+                        // verrou ATA : l'opérateur peut sortir le disque du
+                        // circuit, le certificat et le lot le porteront.
+                        let message = format!(
+                            "{}\n\n{}",
+                            error.message,
+                            tr("Ce disque est verrouillé par un mot de passe ATA que SecMet ne \
+                                contourne jamais. Sans ce mot de passe, vous pouvez le sortir du \
+                                circuit de réemploi : le certificat et le lot porteront « destruction \
+                                physique requise ».")
+                        );
+                        let job_states = job_states_clone.clone();
+                        let badge_button = widget.status_badge.clone();
+                        let name = disk_name.clone();
+                        show_condemn_dialog(&window_clone, &title, &message, move || {
+                            certificate::condemn_disk(&name, "LockedWithoutPassword");
+                            set_status_badge(&badge_button, &tr("À DÉTRUIRE"), "status-failed");
+                            logger::log_disk_condemned(&name);
+                            update_job_state(
+                                &job_states,
+                                &name,
+                                JobState::DestroyRequired,
+                                "Marqué à détruire : verrou ATA sans mot de passe",
+                            );
+                        });
+                    } else if state == JobState::DestroyRequired {
+                        show_error_dialog(
+                            &window_clone,
+                            &title,
+                            &format!(
+                                "{}\n\n{}",
+                                error.message,
+                                trf(
+                                    "Destruction physique requise : {reasons}.",
+                                    &[("reasons", &certificate::reasons_label(&codes))]
+                                )
+                            ),
+                        );
+                    } else {
+                        show_error_dialog(&window_clone, &title, &error.message);
+                    }
                 }
             }
         }
@@ -777,8 +882,8 @@ pub(super) fn update_retry_button_state(
     retry_button: &Button,
 ) {
     let states = job_states.borrow();
-    let has_failed = states.values().any(|record| {
-        record.status == JobState::FailedIo || record.status == JobState::FailedOther
-    });
+    let has_failed = states
+        .values()
+        .any(|record| record.status == JobState::FailedOther);
     retry_button.set_sensitive(has_failed);
 }

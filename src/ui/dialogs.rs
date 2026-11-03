@@ -327,6 +327,45 @@ pub(super) fn show_fatal_dialog(window: &ApplicationWindow, title: &str, message
     dialog.show();
 }
 
+/// Erreur avec décision : « Marquer à détruire » sort le disque du circuit
+/// de réemploi (`on_condemn`), « Fermer » laisse l'échec relançable. La
+/// réponse par défaut est « Fermer » : Entrée ne condamne pas par accident.
+pub(super) fn show_condemn_dialog<F>(
+    parent: &ApplicationWindow,
+    title: &str,
+    message: &str,
+    on_condemn: F,
+) where
+    F: FnOnce() + 'static,
+{
+    let dialog = MessageDialog::new(
+        Some(parent),
+        DialogFlags::MODAL,
+        MessageType::Error,
+        ButtonsType::None,
+        message,
+    );
+    apply_color_scheme_class(&dialog);
+    dialog.set_title(Some(title));
+    dialog.add_button(&tr("Marquer à détruire"), ResponseType::Accept);
+    dialog.add_button(&tr("Fermer"), ResponseType::Close);
+    dialog.set_default_response(ResponseType::Close);
+    let on_condemn = RefCell::new(Some(on_condemn));
+    let handled = Cell::new(false);
+    dialog.connect_response(move |dialog, response| {
+        if handled.replace(true) {
+            return;
+        }
+        dialog.close();
+        if response == ResponseType::Accept {
+            if let Some(f) = on_condemn.borrow_mut().take() {
+                f();
+            }
+        }
+    });
+    dialog.present();
+}
+
 /// Question modale Oui/Non générique ; `on_confirm` est appelé si Oui.
 /// La réponse par défaut est « Non » : Entrée n'accepte pas par accident.
 pub(super) fn confirm_action<F>(

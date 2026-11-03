@@ -43,6 +43,8 @@ fn main() {
             finished_at: Some("2026-10-08 11:04:12".into()),
             duration_seconds: Some(252),
             caveats: vec![],
+            disposition: Some(Disposition::Reusable),
+            disposition_reasons: Vec::new(),
         },
         validation: ValidationFacts {
             kind: "canaries".into(),
@@ -79,6 +81,9 @@ fn main() {
     hdd.erasure.duration_seconds = Some(9_812);
     hdd.erasure.caveats =
         vec!["pont USB : aucune commande firmware envoyée, écriture hôte uniquement".into()];
+    hdd.erasure.disposition = Some(Disposition::DestroyRecommended);
+    hdd.erasure.disposition_reasons =
+        vec!["SmartFailing".into(), "ReallocatedNotOverwritten".into()];
     let mut failed = base.clone();
     failed.certificate_id = "SEC-20261008-DEMO-nvme0n1".into();
     failed.disk.name = "nvme0n1".into();
@@ -90,6 +95,9 @@ fn main() {
     failed.erasure.nist_level = NistLevel::NotClassified;
     failed.validation.anomalies = 3;
     failed.validation.residual_signatures = vec!["PTTYPE=gpt".into()];
+    failed.erasure.disposition = Some(Disposition::DestroyRequired);
+    failed.erasure.disposition_reasons =
+        vec!["UnreadableSectors".into(), "FirmwareIneffective".into()];
     let out = export::export_with_logo(
         &identity,
         std::path::Path::new(&dir),

@@ -67,6 +67,49 @@ impl Outcome {
     }
 }
 
+/// Sort du support à l'issue de l'opération (`secmet-core`, module
+/// `disposition`) : ce que l'atelier doit faire du disque.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Disposition {
+    /// Effacé et vérifié : réemploi possible.
+    Reusable,
+    /// Effacé et vérifié ; destruction physique recommandée.
+    DestroyRecommended,
+    /// Non effacé, aucune voie logicielle restante ; destruction physique requise.
+    DestroyRequired,
+    /// Non effacé, cause étrangère au support ; à relancer.
+    Retry,
+}
+
+impl Disposition {
+    /// Code stable, identique à `secmet_core::disposition::Disposition::code`.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Reusable => "reusable",
+            Self::DestroyRecommended => "destroy_recommended",
+            Self::DestroyRequired => "destroy_required",
+            Self::Retry => "retry",
+        }
+    }
+
+    /// Lecture d'un code.
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "reusable" => Some(Self::Reusable),
+            "destroy_recommended" => Some(Self::DestroyRecommended),
+            "destroy_required" => Some(Self::DestroyRequired),
+            "retry" => Some(Self::Retry),
+            _ => None,
+        }
+    }
+
+    /// Le support doit quitter le circuit de réemploi.
+    pub const fn destroy(self) -> bool {
+        matches!(self, Self::DestroyRecommended | Self::DestroyRequired)
+    }
+}
+
 /// Le disque.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
@@ -121,6 +164,13 @@ pub struct ErasureFacts {
     /// Réserves (pont USB, repli, dégradation Purge → Clear…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub caveats: Vec<String>,
+    /// Sort du support ; absent des attestations antérieures à la 0.3.9.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<Disposition>,
+    /// Raisons du sort, codes stables (`SmartFailing`, `UnreadableSectors`…),
+    /// libellés par [`crate::lang::reason_label`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disposition_reasons: Vec<String>,
 }
 
 /// Éléments maximaux d'une liste (réserves, signatures résiduelles) dans
@@ -232,6 +282,8 @@ impl Attestation {
     /// à appliquer avant signature, pour que le QR reste lisible imprimé.
     pub fn bounded(mut self) -> Self {
         self.erasure.caveats = bounded_items(&self.erasure.caveats, "autres réserves");
+        self.erasure.disposition_reasons =
+            bounded_items(&self.erasure.disposition_reasons, "autres raisons");
         self.validation.residual_signatures =
             bounded_items(&self.validation.residual_signatures, "autres signatures");
         self
@@ -311,6 +363,8 @@ pub(crate) mod tests {
                 finished_at: Some("2026-10-08 11:04:12".into()),
                 duration_seconds: Some(252),
                 caveats: vec![],
+                disposition: Some(Disposition::Reusable),
+                disposition_reasons: Vec::new(),
             },
             validation: ValidationFacts {
                 kind: "canaries".into(),

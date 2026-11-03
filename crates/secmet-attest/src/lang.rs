@@ -76,6 +76,23 @@ pub(crate) struct Texts {
     pub result_success: &'static str,
     pub result_failed: &'static str,
     pub result_cancelled: &'static str,
+    // ── Sort du support ──
+    pub disposition: &'static str,
+    pub disposition_reusable: &'static str,
+    pub disposition_destroy_recommended: &'static str,
+    pub disposition_destroy_required: &'static str,
+    pub disposition_retry: &'static str,
+    /// Étiquette dans la colonne résultat du tableau de lot.
+    pub lot_destroy_tag: &'static str,
+    pub lot_destroy_title: &'static str,
+    pub lot_destroy_subtitle: &'static str,
+    /// `{n}`.
+    pub lot_destroy_banner: &'static str,
+    pub lot_destroy_detail: &'static str,
+    /// `{n}` : complément du bandeau de synthèse.
+    pub lot_destroy_count: &'static str,
+    /// Sort, raisons (les autres colonnes reprennent celles du lot).
+    pub lot_destroy_columns: [&'static str; 2],
     pub operator: &'static str,
     pub software: &'static str,
     pub policy: &'static str,
@@ -167,6 +184,7 @@ impl Texts {
             self.duration,
             self.nist_category,
             self.result,
+            self.disposition,
             self.start,
             self.end,
             self.caveats,
@@ -217,6 +235,18 @@ static FR: Texts = Texts {
     result_success: "SUCCÈS",
     result_failed: "ÉCHEC",
     result_cancelled: "INTERROMPU",
+    disposition: "Sort du support",
+    disposition_reusable: "Réemploi possible",
+    disposition_destroy_recommended: "DESTRUCTION PHYSIQUE RECOMMANDÉE",
+    disposition_destroy_required: "DESTRUCTION PHYSIQUE REQUISE",
+    disposition_retry: "À relancer",
+    lot_destroy_tag: "À DÉTRUIRE",
+    lot_destroy_title: "BORDEREAU DE DESTRUCTION PHYSIQUE",
+    lot_destroy_subtitle: "Supports à sortir du circuit de réemploi",
+    lot_destroy_banner: "{n} support(s) à détruire physiquement",
+    lot_destroy_detail: "Ces supports sont à remettre à une filière de destruction physique (ISO/IEC 21964) : l'effacement logiciel n'a pas abouti ou ne suffit pas à leur état.",
+    lot_destroy_count: "{n} support(s) à détruire physiquement.",
+    lot_destroy_columns: ["SORT", "RAISONS"],
     operator: "Opérateur",
     software: "Logiciel",
     policy: "Politique",
@@ -302,6 +332,18 @@ static EN: Texts = Texts {
     result_success: "SUCCESS",
     result_failed: "FAILED",
     result_cancelled: "INTERRUPTED",
+    disposition: "Media disposition",
+    disposition_reusable: "Fit for reuse",
+    disposition_destroy_recommended: "PHYSICAL DESTRUCTION RECOMMENDED",
+    disposition_destroy_required: "PHYSICAL DESTRUCTION REQUIRED",
+    disposition_retry: "Retry",
+    lot_destroy_tag: "DESTROY",
+    lot_destroy_title: "PHYSICAL DESTRUCTION SLIP",
+    lot_destroy_subtitle: "Media to be withdrawn from reuse",
+    lot_destroy_banner: "{n} medium/media to destroy physically",
+    lot_destroy_detail: "Hand these media over to a physical destruction channel (ISO/IEC 21964): software erasure did not complete or is not sufficient given their condition.",
+    lot_destroy_count: "{n} medium/media to destroy physically.",
+    lot_destroy_columns: ["DISPOSITION", "REASONS"],
     operator: "Operator",
     software: "Software",
     policy: "Policy",
@@ -387,6 +429,18 @@ static DE: Texts = Texts {
     result_success: "ERFOLGREICH",
     result_failed: "FEHLGESCHLAGEN",
     result_cancelled: "ABGEBROCHEN",
+    disposition: "Verbleib",
+    disposition_reusable: "Wiederverwendung möglich",
+    disposition_destroy_recommended: "PHYSISCHE VERNICHTUNG EMPFOHLEN",
+    disposition_destroy_required: "PHYSISCHE VERNICHTUNG ERFORDERLICH",
+    disposition_retry: "Erneut versuchen",
+    lot_destroy_tag: "VERNICHTEN",
+    lot_destroy_title: "VERNICHTUNGSSCHEIN",
+    lot_destroy_subtitle: "Aus der Wiederverwendung zu nehmende Datenträger",
+    lot_destroy_banner: "{n} Datenträger physisch zu vernichten",
+    lot_destroy_detail: "Diese Datenträger sind einer physischen Vernichtung (ISO/IEC 21964) zuzuführen: Die Software-Löschung wurde nicht abgeschlossen oder reicht bei ihrem Zustand nicht aus.",
+    lot_destroy_count: "{n} Datenträger physisch zu vernichten.",
+    lot_destroy_columns: ["VERBLEIB", "GRÜNDE"],
     operator: "Bediener",
     software: "Software",
     policy: "Richtlinie",
@@ -442,3 +496,125 @@ static DE: Texts = Texts {
     doc_title_single: "SecMet-Löschzertifikat — {id}",
     doc_title_session: "SecMet-Löschzertifikate — Sitzung {id}",
 };
+
+/// Libellé d'une raison du sort du support (code stable de
+/// `secmet_core::disposition::DispositionReason`) ; le code lui-même si
+/// inconnu.
+pub fn reason_label(code: &str, lang: Lang) -> String {
+    let (fr, en, de) = match code {
+        "SmartFailing" => (
+            "SMART : panne prédite",
+            "SMART: failure predicted",
+            "SMART: Ausfall vorhergesagt",
+        ),
+        "ReallocatedAboveThreshold" => (
+            "secteurs réalloués au-delà du seuil",
+            "reallocated sectors above threshold",
+            "neu zugewiesene Sektoren über dem Schwellenwert",
+        ),
+        "PendingOrUncorrectable" => (
+            "secteurs en attente ou non corrigibles",
+            "pending or uncorrectable sectors",
+            "ausstehende oder nicht korrigierbare Sektoren",
+        ),
+        "ReliabilityDegraded" => (
+            "NVMe : fiabilité dégradée",
+            "NVMe: reliability degraded",
+            "NVMe: Zuverlässigkeit beeinträchtigt",
+        ),
+        "MediaErrors" => (
+            "NVMe : erreurs d'intégrité média",
+            "NVMe: media integrity errors",
+            "NVMe: Medienintegritätsfehler",
+        ),
+        "SpareBelowThreshold" => (
+            "NVMe : réserve sous le seuil",
+            "NVMe: spare below threshold",
+            "NVMe: Reserve unter dem Schwellenwert",
+        ),
+        "EnduranceExhausted" => (
+            "NVMe : endurance épuisée",
+            "NVMe: endurance exhausted",
+            "NVMe: Lebensdauer erschöpft",
+        ),
+        "UnreadableSectors" => (
+            "secteurs illisibles à la relecture : des données peuvent y subsister",
+            "unreadable sectors on read-back: data may remain there",
+            "beim Rücklesen unlesbare Sektoren: Daten können dort verbleiben",
+        ),
+        "WritesNotPersisted" => (
+            "écritures acquittées mais non persistantes",
+            "writes acknowledged but not persisted",
+            "Schreibvorgänge bestätigt, aber nicht gespeichert",
+        ),
+        "FirmwareIneffective" => (
+            "commande firmware acquittée sans effet",
+            "firmware command acknowledged without effect",
+            "Firmware-Befehl ohne Wirkung bestätigt",
+        ),
+        "ReadOnlyMedia" => (
+            "média en lecture seule",
+            "read-only media",
+            "schreibgeschütztes Medium",
+        ),
+        "LockedWithoutPassword" => (
+            "verrou ATA Security sans mot de passe connu",
+            "ATA Security lock without a known password",
+            "ATA-Security-Sperre ohne bekanntes Passwort",
+        ),
+        "ReallocatedNotOverwritten" => (
+            "secteurs réalloués hors de portée de l'écriture hôte",
+            "reallocated sectors out of reach of the host overwrite",
+            "neu zugewiesene Sektoren außerhalb der Host-Überschreibung",
+        ),
+        "Cancelled" => (
+            "arrêt par l'opérateur",
+            "cancelled by the operator",
+            "vom Bediener abgebrochen",
+        ),
+        "IoError" => (
+            "erreur d'entrée/sortie hors média",
+            "input/output error outside the media",
+            "Ein-/Ausgabefehler außerhalb des Mediums",
+        ),
+        "FirmwareFailure" => (
+            "échec rendu par le firmware",
+            "failure reported by the firmware",
+            "von der Firmware gemeldeter Fehler",
+        ),
+        "NoMethod" => (
+            "aucune méthode exécutable",
+            "no executable method",
+            "keine ausführbare Methode",
+        ),
+        "Blocked" => (
+            "blocage levable par l'opérateur",
+            "blocker the operator can lift",
+            "vom Bediener behebbare Blockierung",
+        ),
+        "Protected" => (
+            "cible protégée (système, montée, swap, volume)",
+            "protected target (system, mounted, swap, volume)",
+            "geschütztes Ziel (System, eingehängt, Swap, Volume)",
+        ),
+        other => return other.to_string(),
+    };
+    match lang {
+        Lang::Fr => fr,
+        Lang::En => en,
+        Lang::De => de,
+    }
+    .to_string()
+}
+
+/// Libellé d'un sort du support.
+pub fn disposition_label(disposition: crate::model::Disposition, lang: Lang) -> &'static str {
+    use crate::model::Disposition;
+    let t = lang.texts();
+    match disposition {
+        Disposition::Reusable => t.disposition_reusable,
+        Disposition::DestroyRecommended => t.disposition_destroy_recommended,
+        Disposition::DestroyRequired => t.disposition_destroy_required,
+        Disposition::Retry => t.disposition_retry,
+    }
+}

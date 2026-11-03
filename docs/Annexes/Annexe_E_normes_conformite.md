@@ -119,6 +119,8 @@ Les commandes sont émises par `secmet-helper` sur un nœud ouvert en exclusif, 
 | Destruction physique | **Non** |
 | Réemploi du support après sanitization | **Oui** — objectif principal |
 | Recommandation de destruction | **Oui** — le plan recommande la destruction après effacement quand le SMART prédit une panne, signale des secteurs réalloués au-delà du seuil, des secteurs en attente ou une fiabilité NVMe dégradée |
+| Sort du support (verdict final) | **Oui** — à l'issue de chaque opération, le moteur (`secmet-core::disposition`) conclut : **réemploi possible**, **destruction recommandée** (effacé mais SMART dégradé, firmware acquittant sans effet contourné par écriture hôte, secteurs réalloués hors de portée d'un *Clear*), **destruction requise** (non effacé sans voie logicielle restante : secteurs illisibles à la relecture, écritures non persistantes, firmware sans effet et sans repli abouti, média en lecture seule, échec sur un disque déjà condamné par le SMART) ou **à relancer** (arrêt, erreur de liaison, firmware refusant, blocage levable). Le sort et ses raisons sont signés dans l'attestation (`erasure.disposition`, `erasure.disposition_reasons`), imprimés sur le certificat, et le PDF de lot ajoute un **bordereau de destruction physique** listant les supports à sortir du circuit |
+| Disque non effaçable (verrou ATA sans mot de passe) | **Oui** — l'opérateur peut le **marquer à détruire** : certificat et lot portent « destruction physique requise » avec la raison, sans qu'aucun contournement ne soit tenté |
 
 ---
 
@@ -172,7 +174,7 @@ Les commandes sont émises par `secmet-helper` sur un nœud ouvert en exclusif, 
 | Purge par crypto-erase | Purge | **Oui** | SANITIZE crypto scramble, NVMe Sanitize crypto, Format NVM SES=2 ; l'acquittement est pris en défaut par les canaris si le firmware n'efface pas |
 | Purge par block erase | Purge | **Oui** | SANITIZE block erase, NVMe Sanitize block erase, Format NVM SES=1 |
 | Secure erase interne (ATA) | Purge / Clear | **Oui** | SECURITY ERASE : Purge sur HDD et en enhanced sur SSD, Clear en normal sur SSD |
-| Destruction physique | Destruction | **Non** | Recommandée sur le certificat quand le SMART le justifie |
+| Destruction physique | Destruction | **Non** | Recommandée ou requise sur le certificat (sort du support) ; bordereau de destruction dans le PDF de lot |
 | Overwrite sur SSD | — | **Repli seulement** | Clear, jamais Purge |
 
 ---

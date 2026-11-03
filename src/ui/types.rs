@@ -25,13 +25,15 @@ pub(super) struct DiskWidget {
     pub(super) stop_handler: Rc<RefCell<Option<gtk4::glib::SignalHandlerId>>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum JobState {
     Pending,
     Running,
     Success,
-    FailedIo,
+    /// Échec relançable (sort `retry` du moteur).
     FailedOther,
+    /// Sort `destroy_required` : plus aucune voie logicielle, non relançable.
+    DestroyRequired,
     /// SSD SATA frozen : non relançable tant que Dé-frozen n'a pas été fait.
     BlockedFrozen,
     /// ATA Security locked : non relançable sans mot de passe.

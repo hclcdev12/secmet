@@ -82,6 +82,23 @@ fn describe(signed: &SignedAttestation, trusted: bool) {
         a.erasure.nist_level.label(),
         a.erasure.outcome
     );
+    if let Some(d) = a.erasure.disposition {
+        let reasons: Vec<String> = a
+            .erasure
+            .disposition_reasons
+            .iter()
+            .map(|c| secmet_attest::lang::reason_label(c, secmet_attest::lang::Lang::Fr))
+            .collect();
+        println!(
+            "sort         : {}{}",
+            secmet_attest::lang::disposition_label(d, secmet_attest::lang::Lang::Fr),
+            if reasons.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", reasons.join(" · "))
+            }
+        );
+    }
     println!("opérateur    : {} · {}", a.operator, a.issued_at);
     println!(
         "clé          : {} ({})",

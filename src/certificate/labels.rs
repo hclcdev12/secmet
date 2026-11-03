@@ -1,6 +1,6 @@
 //! Libellés métier affichés sur les certificats.
 use crate::disk::DiskKind;
-use crate::i18n::{trf_in, Lang};
+use crate::i18n::{tr, trf_in, Lang};
 
 /// Libellé « type média » pour le certificat.
 pub fn media_label(kind: DiskKind, is_usb: bool) -> String {
@@ -87,4 +87,53 @@ pub fn pdf_result_label(success: bool) -> &'static str {
 
 pub fn pdf_result_from_success_flag(success: bool) -> String {
     pdf_result_label(success).to_string()
+}
+
+/// Libellé d'un sort du support (`secmet_core::disposition::Disposition`),
+/// dans la langue courante ; le code si inconnu.
+pub fn disposition_label(code: &str) -> String {
+    disposition_label_in(crate::i18n::current(), code)
+}
+
+/// [`disposition_label`] dans une langue donnée.
+pub fn disposition_label_in(lang: Lang, code: &str) -> String {
+    match secmet_attest::model::Disposition::from_code(code) {
+        Some(d) => {
+            secmet_attest::lang::disposition_label(d, super::pdf::pdf_lang(lang)).to_string()
+        }
+        None => code.to_string(),
+    }
+}
+
+/// Libellés des raisons d'un sort, joints par « · ».
+pub fn reasons_label(codes: &[String]) -> String {
+    let lang = super::pdf::pdf_lang(crate::i18n::current());
+    codes
+        .iter()
+        .map(|c| secmet_attest::lang::reason_label(c, lang))
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+/// Libellé d'une consigne du moteur (`Guidance`) ; le code si inconnu.
+pub fn guidance_label(code: &str) -> String {
+    match code {
+        "UnlockWithPassword" => tr("déverrouiller le disque avec son mot de passe ATA"),
+        "PowerCycle" => tr("couper puis remettre l'alimentation du disque"),
+        "WaitForSanitize" => tr("attendre la fin du sanitize en cours"),
+        "ClearSanitizeFailure" => tr("sortir le disque du mode Failure (nouvel inventaire)"),
+        "SuspendToRam" => tr("dé-frozen par mise en veille"),
+        "RemoveForeignPassword" => tr("retirer le mot de passe ATA posé par un tiers"),
+        "AttachNatively" => tr("brancher le disque en SATA natif plutôt que sur un pont USB"),
+        other => other.to_string(),
+    }
+}
+
+/// Libellés de consignes, joints par « ; ».
+pub fn guidances_label(codes: &[String]) -> String {
+    codes
+        .iter()
+        .map(|c| guidance_label(c))
+        .collect::<Vec<_>>()
+        .join(" ; ")
 }

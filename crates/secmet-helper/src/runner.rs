@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use secmet_core::canary::{self, SessionSeed, VerificationTarget};
+use secmet_core::disposition::{classify_run, FinalVerdict, StepOutcome, StepTrace};
 use secmet_core::engine::{ErasePlan, FailureCriterion, PlannedStep};
 use secmet_core::taxonomy::EraseMethod;
 use secmet_device::signatures;
@@ -183,6 +184,25 @@ pub struct JobReport {
     pub steps: Vec<StepReport>,
     /// Durée totale.
     pub seconds: u64,
+    /// Sort du support (`reusable`, `destroy_recommended`, `destroy_required`,
+    /// `retry`) : [`secmet_core::disposition`].
+    #[serde(default)]
+    pub disposition: String,
+    /// Raisons du sort (codes de `DispositionReason`).
+    #[serde(default)]
+    pub disposition_reasons: Vec<String>,
+    /// Consignes avant relance (codes de `Guidance`).
+    #[serde(default)]
+    pub disposition_guidance: Vec<String>,
+}
+
+impl JobReport {
+    /// Porte un verdict final sur le rapport.
+    pub fn set_verdict(&mut self, verdict: &FinalVerdict) {
+        self.disposition = verdict.disposition.code().to_string();
+        self.disposition_reasons = verdict.reason_codes();
+        self.disposition_guidance = verdict.guidance_codes();
+    }
 }
 
 /// Poignée d'un job : annulation, état courant, rapport final.
@@ -704,7 +724,11 @@ fn run_host_step(
     )
 }
 
-fn run_step(target: &mut dyn Target, step: &PlannedStep, ctx: &mut StepContext<'_>) -> StepReport {
+fn run_step(
+    target: &mut dyn Target,
+    step: &PlannedStep,
+    ctx: &mut StepContext<'_>,
+) -> (StepReport, StepTrace) {
     let started = Instant::now();
     let label = step.method.label();
     ctx.sink.emit(Event::StepStarted {
@@ -753,23 +777,27 @@ fn run_step(target: &mut dyn Target, step: &PlannedStep, ctx: &mut StepContext<'
     });
 
     report.validation = ctx.last_validation.take();
-    match result {
+    let trace_outcome = match result {
         Ok(()) => {
             report.outcome = Outcome::Success;
             report.detail = "validé".to_string();
+            StepOutcome::Success
         }
         Err(StepFailure::Cancelled) => {
             report.outcome = Outcome::Cancelled;
             report.detail = "arrêté par l'opérateur".to_string();
+            StepOutcome::Cancelled
         }
         Err(StepFailure::Criterion { criterion, detail }) => {
             report.criterion = Some(format!("{criterion:?}"));
             report.detail = detail;
+            StepOutcome::Failed(Some(criterion))
         }
         Err(StepFailure::Io(detail)) => {
             report.detail = detail;
+            StepOutcome::Failed(None)
         }
-    }
+    };
     report.seconds = started.elapsed().as_secs();
     ctx.sink.emit(Event::StepFinished {
         step: ctx.index,
@@ -777,7 +805,13 @@ fn run_step(target: &mut dyn Target, step: &PlannedStep, ctx: &mut StepContext<'
         criterion: report.criterion.clone(),
         detail: report.detail.clone(),
     });
-    report
+    (
+        report,
+        StepTrace {
+            method: step.method,
+            outcome: trace_outcome,
+        },
+    )
 }
 
 /// Exécute `plan` sur `target` : étape primaire puis replis, jusqu'au
@@ -798,7 +832,11 @@ pub fn run_plan(
         seed: seed.to_hex(),
         steps: Vec::new(),
         seconds: 0,
+        disposition: String::new(),
+        disposition_reasons: Vec::new(),
+        disposition_guidance: Vec::new(),
     };
+    let mut traces = Vec::new();
     for (index, step) in plan.steps().enumerate() {
         if handle.is_cancelled() {
             report.outcome = Outcome::Cancelled;
@@ -811,9 +849,10 @@ pub fn run_plan(
             index,
             last_validation: None,
         };
-        let step_report = run_step(target, step, &mut ctx);
+        let (step_report, trace) = run_step(target, step, &mut ctx);
         let outcome = step_report.outcome;
         report.steps.push(step_report);
+        traces.push(trace);
         match outcome {
             Outcome::Success => {
                 report.outcome = Outcome::Success;
@@ -836,6 +875,13 @@ pub fn run_plan(
         }
     }
     report.seconds = started.elapsed().as_secs();
+    // Verdict final : arrêt avant la première étape compris.
+    let verdict = if traces.is_empty() && report.outcome == Outcome::Cancelled {
+        FinalVerdict::cancelled()
+    } else {
+        classify_run(plan, &traces)
+    };
+    report.set_verdict(&verdict);
     report
 }
 

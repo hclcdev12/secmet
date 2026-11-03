@@ -11,8 +11,8 @@
 //! et « Médium de stockage », « Détails de l'opération », validation, puis
 //! l'attestation signée avec son QR code, et le pied de page.
 
-use crate::lang::{fill, Lang, Texts};
-use crate::model::{Attestation, NistLevel, Outcome};
+use crate::lang::{disposition_label, fill, reason_label, Lang, Texts};
+use crate::model::{Attestation, Disposition, NistLevel, Outcome};
 use crate::qr::{self, QrMatrix};
 use crate::sign::SignedAttestation;
 use crate::Result;
@@ -829,11 +829,16 @@ pub fn certificate_page(
 
     // Bandeau d'état.
     let level = a.erasure.nist_level;
-    let subtitle = match a.erasure.outcome {
+    let mut subtitle = match a.erasure.outcome {
         Outcome::Success => fill(t.banner_success, &[("level", level_label(level, t))]),
         Outcome::Failed => t.banner_failed.to_string(),
         Outcome::Cancelled => t.banner_cancelled.to_string(),
     };
+    if let Some(d) = a.erasure.disposition.filter(|d| d.destroy()) {
+        subtitle.push(' ');
+        subtitle.push_str(disposition_label(d, lang));
+        subtitle.push('.');
+    }
     y = banner(
         &mut canvas,
         y,
@@ -932,9 +937,15 @@ pub fn certificate_page(
         ),
     ];
     let col_w = (CONTENT_W - 2.0 * CARD_PAD - GAP) / 2.0;
-    let caveats: Vec<Row<'_>> = if a.erasure.caveats.is_empty() {
-        Vec::new()
-    } else {
+    // Pleine largeur sous les colonnes : sort du support (raisons longues)
+    // puis réserves.
+    let mut caveats: Vec<Row<'_>> = match a.erasure.disposition {
+        Some(d) => {
+            vec![Row::new(t.disposition, disposition_text(a, d, lang)).colored(disposition_color(d))]
+        }
+        None => Vec::new(),
+    };
+    if !a.erasure.caveats.is_empty() {
         let shown: Vec<String> = a
             .erasure
             .caveats
@@ -950,8 +961,8 @@ pub fn certificate_page(
                 &[("n", &(a.erasure.caveats.len() - MAX_LIST_ITEMS).to_string())],
             ));
         }
-        vec![Row::new(t.caveats, text)]
-    };
+        caveats.push(Row::new(t.caveats, text));
+    }
     let cols_h = rows_height(&left, col_w - LABEL_W).max(rows_height(&right, col_w - LABEL_W));
     let caveats_h = rows_height(&caveats, CONTENT_W - 2.0 * CARD_PAD - LABEL_W);
     let h = CARD_HEAD_H + CARD_PAD + method_h + 8.0 + cols_h + caveats_h + CARD_PAD;
@@ -1043,7 +1054,13 @@ pub fn certificate_page(
     rows.push(Row::mono(t.public_key, cert.signed.public_key.clone()));
     rows.push(Row::mono(t.signature, cert.signed.signature.clone()));
     rows.push(Row::new(t.verification, t.verification_value));
-    let text_h = rows_height(&rows, text_w - LABEL_W);
+    let mut text_h = rows_height(&rows, text_w - LABEL_W);
+    // Page chargée (sort du support et réserves longs) : la phrase fixe de
+    // vérification cède la place plutôt que de chevaucher le pied de page.
+    if CARD_HEAD_H + 2.0 * CARD_PAD + text_h > available {
+        rows.pop();
+        text_h = rows_height(&rows, text_w - LABEL_W);
+    }
     let h = (CARD_HEAD_H + CARD_PAD + text_h + CARD_PAD)
         .max(CARD_HEAD_H + qr_side + 2.0 * CARD_PAD)
         .min(available);
@@ -1072,6 +1089,180 @@ const LOT_WIDTHS: [f64; 9] = [16.0, 40.0, 44.0, 96.0, 82.0, 50.0, 103.0, 38.0, 4
 fn lot_titles(t: &Texts) -> [&'static str; 9] {
     let c = t.lot_columns;
     ["#", c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]
+}
+
+/// Couleur d'un sort du support.
+const fn disposition_color(d: Disposition) -> Rgb {
+    match d {
+        Disposition::Reusable => GREEN,
+        Disposition::DestroyRequired => RED,
+        Disposition::DestroyRecommended | Disposition::Retry => AMBER,
+    }
+}
+
+/// Libellé du sort suivi de ses raisons.
+fn disposition_text(a: &Attestation, d: Disposition, lang: Lang) -> String {
+    let mut text = disposition_label(d, lang).to_string();
+    if !a.erasure.disposition_reasons.is_empty() {
+        let reasons: Vec<String> = a
+            .erasure
+            .disposition_reasons
+            .iter()
+            .map(|c| reason_label(c, lang))
+            .collect();
+        text.push_str(" — ");
+        text.push_str(&reasons.join(" · "));
+    }
+    text
+}
+
+/// Supports du lot à détruire physiquement.
+fn destroy_count(certs: &[RenderedCertificate]) -> usize {
+    certs
+        .iter()
+        .filter(|c| {
+            c.signed
+                .payload
+                .erasure
+                .disposition
+                .is_some_and(Disposition::destroy)
+        })
+        .count()
+}
+
+/// Largeurs des colonnes du bordereau : n°, disque, modèle, série, sort, raisons.
+const DESTROY_WIDTHS: [f64; 6] = [16.0, 40.0, 110.0, 96.0, 88.0, 161.0];
+
+fn destroy_titles(t: &Texts) -> [&'static str; 6] {
+    let c = t.lot_columns;
+    let d = t.lot_destroy_columns;
+    ["#", c[0], c[2], c[3], d[0], d[1]]
+}
+
+/// Lignes du bordereau, numérotées comme dans le tableau du lot.
+fn destruction_rows(certs: &[RenderedCertificate], lang: Lang) -> Vec<LotRow> {
+    certs
+        .iter()
+        .enumerate()
+        .filter_map(|(i, cert)| {
+            let a = &cert.signed.payload;
+            let d = a.erasure.disposition.filter(|d| d.destroy())?;
+            let reasons: Vec<String> = a
+                .erasure
+                .disposition_reasons
+                .iter()
+                .map(|c| reason_label(c, lang))
+                .collect();
+            let values = [
+                (i + 1).to_string(),
+                or_dash(&a.disk.name),
+                or_dash(&a.disk.model),
+                or_dash(&a.disk.serial),
+                disposition_label(d, lang).to_string(),
+                if reasons.is_empty() {
+                    or_dash("")
+                } else {
+                    reasons.join(" · ")
+                },
+            ];
+            let cells: Vec<Vec<String>> = values
+                .iter()
+                .zip(DESTROY_WIDTHS.iter())
+                .enumerate()
+                .map(|(col, (value, w))| {
+                    let font = if col == 3 { Font::Mono } else { Font::Regular };
+                    wrap(value, font, LOT_CELL_SIZE, w - 2.0 * LOT_CELL_PAD)
+                })
+                .collect();
+            let lines = cells.iter().map(Vec::len).max().unwrap_or(1).max(1) as f64;
+            Some(LotRow {
+                cells,
+                result_color: disposition_color(d),
+                height: lines * LOT_LINE + 2.0 * LOT_CELL_PAD,
+            })
+        })
+        .collect()
+}
+
+/// Hauteur disponible pour les lignes du bordereau sur une page.
+fn destruction_budget() -> f64 {
+    let header_and_banner = 44.0 + 12.0 + GAP + 52.0 + GAP;
+    PAGE_H - 2.0 * MARGIN - header_and_banner - FOOTER_H - LOT_HEAD_H
+}
+
+/// Découpe des lignes en pages : `(début, fin)` par page ; aucune page sans ligne.
+fn chunk_rows(rows: &[LotRow], budget: f64) -> Vec<(usize, usize)> {
+    let mut pages = Vec::new();
+    let mut start = 0;
+    let mut used = 0.0;
+    for (i, row) in rows.iter().enumerate() {
+        if used + row.height > budget && i > start {
+            pages.push((start, i));
+            start = i;
+            used = 0.0;
+        }
+        used += row.height;
+    }
+    if !rows.is_empty() {
+        pages.push((start, rows.len()));
+    }
+    pages
+}
+
+/// Pages du bordereau de destruction physique.
+#[allow(clippy::too_many_arguments)]
+fn destruction_pages(
+    certs: &[RenderedCertificate],
+    rows: &[LotRow],
+    chunks: &[(usize, usize)],
+    logo: (u32, u32),
+    lot_id: &str,
+    first_page: usize,
+    total_pages: usize,
+    lang: Lang,
+) -> Vec<Canvas> {
+    let t = lang.texts();
+    let first = &certs[0].signed.payload;
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(k, (start, end))| {
+            let mut canvas = Canvas::default();
+            let mut y = header(
+                &mut canvas,
+                logo,
+                t.lot_destroy_title,
+                t.lot_destroy_subtitle,
+            );
+            y = banner(
+                &mut canvas,
+                y,
+                (RED, RED_BG),
+                &fill(t.lot_destroy_banner, &[("n", &rows.len().to_string())]),
+                t.lot_destroy_detail,
+                t.lot_id,
+                lot_id,
+            );
+            draw_table(
+                &mut canvas,
+                y,
+                &destroy_titles(t),
+                &DESTROY_WIDTHS,
+                &rows[*start..*end],
+                4,
+                3,
+            );
+            footer(
+                &mut canvas,
+                t,
+                lot_id,
+                &year_of(&first.issued_at),
+                first_page + k + 1,
+                total_pages,
+            );
+            canvas
+        })
+        .collect()
 }
 
 /// Valeur de la ligne « clé de signature ».
@@ -1111,11 +1302,15 @@ fn several_machines(certs: &[RenderedCertificate]) -> bool {
 
 fn lot_row(n: usize, cert: &RenderedCertificate, t: &Texts, show_machine: bool) -> LotRow {
     let a = &cert.signed.payload;
-    let (result, color) = match a.erasure.outcome {
+    let (result, mut color) = match a.erasure.outcome {
         Outcome::Success => (t.lot_success, GREEN),
         Outcome::Failed => (t.lot_failed, RED),
         Outcome::Cancelled => (t.lot_cancelled, AMBER),
     };
+    let destroy = a.erasure.disposition.filter(|d| d.destroy());
+    if let Some(d) = destroy {
+        color = disposition_color(d);
+    }
     let method = if a.erasure.outcome == Outcome::Success {
         format!(
             "{} — NIST {}",
@@ -1153,6 +1348,9 @@ fn lot_row(n: usize, cert: &RenderedCertificate, t: &Texts, show_machine: bool) 
             LOT_CELL_SIZE,
             LOT_WIDTHS[3] - 2.0 * LOT_CELL_PAD,
         ));
+    }
+    if destroy.is_some() {
+        cells[8].push(t.lot_destroy_tag.to_string());
     }
     let lines = cells.iter().map(Vec::len).max().unwrap_or(1).max(1) as f64;
     LotRow {
@@ -1197,13 +1395,27 @@ pub fn lot_pages(certs: &[RenderedCertificate], lang: Lang) -> Vec<(usize, usize
 }
 
 fn draw_lot_table(canvas: &mut Canvas, t: &Texts, top: f64, rows: &[LotRow]) -> f64 {
+    draw_table(canvas, top, &lot_titles(t), &LOT_WIDTHS, rows, 8, 4)
+}
+
+/// Tableau à colonnes fixes : `result_col` en gras de la couleur de la
+/// ligne, `mono_col` en chasse fixe (numéros de série).
+fn draw_table(
+    canvas: &mut Canvas,
+    top: f64,
+    titles: &[&str],
+    widths: &[f64],
+    rows: &[LotRow],
+    result_col: usize,
+    mono_col: usize,
+) -> f64 {
     let total_h = LOT_HEAD_H + rows.iter().map(|r| r.height).sum::<f64>();
     canvas.fill_rect(MARGIN, top - total_h, CONTENT_W, total_h, WHITE);
     canvas.stroke_rect(MARGIN, top - total_h, CONTENT_W, total_h, 0.8, RULE);
     canvas.fill_rect(MARGIN, top - LOT_HEAD_H, CONTENT_W, LOT_HEAD_H, CARD_HEAD);
     canvas.line(MARGIN, top - LOT_HEAD_H, RIGHT, top - LOT_HEAD_H, 0.8, RULE);
     let mut x = MARGIN;
-    for (title, w) in lot_titles(t).into_iter().zip(LOT_WIDTHS) {
+    for (title, w) in titles.iter().zip(widths) {
         canvas.text(x + LOT_CELL_PAD, top - 13.0, Font::Bold, 7.0, MUTED, title);
         x += w;
         if x < RIGHT - 1.0 {
@@ -1213,10 +1425,10 @@ fn draw_lot_table(canvas: &mut Canvas, t: &Texts, top: f64, rows: &[LotRow]) -> 
     let mut y = top - LOT_HEAD_H;
     for row in rows {
         let mut x = MARGIN;
-        for (col, (cell, w)) in row.cells.iter().zip(LOT_WIDTHS.iter()).enumerate() {
-            let (font, color) = if col == 8 {
+        for (col, (cell, w)) in row.cells.iter().zip(widths.iter()).enumerate() {
+            let (font, color) = if col == result_col {
                 (Font::Bold, row.result_color)
-            } else if col == 4 {
+            } else if col == mono_col {
                 (Font::Mono, INK)
             } else {
                 (Font::Regular, INK)
@@ -1270,6 +1482,7 @@ pub fn summary_pages(
         .filter(|c| c.signed.payload.erasure.outcome == Outcome::Success)
         .count();
     let failed = certs.len() - success;
+    let destroy = destroy_count(certs);
     let first = &certs[0].signed.payload;
     let rows: Vec<LotRow> = certs
         .iter()
@@ -1293,12 +1506,17 @@ pub fn summary_pages(
         } else {
             ((AMBER, AMBER_BG), t.lot_mixed, t.lot_mixed_detail)
         };
+        let mut subtitle = subtitle.to_string();
+        if destroy > 0 {
+            subtitle.push(' ');
+            subtitle.push_str(&fill(t.lot_destroy_count, &[("n", &destroy.to_string())]));
+        }
         y = banner(
             &mut canvas,
             y,
             tone,
             &fill(title, &counts),
-            subtitle,
+            &subtitle,
             t.generated_on,
             &display_date(&first.issued_at, t),
         );
@@ -1430,22 +1648,35 @@ fn render_impl(
     } else {
         0
     };
-    let total = summary_count + certs.len();
+    // Bordereau de destruction : avec la synthèse seulement, pour les
+    // supports à sortir du circuit.
+    let slip_rows = if summary_count > 0 {
+        destruction_rows(certs, lang)
+    } else {
+        Vec::new()
+    };
+    let slip_chunks = chunk_rows(&slip_rows, destruction_budget());
+    let total = summary_count + slip_chunks.len() + certs.len();
     let mut pages = Vec::with_capacity(total);
     if summary_count > 0 {
         let lot = lot_id
             .map(str::to_string)
             .unwrap_or_else(|| format!("{}-lot", certs[0].signed.payload.session_id));
         pages.extend(summary_pages(certs, logo, &lot, total, lang));
-    }
-    for (i, cert) in certs.iter().enumerate() {
-        pages.push(certificate_page(
-            cert,
+        pages.extend(destruction_pages(
+            certs,
+            &slip_rows,
+            &slip_chunks,
             logo,
-            summary_count + i + 1,
+            &lot,
+            summary_count,
             total,
             lang,
-        )?);
+        ));
+    }
+    let before = summary_count + slip_chunks.len();
+    for (i, cert) in certs.iter().enumerate() {
+        pages.push(certificate_page(cert, logo, before + i + 1, total, lang)?);
     }
     let first = &certs[0].signed.payload;
     let info = DocumentInfo {
@@ -1713,6 +1944,49 @@ mod tests {
         // Lot clôturé : la synthèse porte l'identifiant du lot.
         assert!(String::from_utf8_lossy(&lot).contains("L-20261030-TEST"));
         assert!(lot.len() > grouped.len());
+    }
+
+    #[test]
+    fn condemned_disks_get_a_destruction_slip_after_the_summary() {
+        use crate::model::Disposition;
+        let id = SigningIdentity::from_seed(&[7u8; 32]);
+        let certs: Vec<RenderedCertificate> = (0..3)
+            .map(|i| {
+                let mut a = sample();
+                a.certificate_id = format!("SEC-SLIP-{i}");
+                a.disk.serial = format!("SLIP{i:04}");
+                a.erasure.disposition = Some(match i {
+                    0 => Disposition::Reusable,
+                    1 => Disposition::DestroyRecommended,
+                    _ => Disposition::DestroyRequired,
+                });
+                if i == 2 {
+                    a.erasure.outcome = Outcome::Failed;
+                    a.erasure.nist_level = NistLevel::NotClassified;
+                    a.erasure.disposition_reasons = vec!["UnreadableSectors".into()];
+                } else if i == 1 {
+                    a.erasure.disposition_reasons = vec!["SmartFailing".into()];
+                }
+                RenderedCertificate::new(id.sign(&a).unwrap()).unwrap()
+            })
+            .collect();
+        let pdf = render_lot(&certs, "L-20261103-SLIP", LOGO_JPEG, Lang::Fr).unwrap();
+        check_structure(&pdf);
+        // Synthèse + bordereau + trois certificats.
+        assert_eq!(page_count(&pdf), 1 + 1 + 3);
+        assert!(contains(&pdf, b"BORDEREAU DE DESTRUCTION PHYSIQUE"));
+        assert!(contains(&pdf, b"2 support\\(s\\)"));
+        assert!(contains(&pdf, b"SLIP0002"));
+        // Sans support à détruire : pas de bordereau.
+        let fine = rendered(2);
+        let pdf = render_lot(&fine, "L-20261103-FINE", LOGO_JPEG, Lang::Fr).unwrap();
+        assert_eq!(page_count(&pdf), 1 + 2);
+        assert!(!contains(&pdf, b"BORDEREAU"));
+        for lang in Lang::ALL {
+            let pdf = render_lot(&certs, "L-20261103-SLIP", LOGO_JPEG, lang).unwrap();
+            check_structure(&pdf);
+            assert_eq!(page_count(&pdf), 5, "{lang:?}");
+        }
     }
 
     #[test]

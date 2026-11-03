@@ -33,7 +33,7 @@ Chaque release est signée par la clé de version SecMet (identifiant `7854d9fe5
 - Arrêt d'une opération en cours (bouton **Stop**)
 - Élévation des privilèges via **PolicyKit** (`pkexec`) et helper dédié
 - Consultation **SMART** (table ATA avec seuils, page Health NVMe) et vérification post-effacement par relecture d'échantillons (canaris ChaCha20) et recherche de signatures résiduelles
-- **Certificat PDF** d'effacement rendu nativement en Rust (`secmet-attest`, sans Chromium) : une page par disque, catégorie NIST SP 800-88 (Purge / Clear), attestation JSON signée **Ed25519** et QR code Base45 vérifiable hors ligne avec `secmet-verify`
+- **Certificat PDF** d'effacement rendu nativement en Rust (`secmet-attest`, sans Chromium) : une page par disque, catégorie NIST SP 800-88 (Purge / Clear), attestation JSON signée **Ed25519** et QR code Base45 vérifiable hors ligne avec `secmet-verify` ; chaque certificat porte le **sort du support** décidé par le moteur (réemploi, destruction recommandée ou requise, à relancer) et le PDF de lot ajoute un bordereau de destruction physique
 - Journalisation des opérations (fichiers JSON dans le répertoire utilisateur)
 - Paquets **`.deb`** (Ubuntu 24.04 et 22.04) et **`.rpm`** (Fedora) pour installation système (TestDisk embarqué si absent du système)
 - **AppImage** autonome (GTK4 et TestDisk embarqués, assemblée dans un conteneur Ubuntu 24.04) : un seul fichier, composant système installé au premier lancement

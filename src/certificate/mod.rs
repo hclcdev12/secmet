@@ -8,7 +8,10 @@
 mod labels;
 mod pdf;
 
-pub use labels::{media_label, method_label, pdf_result_from_success_flag, pdf_result_label};
+pub use labels::{
+    disposition_label, disposition_label_in, guidances_label, media_label, method_label,
+    pdf_result_from_success_flag, pdf_result_label, reasons_label,
+};
 pub use pdf::{open_certificates_folder, open_folder, open_pdf, render_pdf_bundle};
 pub(crate) use pdf::{pdf_lang, render_pdf_bundle_in, signing_identity};
 
@@ -103,6 +106,13 @@ pub struct JobOutcomeRecord {
     /// La dernière étape portait sur tout le contrôleur NVMe.
     #[serde(default)]
     pub whole_controller: bool,
+    /// Sort du support (`reusable`, `destroy_recommended`, `destroy_required`,
+    /// `retry`) ; vide pour un enregistrement antérieur.
+    #[serde(default)]
+    pub disposition: String,
+    /// Raisons du sort (codes stables du moteur).
+    #[serde(default)]
+    pub disposition_reasons: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -410,6 +420,8 @@ pub fn job_outcome_record(report: &JobReport) -> JobOutcomeRecord {
         seconds: report.seconds,
         detail: last.map(|s| s.detail.clone()).unwrap_or_default(),
         whole_controller: last.is_some_and(|s| s.whole_controller),
+        disposition: report.disposition.clone(),
+        disposition_reasons: report.disposition_reasons.clone(),
     }
 }
 
@@ -429,8 +441,20 @@ pub fn finish_disk_job(disk_name: &str, report: &JobReport) {
     }
 }
 
-/// Le job n'a pas pu être lancé (refus, blocage, liaison perdue).
+/// Le job n'a pas pu être lancé (refus, blocage, liaison perdue) : sort
+/// `retry`, sans raison.
 pub fn finish_disk_failed(disk_name: &str, reason: &str) {
+    finish_disk_unrunnable(disk_name, reason, "retry", &[]);
+}
+
+/// Le job n'a pas pu être lancé ; `disposition` et `reasons` : sort du
+/// support décidé d'après le verdict du moteur (`secmet_core::disposition`).
+pub fn finish_disk_unrunnable(
+    disk_name: &str,
+    reason: &str,
+    disposition: &str,
+    reasons: &[String],
+) {
     let now = now_stamp();
     if let Ok(mut guard) = session_mutex().lock() {
         if let Some(session) = guard.as_mut() {
@@ -440,8 +464,33 @@ pub fn finish_disk_failed(disk_name: &str, reason: &str) {
                 rec.job = Some(JobOutcomeRecord {
                     outcome: "failed".into(),
                     detail: reason.to_string(),
+                    disposition: disposition.to_string(),
+                    disposition_reasons: reasons.to_vec(),
                     ..JobOutcomeRecord::default()
                 });
+            }
+        }
+    }
+}
+
+/// Décision de l'opérateur : le disque sort du circuit de réemploi
+/// (`destroy_required`, raison `reason_code`), quel que soit l'état enregistré.
+pub fn condemn_disk(disk_name: &str, reason_code: &str) {
+    if let Ok(mut guard) = session_mutex().lock() {
+        if let Some(session) = guard.as_mut() {
+            if let Some(rec) = session.disks.iter_mut().find(|d| d.disk_name == disk_name) {
+                if rec.finished_at.is_none() {
+                    rec.finished_at = Some(now_stamp());
+                }
+                rec.result_label = pdf_result_from_success_flag(false);
+                let job = rec.job.get_or_insert_with(|| JobOutcomeRecord {
+                    outcome: "failed".into(),
+                    ..JobOutcomeRecord::default()
+                });
+                job.disposition = "destroy_required".to_string();
+                if !job.disposition_reasons.iter().any(|r| r == reason_code) {
+                    job.disposition_reasons.push(reason_code.to_string());
+                }
             }
         }
     }
@@ -550,6 +599,17 @@ pub(crate) mod tests {
             root_traced: None,
             nvme_multiple_namespaces: false,
             job: Some(JobOutcomeRecord {
+                disposition: if success {
+                    "reusable"
+                } else {
+                    "destroy_required"
+                }
+                .into(),
+                disposition_reasons: if success {
+                    Vec::new()
+                } else {
+                    vec!["UnreadableSectors".into()]
+                },
                 outcome: if success { "success" } else { "failed" }.into(),
                 method_code: "HOST_OVERWRITE_1_ZERO".into(),
                 method_label: method_label("HOST_OVERWRITE_1_ZERO"),
@@ -586,6 +646,9 @@ pub(crate) mod tests {
 
     fn job_report(outcome: Outcome, level: Option<&str>) -> JobReport {
         JobReport {
+            disposition: String::new(),
+            disposition_reasons: Vec::new(),
+            disposition_guidance: Vec::new(),
             outcome,
             achieved_level: level.map(str::to_string),
             method: Some("ATA_SANITIZE_BLOCK_ERASE".into()),
@@ -758,6 +821,19 @@ pub(crate) mod tests {
         let a =
             pdf::attestation_from_record(&session, &failed, "Op", "2026-01-01 11:05:00", Lang::Fr);
         assert_eq!(a.erasure.outcome, secmet_attest::model::Outcome::Failed);
+        // Le sort du support et ses raisons sont signés avec l'attestation.
+        assert_eq!(
+            a.erasure.disposition,
+            Some(secmet_attest::model::Disposition::DestroyRequired)
+        );
+        assert_eq!(a.erasure.disposition_reasons, ["UnreadableSectors"]);
+        let ok = record("sdb", true);
+        let a_ok =
+            pdf::attestation_from_record(&session, &ok, "Op", "2026-01-01 11:05:00", Lang::Fr);
+        assert_eq!(
+            a_ok.erasure.disposition,
+            Some(secmet_attest::model::Disposition::Reusable)
+        );
         assert_eq!(
             a.erasure.nist_level,
             secmet_attest::model::NistLevel::NotClassified

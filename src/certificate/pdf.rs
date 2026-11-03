@@ -3,8 +3,8 @@
 
 use chrono::NaiveDateTime;
 use secmet_attest::model::{
-    Attestation, BenchFacts, DiskFacts, ErasureFacts, NistLevel, Outcome, ValidationFacts,
-    SCHEMA_VERSION,
+    Attestation, BenchFacts, DiskFacts, Disposition, ErasureFacts, NistLevel, Outcome,
+    ValidationFacts, SCHEMA_VERSION,
 };
 use secmet_attest::sign::SigningIdentity;
 use secmet_attest::{export, keystore};
@@ -396,6 +396,10 @@ pub(crate) fn attestation_from_record(
                 duration_seconds(rec.started_at.as_deref(), rec.finished_at.as_deref())
             }),
             caveats,
+            disposition: job.and_then(|j| Disposition::from_code(&j.disposition)),
+            disposition_reasons: job
+                .map(|j| j.disposition_reasons.clone())
+                .unwrap_or_default(),
         },
         validation: ValidationFacts {
             kind: validation_kind,

@@ -8,6 +8,7 @@
 //! | [`taxonomy`]   | Niveaux NIST, méthodes d'effacement, capacités d'une cible           |
 //! | [`engine`]     | Plan d'action : méthode retenue, replis, dégradation, critères d'échec |
 //! | [`canary`]     | Échantillonnage, motifs ChaCha20 par LBA, validation post-effacement  |
+//! | [`disposition`]| Verdict final : réemploi, destruction recommandée ou requise, relance |
 //! | `from_device`  | (feature `device`) conversion depuis `secmet-device`                 |
 //!
 //! Règles invariantes :
@@ -21,6 +22,7 @@
 #![forbid(unsafe_code)]
 
 pub mod canary;
+pub mod disposition;
 pub mod engine;
 pub mod taxonomy;
 

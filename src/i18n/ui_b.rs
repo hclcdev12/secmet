@@ -20,7 +20,7 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("ARRÊTÉ", "STOPPED", "GESTOPPT"),
     ("ARRÊT ANNULÉ", "STOP CANCELLED", "STOPP ABGEBROCHEN"),
     ("ÉCHEC", "FAILED", "FEHLER"),
-    ("ÉCHEC E/S", "I/O FAILURE", "E/A-FEHLER"),
+    ("À DÉTRUIRE", "DESTROY", "VERNICHTEN"),
     // ── erase.rs ──
     (
         "{base} — {passes} passe pseudo-aléatoire + zéros",
@@ -67,13 +67,73 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Schritt {n}: {method} (NIST {level})",
     ),
     ("OK — {method} (NIST {level})", "OK — {method} (NIST {level})", "OK — {method} (NIST {level})"),
+    (
+        "OK — {method} (NIST {level}) · destruction physique recommandée",
+        "OK — {method} (NIST {level}) · physical destruction recommended",
+        "OK — {method} (NIST {level}) · physische Vernichtung empfohlen",
+    ),
+    (
+        "Destruction physique requise : {reasons}.",
+        "Physical destruction required: {reasons}.",
+        "Physische Vernichtung erforderlich: {reasons}.",
+    ),
+    ("À relancer : {reasons}.", "Retry: {reasons}.", "Erneut versuchen: {reasons}."),
+    (" Consigne : {guidance}.", " Guidance: {guidance}.", " Hinweis: {guidance}."),
+    ("Marquer à détruire", "Mark for destruction", "Zur Vernichtung markieren"),
+    (
+        "Ce disque est verrouillé par un mot de passe ATA que SecMet ne contourne jamais. Sans ce \
+         mot de passe, vous pouvez le sortir du circuit de réemploi : le certificat et le lot \
+         porteront « destruction physique requise ».",
+        "This disk is locked by an ATA password that SecMet never bypasses. Without that password, \
+         you can withdraw it from reuse: the certificate and the batch will state \
+         \"physical destruction required\".",
+        "Dieser Datenträger ist durch ein ATA-Passwort gesperrt, das SecMet niemals umgeht. Ohne \
+         dieses Passwort können Sie ihn aus der Wiederverwendung nehmen: Zertifikat und Charge \
+         tragen dann „physische Vernichtung erforderlich“.",
+    ),
+    (
+        " — destruction physique recommandée après effacement (état du disque)",
+        " — physical destruction recommended after erasure (disk condition)",
+        " — physische Vernichtung nach der Löschung empfohlen (Zustand des Datenträgers)",
+    ),
+    (
+        "déverrouiller le disque avec son mot de passe ATA",
+        "unlock the disk with its ATA password",
+        "den Datenträger mit seinem ATA-Passwort entsperren",
+    ),
+    (
+        "couper puis remettre l'alimentation du disque",
+        "power-cycle the disk",
+        "die Stromversorgung des Datenträgers aus- und wieder einschalten",
+    ),
+    (
+        "attendre la fin du sanitize en cours",
+        "wait for the running sanitize to finish",
+        "das Ende des laufenden Sanitize abwarten",
+    ),
+    (
+        "sortir le disque du mode Failure (nouvel inventaire)",
+        "clear the disk's Failure mode (new inventory)",
+        "den Failure-Modus des Datenträgers beenden (neue Inventur)",
+    ),
+    ("dé-frozen par mise en veille", "un-freeze by suspend-to-RAM", "per Standby entsperren (frozen)"),
+    (
+        "retirer le mot de passe ATA posé par un tiers",
+        "remove the ATA password set by a third party",
+        "das von Dritten gesetzte ATA-Passwort entfernen",
+    ),
+    (
+        "brancher le disque en SATA natif plutôt que sur un pont USB",
+        "attach the disk natively over SATA rather than a USB bridge",
+        "den Datenträger nativ per SATA statt über eine USB-Bridge anschließen",
+    ),
     ("Interrompu", "Interrupted", "Unterbrochen"),
     ("Échec", "Failed", "Fehlgeschlagen"),
     ("Échec effacement {disk}", "Erasure failed: {disk}", "Löschung fehlgeschlagen: {disk}"),
     (
-        "Aucune étape du plan n'a abouti.\n\n{detail}",
-        "No step of the plan succeeded.\n\n{detail}",
-        "Kein Schritt des Plans war erfolgreich.\n\n{detail}",
+        "Aucune étape du plan n'a abouti.\n\n{detail}\n\n{verdict}",
+        "No step of the plan succeeded.\n\n{detail}\n\n{verdict}",
+        "Kein Schritt des Plans war erfolgreich.\n\n{detail}\n\n{verdict}",
     ),
     ("Vérification : non effectuée", "Verification: not performed", "Prüfung: nicht durchgeführt"),
     ("Effacement impossible : {disk}", "Erasure impossible: {disk}", "Löschung nicht möglich: {disk}"),

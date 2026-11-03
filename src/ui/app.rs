@@ -577,8 +577,7 @@ pub(super) fn build_ui(app: &Application) {
             let mut failed = Vec::new();
             for widget in disk_widgets_for_retry.borrow().iter() {
                 if let Some(record) = states.get(&widget.disk.name) {
-                    if record.status == JobState::FailedIo || record.status == JobState::FailedOther
-                    {
+                    if record.status == JobState::FailedOther {
                         failed.push((widget.clone(), widget.disk.clone()));
                     }
                 }

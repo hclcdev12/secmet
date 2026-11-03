@@ -321,6 +321,11 @@ impl Disk {
                 {
                     text.push_str(&tr(" — autres espaces de noms du contrôleur non couverts"));
                 }
+                if !plan.recommend_destroy.is_empty() {
+                    text.push_str(&tr(
+                        " — destruction physique recommandée après effacement (état du disque)",
+                    ));
+                }
                 text
             }
             None => tr("méthode décidée au lancement"),

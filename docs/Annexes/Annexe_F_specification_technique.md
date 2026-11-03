@@ -310,7 +310,9 @@ Entrée : capacités de la cible (média, transport, ATA/NVMe, santé, protectio
 
 - `Refused { reasons }` : protections ou média en lecture seule ;
 - `Blocked { reasons, guidance }` : verrouillé, tentatives expirées, sanitize en cours ou en échec ;
-- `Ready(plan)` : primaire, replis, exclus (gelé, mot de passe tiers, pont USB, repli hôte interdit), dégradation, recommandations de destruction, notes (espaces de noms NVMe non couverts).
+- `Ready(plan)` : primaire, replis, exclus (gelé, mot de passe tiers, pont USB, repli hôte interdit), dégradation, recommandations de destruction, notes (espaces de noms NVMe non couverts), santé du support à la décision.
+
+**Verdict final** (`secmet-core::disposition`) : à partir du plan et des traces d'exécution (méthode et issue de chaque étape), une fonction pure conclut sur le **sort du support** — `reusable`, `destroy_recommended`, `destroy_required` ou `retry` — avec ses raisons (codes stables : `SmartFailing`, `UnreadableSectors`, `WritesNotPersisted`, `FirmwareIneffective`, `ReadOnlyMedia`, `LockedWithoutPassword`, `ReallocatedNotOverwritten`, `Cancelled`, `IoError`, `FirmwareFailure`, `NoMethod`, `Blocked`, `Protected`) et les consignes avant relance. Un échec avec preuve matérielle (secteurs illisibles, écritures non persistantes, firmware sans effet sans repli abouti) ou sur un disque déjà condamné par le SMART est terminal : l'interface n'offre plus « Relancer », le badge passe à **À DÉTRUIRE**. Le helper porte le verdict dans le rapport de job (`disposition`, `disposition_reasons`, `disposition_guidance`) ; l'interface le reporte dans l'attestation signée et le PDF.
 
 Ordre des candidats : NVMe Sanitize (block, crypto), Format NVM (crypto, user data), Sanitize overwrite ; ATA SANITIZE (crypto scramble, block erase, overwrite HDD), SECURITY ERASE (enhanced, normal) ; écriture hôte. Chaque étape porte ses critères d'échec et sa spécification de relecture.
 
@@ -407,7 +409,7 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
     "version": 1, "certificate_id": "SEC-…-sdc", "session_id": "SEC-…",
     "issued_at": "…", "operator": "…", "software": "secmet 0.3.1",
     "disk": {"name","model","serial","firmware","media","transport","capacity","size_bytes"},
-    "erasure": {"method_code","method_label","nist_level","policy","outcome","started_at","finished_at","duration_seconds","caveats"},
+    "erasure": {"method_code","method_label","nist_level","policy","outcome","started_at","finished_at","duration_seconds","caveats","disposition","disposition_reasons"},
     "validation": {"kind","seed","samples","anomalies","evidence_sha256","residual_signatures","verify_status"},
     "bench": {"manufacturer","model","serial"},
     "report_sha256": "…"

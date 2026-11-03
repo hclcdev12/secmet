@@ -48,6 +48,22 @@ pub fn log_job_report(disk_name: &str, report: &JobReport) {
         report.seconds,
         report.seed
     );
+    if !report.disposition.is_empty() {
+        body.push_str(&format!(
+            "Sort du support : {}",
+            certificate::disposition_label_in(crate::i18n::Lang::Fr, &report.disposition)
+        ));
+        if !report.disposition_reasons.is_empty() {
+            body.push_str(&format!(" — {}", report.disposition_reasons.join(", ")));
+        }
+        if !report.disposition_guidance.is_empty() {
+            body.push_str(&format!(
+                " — consigne {}",
+                report.disposition_guidance.join(", ")
+            ));
+        }
+        body.push('\n');
+    }
     for step in &report.steps {
         body.push_str(&format!(
             "\n── Étape {} : {} ({}) ──\nIssue : {:?}{}\nDétail : {}\n",
@@ -81,6 +97,15 @@ pub fn log_job_report(disk_name: &str, report: &JobReport) {
 }
 
 /// Le job n'a pas pu être lancé ou la liaison a été perdue.
+/// Décision de l'opérateur : disque sorti du circuit de réemploi.
+pub fn log_disk_condemned(disk_name: &str) {
+    trace_log::log_erase_finished(
+        disk_name,
+        "échec",
+        "marqué à détruire par l'opérateur : verrou ATA Security sans mot de passe",
+    );
+}
+
 pub fn log_erase_failed(disk_name: &str, reason: &str) {
     trace_log::log_erase_finished(disk_name, "échec", reason);
     if let Some(path) = trace_log::disk_log_path(disk_name) {

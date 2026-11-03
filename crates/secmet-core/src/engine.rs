@@ -17,7 +17,7 @@
 
 use crate::canary::{SamplingRules, VerificationSpec, VerificationTarget};
 use crate::taxonomy::{
-    EraseMethod, NistLevel, Policy, SanitizeState, TargetCapabilities, Transport,
+    EraseMethod, HealthFacts, NistLevel, Policy, SanitizeState, TargetCapabilities, Transport,
 };
 use crate::{CoreError, Result};
 
@@ -257,6 +257,9 @@ pub struct ErasePlan {
     pub recommend_destroy: Vec<DestroyReason>,
     /// Limites connues du plan.
     pub notes: Vec<PlanNote>,
+    /// Santé du support à la décision, pour le verdict final
+    /// ([`crate::disposition`]).
+    pub health: HealthFacts,
 }
 
 impl ErasePlan {
@@ -426,6 +429,7 @@ pub fn decide(
         degradation,
         recommend_destroy: destroy_reasons(target, policy),
         notes,
+        health: target.health,
     })))
 }
 

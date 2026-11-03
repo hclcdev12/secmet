@@ -53,7 +53,8 @@ Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis ide
 4. Cliquer **Lancer la suppression sécurisée** : le dialogue de confirmation récapitule, par disque, la méthode, la catégorie NIST et les replis ; pour un HDD en écriture hôte, choisir le nombre de passes. Confirmer.
 5. Suivre la progression : étape du plan, phase (canaris, firmware, relecture), pourcentage, débit et ETA pour l'écriture hôte, pourcentage du disque pour un sanitize, temps restant estimé pour un SECURITY ERASE (durée annoncée par le disque).
 6. **Stop** interrompt une écriture hôte entre deux blocs ou un sanitize entre deux sondages. Pendant un Format NVM ou un SECURITY ERASE UNIT, le bouton est grisé : la commande ne peut pas être interrompue (débrancher le disque la fait échouer et laisse un mot de passe que SecMet lèvera au scan suivant).
-7. À la fin de chaque disque : **Vérification : OK** (blocs relus, anomalies, signatures résiduelles) ou KO avec le bouton **Détails vérification**. **Relancer les échoués** relance uniquement les disques en échec.
+7. À la fin de chaque disque : **Vérification : OK** (blocs relus, anomalies, signatures résiduelles) ou KO avec le bouton **Détails vérification**. Le moteur conclut sur le **sort du support** : un succès peut porter « destruction physique recommandée » (état du disque), un échec est soit **ÉCHEC** (à relancer, avec la consigne : liaison, firmware, blocage) soit **À DÉTRUIRE** (secteurs illisibles, écritures non persistantes, firmware sans effet, disque déjà condamné par le SMART). **Relancer les échoués** relance uniquement les disques en ÉCHEC, jamais ceux à détruire.
+8. Un disque **verrouillé** par un mot de passe ATA inconnu n'est jamais forcé : le dialogue propose **Marquer à détruire**, qui le sort du circuit de réemploi ; le certificat et le lot portent alors « destruction physique requise ».
 
 ## 5) Certificat et archivage
 
@@ -147,7 +148,7 @@ Après une session avec au moins un succès, **TestDisk** analyse en lecture seu
 
 ## 11) Badges et bouton **i**
 
-- **i vert** : SMART bon ; **w orange** : à surveiller ; **! rouge** : SMART dégradé (secteurs réalloués, panne prédite) ; le certificat recommande alors la destruction physique après l'effacement. **? gris** : inspection firmware impossible (le disque reste effaçable par écriture hôte si rien d'autre ne l'interdit).
+- **i vert** : SMART bon ; **w orange** : à surveiller ; **! rouge** : SMART dégradé (secteurs réalloués, panne prédite) ; la confirmation l'annonce et le certificat porte alors « destruction physique recommandée » après l'effacement. **? gris** : inspection firmware impossible (le disque reste effaçable par écriture hôte si rien d'autre ne l'interdit).
 - Le bouton **i** ouvre l'identité, les capacités (sanitize, Security, Format NVM), l'état ATA Security et la table SMART (attributs ATA avec seuils, page Health NVMe).
 
 ## Accessibilité visuelle (atelier)
@@ -169,5 +170,6 @@ Styles centralisés dans [`resources/secmet.css`](../../resources/secmet.css) (t
 - **FROZEN** : Dé-frozen puis Rafraîchir.
 - **Stop grisé** : commande firmware bloquante en cours (Format NVM, SECURITY ERASE UNIT) ; attendre la fin estimée.
 - **Vérification KO** : le firmware a acquitté sans effacer ou des signatures subsistent ; le plan passe au repli suivant automatiquement ; sinon **Relancer les échoués**.
+- **Badge À DÉTRUIRE** : le moteur a conclu qu'aucune voie logicielle ne reste (le dialogue d'échec donne la raison). Ne pas relancer : remettre le disque à la filière de destruction physique ; à la clôture du lot, le PDF contient un **bordereau de destruction** avec les numéros de série concernés.
 - **PDF s'ouvre dans un éditeur** : installer un lecteur PDF (`evince`, `okular`, `atril`) et utiliser **Ouvrir le PDF** ; les `.json` sont les attestations signées, pas le certificat visuel.
 - **`secmet-verify` répond « clé non vérifiée »** : ajouter la clé publique du banc avec `--trust` ou dans `/etc/secmet/trusted-keys`.
