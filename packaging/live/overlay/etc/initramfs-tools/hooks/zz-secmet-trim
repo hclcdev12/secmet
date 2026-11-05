@@ -1,0 +1,16 @@
+#!/bin/sh
+# Clé SecMet : l'initramfs ne sert qu'à trouver la clé, copier le système
+# en mémoire (toram) et le monter. Le pilote nouveau et le firmware NVIDIA
+# GSP qu'il entraîne (103 Mo, non compressibles) n'y servent à rien : le
+# système complet (squashfs) les a et les charge au démarrage réel. Sans
+# eux, l'initrd passe d'environ 190 à 85 Mo, lus par GRUB depuis la clé
+# avant tout affichage. Seule perte : sur une carte NVIDIA, l'écran de
+# démarrage (plymouth) n'apparaît qu'après le montage du système.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+    prereqs) prereqs; exit 0 ;;
+esac
+rm -rf "${DESTDIR}/usr/lib/firmware/nvidia"
+find "${DESTDIR}/usr/lib/modules" -type d -name nouveau -path '*/drivers/gpu/drm/*' -prune -exec rm -rf {} + 2>/dev/null || true
+exit 0
