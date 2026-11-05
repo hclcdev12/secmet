@@ -17,16 +17,23 @@ pub const DATA_LABEL: &str = "SECMET-DATA";
 /// Sous-dossier du coffre sur la clé.
 pub const KEY_VAULT_SUBDIR: &str = "vault";
 
-/// Dossier effectif du coffre : `<montage SECMET-DATA>/vault` si la
-/// partition de données d'une clé SecMet est montée, sinon `default`.
+/// Dossier effectif du coffre : `<montage SECMET-DATA>/vault` quand le
+/// système a démarré depuis une clé SecMet et que sa partition de données
+/// est montée, sinon `default`.
 ///
 /// Sur un système live, `/var/lib` est en mémoire : un SECURITY ERASE
 /// interrompu par une coupure laisserait le disque verrouillé avec un mot
 /// de passe perdu au redémarrage. Sur la clé, le coffre suit la machine.
-/// Aucune donnée du client n'intervient ; le dossier n'est utilisé que s'il
-/// est sûr (voir [`secure_key_dir`]), sinon repli sur `default` avec un
-/// avertissement.
+/// Sur un poste installé, une clé SecMet branchée n'est qu'un disque parmi
+/// d'autres : le coffre reste sur le poste, sinon un mot de passe posé
+/// pendant la présence de la clé deviendrait introuvable une fois la clé
+/// retirée. Aucune donnée du client n'intervient ; le dossier n'est utilisé
+/// que s'il est sûr (voir [`secure_key_dir`]), sinon repli sur `default`
+/// avec un avertissement.
 pub fn resolve_dir(default: &Path) -> PathBuf {
+    if !running_on_secmet_key() {
+        return default.to_path_buf();
+    }
     match key_mount().map(|m| (m.clone(), secure_key_dir(&m))) {
         Some((_, Ok(dir))) => dir,
         Some((mount, Err(e))) => {
@@ -39,6 +46,17 @@ pub fn resolve_dir(default: &Path) -> PathBuf {
         }
         None => default.to_path_buf(),
     }
+}
+
+/// Lanceur de session de l'image de la clé SecMet (`packaging/live/overlay`) :
+/// présent uniquement dans le système live de la clé, jamais dans un paquet
+/// installé. `boot=live` seul ne suffirait pas : d'autres systèmes live
+/// (démarrage réseau d'un banc, par exemple) le portent aussi.
+pub const LIVE_MARKER: &str = "/usr/local/bin/secmet-live";
+
+/// Vrai si le système en cours est celui de la clé SecMet.
+pub fn running_on_secmet_key() -> bool {
+    Path::new(LIVE_MARKER).is_file()
 }
 
 /// Point de montage de la partition `SECMET-DATA`, si elle est montée.
@@ -244,6 +262,19 @@ mod key_dir_tests {
         }
         let err = secure_key_dir(tmp.path()).unwrap_err();
         assert!(err.to_string().contains("racine du montage"));
+        assert_eq!(
+            resolve_dir(Path::new("/var/lib/secmet/x")),
+            PathBuf::from("/var/lib/secmet/x")
+        );
+    }
+
+    /// Hors de la clé (poste de développement, banc installé), le coffre
+    /// reste dans le dossier par défaut même si une clé est branchée.
+    #[test]
+    fn off_the_key_the_default_dir_is_kept() {
+        if Path::new(LIVE_MARKER).is_file() {
+            return; // test lancé sur la clé elle-même : non couvert ici
+        }
         assert_eq!(
             resolve_dir(Path::new("/var/lib/secmet/x")),
             PathBuf::from("/var/lib/secmet/x")

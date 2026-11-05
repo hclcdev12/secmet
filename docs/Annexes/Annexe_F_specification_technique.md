@@ -397,7 +397,7 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
 ├── attestation-key.hex (0600)      # graine Ed25519
 ├── attestation-key.pub
 └── trusted-keys                    # clés acceptées par secmet-verify
-/var/lib/secmet/ata-security/       # coffre des mots de passe SecMet (root) ; SECMET-DATA/vault/ si la clé est montée (annexe M)
+/var/lib/secmet/ata-security/       # coffre des mots de passe SecMet (root) ; SECMET-DATA/vault/ sur le système de la clé (annexe M)
 ```
 
 ### 8.2 Attestation signée

@@ -46,9 +46,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Eine Charge fasst die an diesem Arbeitsplatz gelöschten Datenträger zusammen, Sitzung für Sitzung (anschließen, löschen, abziehen, wiederholen). Das Zertifikat jedes Datenträgers wird darin erfasst; beim Abschluss entstehen ein Sammelzertifikat und ein signiertes Manifest.",
     ),
     (
-        "Livrables dans l'archive du lot (une clé SECMET-EXP branchée les recevrait aussi).",
-        "Deliverables are in the batch archive (a plugged-in SECMET-EXP key would receive them too).",
-        "Die Ergebnisse liegen im Chargenarchiv (ein angeschlossener SECMET-EXP-Stick erhielte sie ebenfalls).",
+        "Livrables dans l'archive du lot.",
+        "Deliverables are in the batch archive.",
+        "Die Ergebnisse liegen im Chargenarchiv.",
     ),
     (
         "Référence : {reference}",

@@ -825,8 +825,16 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
                 .push(dir.join(format!("{}.json", export::safe_filename(&p.certificate_id))));
             deliverables.push(dir.join(format!("{}.pdf", export::safe_filename(&p.session_id))));
         }
-        // Livrables sur la partition d'export, si elle est là (non bloquant).
-        let (exported_to, export_error) = match lot::find_export_mount() {
+        // Livrables sur la partition d'export de la clé, seulement quand
+        // l'application tourne depuis la clé (non bloquant). Sur un poste
+        // installé, une clé SecMet branchée n'est qu'un disque parmi
+        // d'autres : les livrables restent dans l'archive du poste.
+        let export_mount = if paths::dedicated_data_dir() {
+            lot::find_export_mount()
+        } else {
+            None
+        };
+        let (exported_to, export_error) = match export_mount {
             None => (None, None),
             Some(mount) => {
                 let target = mount.join(&lot_id);
@@ -1078,10 +1086,7 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
                     (None, None) if paths::dedicated_data_dir() => {
                         tr("Partition d'export absente (SECMET-EXP) : rien n'a été copié.")
                     }
-                    (None, None) => tr(
-                        "Livrables dans l'archive du lot (une clé SECMET-EXP branchée les \
-                         recevrait aussi).",
-                    ),
+                    (None, None) => tr("Livrables dans l'archive du lot."),
                 });
                 let folder = report
                     .exported_to

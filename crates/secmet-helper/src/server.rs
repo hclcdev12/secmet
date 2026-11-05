@@ -116,8 +116,8 @@ fn send(writer: &Writer, message: &Message) -> std::io::Result<()> {
 }
 
 impl Server {
-    /// Coffre ATA : sur la clé SecMet si sa partition de données est montée
-    /// (résolu à chaque usage, la clé peut arriver après le démarrage), sinon
+    /// Coffre ATA : sur la clé SecMet quand le système a démarré dessus et
+    /// que sa partition de données est montée (résolu à chaque usage), sinon
     /// le dossier configuré. Un `--vault-dir` explicite (tests) est respecté.
     fn vault_dir(&self) -> PathBuf {
         if self.config.vault_dir == Path::new(crate::vault::DEFAULT_DIR) {
