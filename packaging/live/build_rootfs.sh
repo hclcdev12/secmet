@@ -197,14 +197,14 @@ KVER="$(ls -1 "$ROOTFS/usr/lib/modules" | sort -V | tail -1)"
 for m in kernel/sound kernel/drivers/media/usb kernel/drivers/media/pci kernel/drivers/media/dvb-frontends \
          kernel/drivers/media/tuners kernel/drivers/infiniband kernel/drivers/comedi \
          kernel/drivers/iio kernel/drivers/usb/gadget kernel/drivers/net/can kernel/drivers/net/dsa \
-         kernel/fs/ocfs2 kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
+         kernel/fs/ocfs2 kernel/fs/smb/server kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
     rm -rf "$ROOTFS/usr/lib/modules/$KVER/$m"
 done
 # Garde : aucun module restant ne doit dépendre d'un module retiré.
 in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
 if grep -qiE 'unknown symbol|needs unknown' /tmp/depmod.log; then
     echo "modules noyau : dépendances non résolues après élagage :" >&2
-    grep -iE 'unknown symbol|needs unknown' /tmp/depmod.log | head -20 >&2
+    grep -iE 'unknown symbol|needs unknown' /tmp/depmod.log | awk '{print $3}' | sort -u >&2
     exit 1
 fi
 # live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
