@@ -1,6 +1,6 @@
 # SecMet
 
-Application **Rust** (GTK4, v0.3.8) pour l'effacement sécurisé de disques sous Linux, conforme **NIST SP 800-88** : commandes firmware ATA/NVMe (sanitize, Security Erase, Format NVM) et écriture hôte vérifiée, réalisées nativement par un helper privilégié (aucun `hdparm`, `nvme-cli`, `smartctl`, `shred`, `lsblk` ni `blkid`). Pensée pour un usage en **atelier / banc de nettoyage** : détection des disques branchés, sélection multiple, effacements en parallèle avec suivi de progression.
+Application **Rust** (GTK4, v0.3.9) pour l'effacement sécurisé de disques sous Linux, conforme **NIST SP 800-88** : commandes firmware ATA/NVMe (sanitize, Security Erase, Format NVM) et écriture hôte vérifiée, réalisées nativement par un helper privilégié (aucun `hdparm`, `nvme-cli`, `smartctl`, `shred`, `lsblk` ni `blkid`). Pensée pour un usage en **atelier / banc de nettoyage** : détection des disques branchés, sélection multiple, effacements en parallèle avec suivi de progression.
 
 > **Attention** — Cette application détruit définitivement les données des disques sélectionnés. Vérifiez toujours les cibles avant de lancer une suppression. Le disque système est protégé, mais une erreur d'identification reste possible sur d'autres supports.
 
