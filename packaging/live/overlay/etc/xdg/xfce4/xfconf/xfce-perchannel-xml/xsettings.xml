@@ -1,5 +1,5 @@
 <?xml version="1.1" encoding="UTF-8"?>
-<!-- Clé SecMet : bureau sombre et plat. GTK 3 (Thunar, Atril, panneau) :
+<!-- Clé SecMet : bureau sombre et plat. GTK 3 (Thunar, Zathura, panneau) :
      Arc-Dark ; icônes elementary-xfce-dark ; police Ubuntu ; rendu des
      polices lissé. GTK 4 (SecMet) garde son thème par défaut sombre
      (GTK_THEME dans secmet-live). -->

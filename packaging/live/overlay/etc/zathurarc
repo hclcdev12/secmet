@@ -1,0 +1,7 @@
+# Clé SecMet : lecteur PDF Zathura (certificats). Page ajustée à la
+# fenêtre à l'ouverture, copie vers le presse-papiers système, titre = nom
+# du fichier. Souris : molette pour défiler, Ctrl+molette pour zoomer.
+set adjust-open best-fit
+set selection-clipboard clipboard
+set window-title-basename true
+set statusbar-home-tilde true

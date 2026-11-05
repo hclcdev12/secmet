@@ -16,7 +16,7 @@ L'état du lot ne peut pas vivre en mémoire (chaque laptop redémarre la clé) 
 
 | Sujet | Décision |
 |-------|----------|
-| Système de la clé | Ubuntu 24.04 LTS minimal (noyau HWE pour le matériel récent), **bureau XFCE dépouillé** (gestionnaire de fichiers, terminal dans le menu, lecteur PDF, réglages réseau, extinction) avec connexion automatique, SecMet lancée maximisée au démarrage ; SecMet installé depuis le `.deb` `ubuntu24.04` (pas d'AppImage, pas de FUSE). Choix validé : le bureau est la solution la plus simple pour l'opérateur, car il garde des issues (relire un PDF, brancher le réseau, éteindre) sans rien imposer |
+| Système de la clé | Ubuntu 24.04 LTS minimal (noyau HWE pour le matériel récent), **bureau XFCE dépouillé** (gestionnaire de fichiers, terminal dans le menu, lecteur PDF Zathura, réglages réseau, extinction) avec connexion automatique, SecMet lancée maximisée au démarrage ; SecMet installé depuis le `.deb` `ubuntu24.04` (pas d'AppImage, pas de FUSE). Choix validé : le bureau est la solution la plus simple pour l'opérateur, car il garde des issues (relire un PDF, brancher le réseau, éteindre) sans rien imposer |
 | Droits administrateur | **Conservés** : le mot de passe PolicyKit est demandé comme sur le banc |
 | Lot et clé | **Un lot = une clé**. Plusieurs clés sur un même lot : évolution ultérieure (§M.10) |
 | Données de travail | Partition **ext4** dédiée sur la clé (journal du lot, journaux, attestations, PDF, clé de signature, réglages) |

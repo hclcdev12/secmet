@@ -81,16 +81,16 @@ in_chroot apt-get install -y -qq --no-install-recommends \
     live-boot live-boot-initramfs-tools initramfs-tools \
     systemd systemd-sysv systemd-timesyncd dbus dbus-user-session udev kmod \
     locales console-setup keyboard-configuration kbd tzdata \
-    sudo policykit-1 udisks2 gvfs gvfs-backends \
+    sudo policykit-1 udisks2 gvfs \
     network-manager network-manager-gnome wpasupplicant iproute2 iputils-ping ca-certificates \
     xserver-xorg xserver-xorg-video-all xserver-xorg-input-all xinit x11-xserver-utils \
     lightdm lightdm-gtk-greeter \
     xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings xfce4-power-manager \
-    xfce4-terminal thunar thunar-volman tumbler atril zenity xdg-utils \
+    xterm thunar thunar-volman tumbler zathura zathura-pdf-poppler zenity xdg-utils \
     policykit-1-gnome language-pack-fr language-pack-gnome-fr \
     xfce4-whiskermenu-plugin arc-theme elementary-xfce-icon-theme fonts-ubuntu \
     plymouth plymouth-theme-spinner librsvg2-common \
-    fonts-dejavu fonts-noto-core fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
+    fonts-dejavu fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
     libgtk-4-1 exfatprogs dosfstools e2fsprogs fdisk parted \
     less nano >/tmp/apt.log 2>&1 || { tail -40 /tmp/apt.log; exit 1; }
 
@@ -184,6 +184,15 @@ for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 cxgb3 liquidio t
     rm -rf "$ROOTFS/usr/lib/firmware/$fw"
 done
 rm -rf "$ROOTFS"/usr/lib/firmware/intel/sof*
+# Modules noyau sans objet (son, capture vidéo et TV, InfiniBand, acquisition
+# de mesures, ZFS, en-têtes du noyau) : copiés en mémoire à chaque démarrage.
+KVER="$(ls -1 "$ROOTFS/usr/lib/modules" | sort -V | tail -1)"
+for m in kernel/sound kernel/drivers/media kernel/drivers/infiniband kernel/drivers/comedi \
+         kernel/drivers/iio kernel/drivers/usb/gadget kernel/drivers/net/can kernel/drivers/net/dsa \
+         kernel/fs/ocfs2 kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
+    rm -rf "$ROOTFS/usr/lib/modules/$KVER/$m"
+done
+in_chroot depmod -a "$KVER"
 # live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
 # systemd y voit un périphérique bloc et journalise trente fois « Failed to
 # open /dev/shm device » à chaque démarrage. Nom de source neutre.
