@@ -200,13 +200,25 @@ for m in kernel/sound kernel/drivers/media/usb kernel/drivers/media/pci kernel/d
          kernel/fs/ocfs2 kernel/fs/smb/server kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
     rm -rf "$ROOTFS/usr/lib/modules/$KVER/$m"
 done
-# Garde : aucun module restant ne doit dépendre d'un module retiré.
-in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
-if grep -qiE 'unknown symbol|needs unknown' /tmp/depmod.log; then
-    echo "modules noyau : dépendances non résolues après élagage :" >&2
-    grep -iE 'unknown symbol|needs unknown' /tmp/depmod.log | awk '{print $3}' | sort -u >&2
-    exit 1
-fi
+# Cohérence : un module qui dépendait d'un sous-système retiré (ksmbd et
+# RDMA sans InfiniBand, capteurs ADC sans iio…) est retiré à son tour,
+# jusqu'à ce que depmod -e ne signale plus aucun symbole non résolu.
+for pass in 1 2 3 4 5; do
+    in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
+    bad="$(grep -i 'needs unknown symbol' /tmp/depmod.log | awk '{print $3}' | sort -u)"
+    [[ -n "$bad" ]] || break
+    echo "modules dépendants retirés (passe $pass) : $(echo "$bad" | xargs -n1 basename | sed 's/\.ko\.zst$//' | tr '\n' ' ')"
+    for f in $bad; do rm -f "$ROOTFS$f"; done
+done
+[[ -z "$bad" ]] || { echo "modules noyau : dépendances toujours non résolues" >&2; echo "$bad" >&2; exit 1; }
+# Les pilotes qui comptent doivent être là (affichage, stockage USB, Wi-Fi).
+for must in kernel/drivers/gpu/drm/radeon/radeon.ko.zst kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko.zst \
+            kernel/drivers/gpu/drm/i915/i915.ko.zst kernel/drivers/gpu/drm/nouveau/nouveau.ko.zst \
+            kernel/drivers/gpu/drm/display/drm_display_helper.ko.zst kernel/drivers/media/cec/core/cec.ko.zst \
+            kernel/drivers/usb/storage/uas.ko.zst kernel/drivers/net/wireless/intel/iwlwifi/iwlwifi.ko.zst \
+            kernel/drivers/net/wireless/realtek/rtw89/rtw89_core.ko.zst kernel/drivers/net/wireless/ath/ath11k/ath11k.ko.zst; do
+    [[ -f "$ROOTFS/usr/lib/modules/$KVER/$must" ]] || { echo "module requis absent après élagage : $must" >&2; exit 1; }
+done
 # live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
 # systemd y voit un périphérique bloc et journalise trente fois « Failed to
 # open /dev/shm device » à chaque démarrage. Nom de source neutre.
