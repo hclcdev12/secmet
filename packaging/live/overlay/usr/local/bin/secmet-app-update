@@ -27,8 +27,14 @@ for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,
         logger -t secmet-app-update "version $version : signature ou empreinte invalide, ignorée"
         continue
     fi
-    if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades "$deb" >/tmp/secmet-app-update.log 2>&1; then
-        logger -t secmet-app-update "SecMet $version installée depuis la partition de données"
+    # dpkg direct, sans déclencheurs : les dépendances sont celles de
+    # l'image, et les déclencheurs (man-db, caches d'icônes et de menus)
+    # coûtaient près de 30 s sur une clé lente avant la session, pour
+    # un système en mémoire qui n'en a pas l'usage. Les déclencheurs en
+    # attente ne gênent pas dpkg par la suite.
+    t0=$(date +%s)
+    if dpkg -i --no-triggers --force-confold "$deb" >/tmp/secmet-app-update.log 2>&1; then
+        logger -t secmet-app-update "SecMet $version installée depuis la partition de données ($(( $(date +%s) - t0 )) s)"
         exit 0
     fi
     logger -t secmet-app-update "version $version : installation échouée ($(tail -1 /tmp/secmet-app-update.log)), repli"
