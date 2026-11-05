@@ -188,13 +188,14 @@ for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 cxgb3 liquidio t
     rm -rf "$ROOTFS/usr/lib/firmware/$fw"
 done
 rm -rf "$ROOTFS"/usr/lib/firmware/intel/sof*
-# Modules noyau sans objet (son, webcams, cartes TV, InfiniBand, acquisition
-# de mesures, ZFS, en-têtes du noyau) : copiés en mémoire à chaque démarrage.
+# Modules noyau sans objet (webcams, cartes TV, InfiniBand, acquisition de
+# mesures, ZFS, en-têtes du noyau) : copiés en mémoire à chaque démarrage.
 # Jamais drivers/media en entier : media/cec est requis par
 # drm_display_helper, donc par tous les pilotes graphiques (constaté le
-# 2026-11-05 : sans lui, simpledrm seul et écran noir au réveil).
+# 2026-11-05 : sans lui, simpledrm seul et écran noir au réveil). Ni sound :
+# thinkpad_acpi et toshiba_acpi (touches, capot) en dépendent.
 KVER="$(ls -1 "$ROOTFS/usr/lib/modules" | sort -V | tail -1)"
-for m in kernel/sound kernel/drivers/media/usb kernel/drivers/media/pci kernel/drivers/media/dvb-frontends \
+for m in kernel/drivers/media/usb kernel/drivers/media/pci kernel/drivers/media/dvb-frontends \
          kernel/drivers/media/tuners kernel/drivers/infiniband kernel/drivers/comedi \
          kernel/drivers/iio kernel/drivers/usb/gadget kernel/drivers/net/can kernel/drivers/net/dsa \
          kernel/fs/ocfs2 kernel/fs/smb/server kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
@@ -205,7 +206,7 @@ done
 # jusqu'à ce que depmod -e ne signale plus aucun symbole non résolu.
 for pass in 1 2 3 4 5; do
     in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
-    bad="$(grep -i 'needs unknown symbol' /tmp/depmod.log | awk '{print $3}' | sort -u)"
+    bad="$(grep -i 'needs unknown symbol' /tmp/depmod.log | awk '{print $3}' | sort -u || true)"
     [[ -n "$bad" ]] || break
     echo "modules dépendants retirés (passe $pass) : $(echo "$bad" | xargs -n1 basename | sed 's/\.ko\.zst$//' | tr '\n' ' ')"
     for f in $bad; do rm -f "$ROOTFS$f"; done
