@@ -168,6 +168,10 @@ in_chroot systemctl set-default graphical.target >/dev/null 2>&1 || true
 # avec ce noyau) pour un poste graphique ; la disposition clavier des
 # consoles reste assurée par keyboard-setup.
 in_chroot systemctl mask console-setup.service >/dev/null 2>&1 || true
+# Minuteries sans objet sur un système en mémoire (apt, man-db, fstrim,
+# e2scrub, motd) : du travail disque et réseau au démarrage pour rien.
+in_chroot systemctl mask apt-daily.timer apt-daily-upgrade.timer dpkg-db-backup.timer \
+    man-db.timer fstrim.timer e2scrub_all.timer motd-news.timer >/dev/null 2>&1 || true
 
 # --- 5. initramfs, nettoyage, sortie ----------------------------------------
 # Micrologiciels sans objet sur un poste x86 (commutateurs et cartes réseau de
@@ -184,15 +188,25 @@ for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 cxgb3 liquidio t
     rm -rf "$ROOTFS/usr/lib/firmware/$fw"
 done
 rm -rf "$ROOTFS"/usr/lib/firmware/intel/sof*
-# Modules noyau sans objet (son, capture vidéo et TV, InfiniBand, acquisition
+# Modules noyau sans objet (son, webcams, cartes TV, InfiniBand, acquisition
 # de mesures, ZFS, en-têtes du noyau) : copiés en mémoire à chaque démarrage.
+# Jamais drivers/media en entier : media/cec est requis par
+# drm_display_helper, donc par tous les pilotes graphiques (constaté le
+# 2026-11-05 : sans lui, simpledrm seul et écran noir au réveil).
 KVER="$(ls -1 "$ROOTFS/usr/lib/modules" | sort -V | tail -1)"
-for m in kernel/sound kernel/drivers/media kernel/drivers/infiniband kernel/drivers/comedi \
+for m in kernel/sound kernel/drivers/media/usb kernel/drivers/media/pci kernel/drivers/media/dvb-frontends \
+         kernel/drivers/media/tuners kernel/drivers/infiniband kernel/drivers/comedi \
          kernel/drivers/iio kernel/drivers/usb/gadget kernel/drivers/net/can kernel/drivers/net/dsa \
          kernel/fs/ocfs2 kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
     rm -rf "$ROOTFS/usr/lib/modules/$KVER/$m"
 done
-in_chroot depmod -a "$KVER"
+# Garde : aucun module restant ne doit dépendre d'un module retiré.
+in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
+if grep -qiE 'unknown symbol|needs unknown' /tmp/depmod.log; then
+    echo "modules noyau : dépendances non résolues après élagage :" >&2
+    grep -iE 'unknown symbol|needs unknown' /tmp/depmod.log | head -20 >&2
+    exit 1
+fi
 # live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
 # systemd y voit un périphérique bloc et journalise trente fois « Failed to
 # open /dev/shm device » à chaque démarrage. Nom de source neutre.

@@ -23,17 +23,21 @@ for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,
         logger -t secmet-app-update "version $version pas plus récente que $installed : rien à faire"
         exit 0
     fi
+    tv=$(date +%s)
     if ! secmet-release verify "$dir" --trust "$TRUST" --file "$(basename "$deb")" >/dev/null 2>&1; then
         logger -t secmet-app-update "version $version : signature ou empreinte invalide, ignorée"
         continue
     fi
+    logger -t secmet-app-update "version $version : signature et empreinte vérifiées ($(( $(date +%s) - tv )) s)"
     # dpkg direct, sans déclencheurs : les dépendances sont celles de
     # l'image, et les déclencheurs (man-db, caches d'icônes et de menus)
     # coûtaient près de 30 s sur une clé lente avant la session, pour
     # un système en mémoire qui n'en a pas l'usage. Les déclencheurs en
     # attente ne gênent pas dpkg par la suite.
+    # --force-unsafe-io : pas de fsync (système en mémoire) ; sans lui,
+    # dpkg attendait la clé (18 s mesurés contre 0,5 s sur un banc).
     t0=$(date +%s)
-    if dpkg -i --no-triggers --force-confold "$deb" >/tmp/secmet-app-update.log 2>&1; then
+    if dpkg -i --no-triggers --force-unsafe-io --force-confold "$deb" >/tmp/secmet-app-update.log 2>&1; then
         logger -t secmet-app-update "SecMet $version installée depuis la partition de données ($(( $(date +%s) - t0 )) s)"
         exit 0
     fi
