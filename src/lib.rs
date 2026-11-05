@@ -8,6 +8,7 @@ pub mod disk_info;
 pub mod error;
 pub mod helper_client;
 pub mod i18n;
+pub mod key_cleanup;
 pub mod logger;
 pub mod logo;
 pub mod lot;

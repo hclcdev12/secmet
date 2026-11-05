@@ -37,6 +37,47 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Closed batches are copied to the export partition (SECMET-EXP) when closed; those missing there can be copied again from the key's archive.",
         "Abgeschlossene Chargen werden beim Abschluss auf die Exportpartition (SECMET-EXP) kopiert; dort fehlende können aus dem Archiv des Sticks erneut kopiert werden.",
     ),
+    ("Nettoyage de la clé", "Key cleanup", "Bereinigung des Sticks"),
+    (
+        "Retire de la clé ce que les lots et les effacements y ont laissé. Les réglages, les mises à jour, le coffre des mots de passe ATA et les journaux de démarrage ne sont jamais touchés ; sur la partition d'export, seuls les dossiers de lot (L-…) et de session (SEC-…) le sont.",
+        "Removes from the key what batches and erasures left behind. Settings, updates, the ATA password vault and boot logs are never touched; on the export partition, only batch (L-…) and session (SEC-…) folders are.",
+        "Entfernt vom Stick, was Chargen und Löschungen hinterlassen haben. Einstellungen, Updates, der ATA-Passworttresor und die Startprotokolle bleiben unberührt; auf der Exportpartition nur die Chargen- (L-…) und Sitzungsordner (SEC-…).",
+    ),
+    ("Lots archivés ({count})", "Archived batches ({count})", "Archivierte Chargen ({count})"),
+    (
+        "Livrables sur la partition d'export ({count} dossier(s))",
+        "Deliverables on the export partition ({count} folder(s))",
+        "Ergebnisse auf der Exportpartition ({count} Ordner)",
+    ),
+    (
+        "Certificats hors lot, rapports et journaux de session ({count})",
+        "Certificates outside batches, session reports and logs ({count})",
+        "Zertifikate außerhalb von Chargen, Sitzungsberichte und -protokolle ({count})",
+    ),
+    ("Nettoyer la clé…", "Clean the key…", "Stick bereinigen…"),
+    (
+        "Un lot est ouvert : clôturez-le ou abandonnez-le avant de nettoyer la clé.",
+        "A batch is open: close or abandon it before cleaning the key.",
+        "Eine Charge ist offen: Schließen Sie sie ab oder geben Sie sie auf, bevor Sie den Stick bereinigen.",
+    ),
+    ("Cochez au moins un groupe.", "Tick at least one group.", "Wählen Sie mindestens eine Gruppe."),
+    (
+        "Supprimer définitivement de la clé : {archived} lot(s) archivé(s), {exports} dossier(s) sur la partition d'export, {standalone} fichier(s) hors lot, soit {size} ?",
+        "Permanently delete from the key: {archived} archived batch(es), {exports} folder(s) on the export partition, {standalone} file(s) outside batches, {size} in all?",
+        "Endgültig vom Stick löschen: {archived} archivierte Charge(n), {exports} Ordner auf der Exportpartition, {standalone} Datei(en) außerhalb von Chargen, insgesamt {size}?",
+    ),
+    (
+        "Attention : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition d'export ({list}). Leur archive sur la clé est la seule copie signée ; utilisez d'abord « Recopier les lots clôturés sur la partition d'export » si vous voulez la conserver.",
+        "Warning: {count} closed batch(es) have no copy on the export partition ({list}). Their archive on the key is the only signed copy; use \"Copy closed batches to the export partition again\" first if you want to keep it.",
+        "Achtung: {count} abgeschlossene Charge(n) haben keine Kopie auf der Exportpartition ({list}). Ihr Archiv auf dem Stick ist die einzige signierte Kopie; verwenden Sie zuerst „Abgeschlossene Chargen erneut auf die Exportpartition kopieren“, wenn Sie sie behalten möchten.",
+    ),
+    (
+        "{removed} élément(s) supprimé(s), {size} libérés.",
+        "{removed} item(s) deleted, {size} freed.",
+        "{removed} Element(e) gelöscht, {size} freigegeben.",
+    ),
+    ("{n} Ko", "{n} KB", "{n} KB"),
+    ("{n} Mo", "{n} MB", "{n} MB"),
     (
         "Recopier les lots clôturés sur la partition d'export",
         "Copy closed batches to the export partition again",

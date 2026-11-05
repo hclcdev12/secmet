@@ -16,10 +16,195 @@ use std::rc::Rc;
 
 use crate::i18n::{self, tr, trf, Lang};
 use crate::update::{self, UpdateState};
-use crate::{pdf_logo, settings};
+use crate::{key_cleanup, pdf_logo, settings};
 
 use super::app::build_ui;
 use super::app_theme::apply_color_scheme_class;
+
+/// Lieux du nettoyage de la clé, d'après les chemins courants.
+fn cleanup_places() -> key_cleanup::Places {
+    key_cleanup::Places {
+        archive: crate::paths::archive_dir(),
+        logs: crate::paths::logs_dir(),
+        export: crate::lot::export_mount_on_key(),
+    }
+}
+
+/// Taille lisible : kilo-octets sous 1 Mo, sinon méga-octets à une décimale.
+fn human_size(bytes: u64) -> String {
+    if bytes < 1_048_576 {
+        trf("{n} Ko", &[("n", &bytes.div_ceil(1024).to_string())])
+    } else {
+        trf(
+            "{n} Mo",
+            &[("n", &format!("{:.1}", bytes as f64 / 1_048_576.0))],
+        )
+    }
+}
+
+/// Réglages de la clé : section « Nettoyage de la clé ». Trois groupes à
+/// cocher, inventaire affiché avant d'agir, confirmation avec les comptes
+/// réels ; avertissement (non bloquant) si un lot clôturé n'a pas sa copie
+/// sur la partition d'export. Refusé tant qu'un lot est ouvert.
+fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
+    let title = Label::new(None);
+    title.set_markup(&format!("<b>{}</b>", tr("Nettoyage de la clé")));
+    title.set_xalign(0.0);
+    title.set_margin_top(6);
+    content.append(&title);
+    let note = Label::new(Some(&tr(
+        "Retire de la clé ce que les lots et les effacements y ont laissé. Les réglages, \
+         les mises à jour, le coffre des mots de passe ATA et les journaux de démarrage ne \
+         sont jamais touchés ; sur la partition d'export, seuls les dossiers de lot (L-…) et \
+         de session (SEC-…) le sont.",
+    )));
+    note.set_wrap(true);
+    note.set_xalign(0.0);
+    note.add_css_class("dim-label");
+    content.append(&note);
+
+    let inv = key_cleanup::inventory(&cleanup_places());
+    let archived = CheckButton::with_label(&trf(
+        "Lots archivés ({count})",
+        &[("count", &inv.archived.len().to_string())],
+    ));
+    let exports = CheckButton::with_label(&trf(
+        "Livrables sur la partition d'export ({count} dossier(s))",
+        &[("count", &inv.exports.len().to_string())],
+    ));
+    let standalone = CheckButton::with_label(&trf(
+        "Certificats hors lot, rapports et journaux de session ({count})",
+        &[("count", &inv.standalone_files.to_string())],
+    ));
+    archived.set_active(true);
+    exports.set_active(true);
+    standalone.set_active(true);
+    if crate::lot::export_mount_on_key().is_none() {
+        exports.set_active(false);
+        exports.set_sensitive(false);
+        exports.set_tooltip_text(Some(&tr(
+            "Partition d'export absente (SECMET-EXP) : rien n'a été copié.",
+        )));
+    }
+    for c in [&archived, &exports, &standalone] {
+        content.append(c);
+    }
+    let row = GtkBox::new(Orientation::Horizontal, 8);
+    let button = Button::with_label(&tr("Nettoyer la clé…"));
+    button.add_css_class("destructive-action");
+    row.append(&button);
+    let status = Label::new(None);
+    status.set_xalign(0.0);
+    status.set_wrap(true);
+    status.add_css_class("dim-label");
+    row.append(&status);
+    content.append(&row);
+
+    let parent = parent.clone();
+    button.connect_clicked(move |button| {
+        if super::lot_ui::is_active() {
+            status.set_text(&tr(
+                "Un lot est ouvert : clôturez-le ou abandonnez-le avant de nettoyer la clé.",
+            ));
+            return;
+        }
+        let choice = key_cleanup::Choice {
+            archived: archived.is_active(),
+            exports: exports.is_active(),
+            standalone: standalone.is_active(),
+        };
+        if choice.is_empty() {
+            status.set_text(&tr("Cochez au moins un groupe."));
+            return;
+        }
+        let places = cleanup_places();
+        let inv = key_cleanup::inventory(&places);
+        let mut message = trf(
+            "Supprimer définitivement de la clé : {archived} lot(s) archivé(s), {exports} \
+             dossier(s) sur la partition d'export, {standalone} fichier(s) hors lot, soit \
+             {size} ?",
+            &[
+                (
+                    "archived",
+                    &if choice.archived {
+                        inv.archived.len()
+                    } else {
+                        0
+                    }
+                    .to_string(),
+                ),
+                (
+                    "exports",
+                    &if choice.exports { inv.exports.len() } else { 0 }.to_string(),
+                ),
+                (
+                    "standalone",
+                    &if choice.standalone {
+                        inv.standalone_files
+                    } else {
+                        0
+                    }
+                    .to_string(),
+                ),
+                ("size", &human_size(inv.bytes)),
+            ],
+        );
+        if choice.archived && !inv.not_exported.is_empty() {
+            message.push_str("\n\n");
+            message.push_str(&trf(
+                "Attention : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition \
+                 d'export ({list}). Leur archive sur la clé est la seule copie signée ; \
+                 utilisez d'abord « Recopier les lots clôturés sur la partition d'export » \
+                 si vous voulez la conserver.",
+                &[
+                    ("count", &inv.not_exported.len().to_string()),
+                    ("list", &inv.not_exported.join(", ")),
+                ],
+            ));
+        }
+        let button = button.clone();
+        let button_declined = button.clone();
+        let status = status.clone();
+        let archived = archived.clone();
+        let exports = exports.clone();
+        let standalone = standalone.clone();
+        button.set_sensitive(false);
+        super::dialogs::confirm_action_dual(
+            &parent,
+            &tr("Nettoyage de la clé"),
+            &message,
+            move || {
+                let report = key_cleanup::clean(&places, choice);
+                let mut text = trf(
+                    "{removed} élément(s) supprimé(s), {size} libérés.",
+                    &[
+                        ("removed", &report.removed.to_string()),
+                        ("size", &human_size(report.bytes)),
+                    ],
+                );
+                for (path, e) in &report.errors {
+                    text.push_str(&format!("\n{path} : {e}"));
+                }
+                status.set_text(&text);
+                let inv = key_cleanup::inventory(&cleanup_places());
+                archived.set_label(Some(&trf(
+                    "Lots archivés ({count})",
+                    &[("count", &inv.archived.len().to_string())],
+                )));
+                exports.set_label(Some(&trf(
+                    "Livrables sur la partition d'export ({count} dossier(s))",
+                    &[("count", &inv.exports.len().to_string())],
+                )));
+                standalone.set_label(Some(&trf(
+                    "Certificats hors lot, rapports et journaux de session ({count})",
+                    &[("count", &inv.standalone_files.to_string())],
+                )));
+                button.set_sensitive(true);
+            },
+            move || button_declined.set_sensitive(true),
+        );
+    });
+}
 
 /// Choix de logo en attente de validation.
 #[derive(Default)]
@@ -264,6 +449,7 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
         export_btn.connect_clicked(move |_| {
             export_status.set_text(&super::lot_ui::export_archived_text(None));
         });
+        cleanup_section(parent, &content);
     }
 
     // ── Lots (poste installé ; sur la clé live les lots sont toujours actifs) ──
