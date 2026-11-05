@@ -92,7 +92,7 @@ in_chroot apt-get install -y -qq --no-install-recommends \
     plymouth plymouth-theme-spinner librsvg2-common \
     fonts-dejavu fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
     libgtk-4-1 exfatprogs dosfstools e2fsprogs fdisk parted \
-    less nano >/tmp/apt.log 2>&1 || { tail -40 /tmp/apt.log; exit 1; }
+    less nano time >/tmp/apt.log 2>&1 || { tail -40 /tmp/apt.log; exit 1; }
 
 step "SecMet"
 cp "$DEB" "$ROOTFS/tmp/secmet.deb"
@@ -228,6 +228,11 @@ sed -i 's|dev="/dev/shm"|dev="tmpfs"|' "$ROOTFS/usr/lib/live/boot/9990-toram-tod
 # démarrage ne montrait rien : message sous le logo, retiré à la fin.
 sed -i 's|^\t\t\t\tcp ${MODULETORAMFILE} ${copyto}|\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth message --text="Copie du système en mémoire (environ 30 s)…"\n\t\t\t\tcp ${MODULETORAMFILE} ${copyto}\n\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth hide-message --text="Copie du système en mémoire (environ 30 s)…"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
 grep -q 'plymouth message' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch toram-todisk.sh non appliqué" >&2; exit 1; }
+# Taille du module à copier : live-boot lit le 5e champ de « ls -la », mais
+# le busybox de l'initramfs n'affiche ni propriétaire ni date (4 champs) :
+# « expr: syntax error » puis « sh: bad number » à chaque démarrage toram.
+sed -i 's|size=$( expr $(ls -la ${MODULETORAMFILE} \| awk .{print $5}.) / 1024 + 5000 )|size=$(( $(stat -c %s "${MODULETORAMFILE}") / 1024 + 5000 ))|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
+grep -q 'stat -c %s' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch taille toram non appliqué" >&2; exit 1; }
 step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
 in_chroot apt-get clean

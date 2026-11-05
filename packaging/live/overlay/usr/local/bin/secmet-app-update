@@ -36,9 +36,17 @@ for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,
     # attente ne gênent pas dpkg par la suite.
     # --force-unsafe-io : pas de fsync (système en mémoire) ; sans lui,
     # dpkg attendait la clé (18 s mesurés contre 0,5 s sur un banc).
+    # Diagnostic : étapes de dpkg horodatées et temps CPU, conservés sur la
+    # partition de données (logs/system/app-update-<boot>.log).
+    LOG="$DATA/logs/system/app-update-$(tr -d - < /proc/sys/kernel/random/boot_id).log"
     t0=$(date +%s)
-    if dpkg -i --no-triggers --force-unsafe-io --force-confold "$deb" >/tmp/secmet-app-update.log 2>&1; then
-        logger -t secmet-app-update "SecMet $version installée depuis la partition de données ($(( $(date +%s) - t0 )) s)"
+    /usr/bin/time -f "dpkg : %e s réel, %U s utilisateur, %S s système, %F défauts de page majeurs" \
+        dpkg -D1 -i --no-triggers --force-unsafe-io --force-confold "$deb" 2>&1 \
+        | while IFS= read -r l; do printf '%s %s\n' "$(date +%T.%N | cut -c1-12)" "$l"; done > /tmp/secmet-app-update.log
+    rc=$(dpkg-query -W -f='${Version}' secmet 2>/dev/null | sed 's/~.*//')
+    cp /tmp/secmet-app-update.log "$LOG" 2>/dev/null || true
+    if [ "$rc" = "$version" ]; then
+        logger -t secmet-app-update "SecMet $version installée depuis la partition de données ($(( $(date +%s) - t0 )) s ; détail : $LOG)"
         exit 0
     fi
     logger -t secmet-app-update "version $version : installation échouée ($(tail -1 /tmp/secmet-app-update.log)), repli"
