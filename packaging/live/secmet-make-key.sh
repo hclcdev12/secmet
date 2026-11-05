@@ -151,9 +151,10 @@ umount "$MNT/sys"
 echo "Données : dossiers et clé de signature…"
 mount "$DATA" "$MNT/data"
 # Schéma de propriétés (Annexe M) : racine root 0755, dossiers de l'opérateur
-# (uid 1000 dans l'image), vault réservé au helper (root 0700).
+# (uid 1000 dans l'image, dont app/ pour les mises à jour conservées),
+# vault réservé au helper (root 0700).
 chown root:root "$MNT/data"; chmod 755 "$MNT/data"
-for d in config logs lots archive; do
+for d in config logs lots archive app; do
     mkdir -p "$MNT/data/$d"; chown 1000:1000 "$MNT/data/$d"; chmod 700 "$MNT/data/$d"
 done
 mkdir -p "$MNT/data/vault"; chown root:root "$MNT/data/vault"; chmod 700 "$MNT/data/vault"

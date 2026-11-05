@@ -8,7 +8,12 @@ DATA=/media/secmet-data
 STORE="$DATA/app"
 TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
 mountpoint -q "$DATA" || exit 0
-[ -d "$STORE" ] || exit 0
+# Clé fabriquée sans app/ (racine root 0755) : l'opérateur ne pourrait pas
+# le créer et « Installer la mise à jour » échouerait (EACCES).
+if [ ! -d "$STORE" ]; then
+    mkdir -p "$STORE" && chown 1000:1000 "$STORE" && chmod 700 "$STORE"
+    exit 0
+fi
 installed=$(dpkg-query -W -f='${Version}' secmet 2>/dev/null | sed 's/~.*//')
 for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,2n -k3,3n -r); do
     version=$(basename "$dir")

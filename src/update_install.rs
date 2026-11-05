@@ -227,7 +227,17 @@ fn store_for_key(
     sig_text: &str,
 ) -> Result<(), String> {
     let dir = store.join(version);
-    fs::create_dir_all(&dir).map_err(|e| format!("{} : {e}", dir.display()))?;
+    fs::create_dir_all(&dir).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            format!(
+                "{} : {e} (dossier app/ de la partition de données absent ou réservé à root : \
+                 redémarrer la clé le recrée, ou le créer pour l'opérateur)",
+                dir.display()
+            )
+        } else {
+            format!("{} : {e}", dir.display())
+        }
+    })?;
     let name = package
         .file_name()
         .ok_or_else(|| "nom de paquet invalide".to_string())?;
