@@ -164,14 +164,30 @@ mkdir -p "$ROOTFS/etc/NetworkManager/conf.d"
 printf '[keyfile]\nunmanaged-devices=none\n' > "$ROOTFS/etc/NetworkManager/conf.d/10-globally-managed-devices.conf"
 in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journal-sync.timer secmet-journal-final secmet-first-boot secmet-app-update >/dev/null 2>&1 || true
 in_chroot systemctl set-default graphical.target >/dev/null 2>&1 || true
+# Police de la console texte : 9 s au démarrage (setfont échoue cinq fois
+# avec ce noyau) pour un poste graphique ; la disposition clavier des
+# consoles reste assurée par keyboard-setup.
+in_chroot systemctl mask console-setup.service >/dev/null 2>&1 || true
 
 # --- 5. initramfs, nettoyage, sortie ----------------------------------------
 # Micrologiciels sans objet sur un poste x86 (commutateurs et cartes réseau de
 # centre de données, SoC ARM) : retirés avant l'initramfs, qui en embarque une
 # partie. Environ 240 Mo de moins à lire sur la clé à chaque démarrage.
-for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 liquidio ti-connectivity; do
+# Firmware sans objet sur un poste à effacer (copié en mémoire à chaque
+# démarrage, non compressible) : cartes réseau de serveurs, commutateurs,
+# points d'accès et plateformes routeurs, caméras et capteurs, DSP audio, NPU.
+for fw in mellanox mrvl/prestera qcom netronome dpaa2 qed cxgb4 cxgb3 liquidio ti-connectivity \
+          bnx2x bnx2 qlogic tehuti acenic tigon slicoss 3com advansys intel/ice \
+          mediatek/mt7996 ath11k/IPQ8074 ath11k/IPQ6018 ath11k/IPQ5018 ath11k/QCN9074 ath12k/QCN9274 \
+          intel/ipu intel/vsc intel/ish intel/vpu LENOVO HP dell \
+          intel/avs intel/catpt cirrus asihpi; do
     rm -rf "$ROOTFS/usr/lib/firmware/$fw"
 done
+rm -rf "$ROOTFS"/usr/lib/firmware/intel/sof*
+# live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
+# systemd y voit un périphérique bloc et journalise trente fois « Failed to
+# open /dev/shm device » à chaque démarrage. Nom de source neutre.
+sed -i 's|dev="/dev/shm"|dev="tmpfs"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
 step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
 in_chroot apt-get clean
