@@ -123,6 +123,16 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Kein Datenträger in dieser Charge gelöscht: Sie kann nicht abgeschlossen werden (kein Sammelzertifikat), aber aufgegeben. Die Charge wird dann unverändert mit ihrem Journal archiviert, ohne Zertifikat und Manifest; ihre fehlgeschlagenen oder unterbrochenen Einträge bleiben darin erfasst.",
     ),
     ("Abandonner le lot", "Abandon the batch", "Charge aufgeben"),
+    (
+        "Réessayer la copie sur la partition d'export",
+        "Retry the copy to the export partition",
+        "Kopie auf die Exportpartition erneut versuchen",
+    ),
+    (
+        "{copied} lot(s) copié(s), {present} déjà présent(s) sur {mount}",
+        "{copied} batch(es) copied, {present} already present on {mount}",
+        "{copied} Charge(n) kopiert, {present} bereits vorhanden auf {mount}",
+    ),
     ("Lot abandonné", "Batch abandoned", "Charge aufgegeben"),
     (
         "Lot abandonné sans certificat ; son journal est conservé.\nArchive : {dir}",

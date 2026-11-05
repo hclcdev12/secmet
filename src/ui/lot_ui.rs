@@ -745,6 +745,7 @@ pub(super) fn register_end(window: &ApplicationWindow, status: &Label) {
 // ── Clôture ─────────────────────────────────────────────────────────────────
 
 struct ClosureReport {
+    lot_id: String,
     pdf: PathBuf,
     manifest: PathBuf,
     archived: PathBuf,
@@ -829,17 +830,13 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
         // l'application tourne depuis la clé (non bloquant). Sur un poste
         // installé, une clé SecMet branchée n'est qu'un disque parmi
         // d'autres : les livrables restent dans l'archive du poste.
-        let export_mount = if paths::dedicated_data_dir() {
-            lot::find_export_mount()
-        } else {
-            None
-        };
-        let (exported_to, export_error) = match export_mount {
+        let (exported_to, export_error) = match lot::export_mount_on_key() {
             None => (None, None),
             Some(mount) => {
-                let target = mount.join(&lot_id);
-                match copy_deliverables(&dir, &deliverables, &manifest_path, &target) {
-                    Ok(()) => (Some(target), None),
+                let mut files = deliverables;
+                files.push(manifest_path.clone());
+                match lot::copy_to_export(&mount, &lot_id, &files) {
+                    Ok(target) => (Some(target), None),
                     Err(e) => (None, Some(e)),
                 }
             }
@@ -856,6 +853,10 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
                         Err(_) => p.clone(),
                     };
                     Ok(ClosureReport {
+                        lot_id: archived
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default(),
                         pdf: relocate(&pdf),
                         manifest: relocate(&manifest_path),
                         archived,
@@ -872,26 +873,25 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
     }
 }
 
-fn copy_deliverables(
-    certificates: &std::path::Path,
-    deliverables: &[PathBuf],
-    manifest_path: &std::path::Path,
-    target: &std::path::Path,
-) -> Result<(), String> {
-    fs::create_dir_all(target).map_err(|e| format!("{} : {e}", target.display()))?;
-    let mut sources: Vec<PathBuf> = deliverables
-        .iter()
-        .filter(|p| p.starts_with(certificates) && p.is_file())
-        .cloned()
-        .collect();
-    sources.push(manifest_path.to_path_buf());
-    for src in sources {
-        let Some(name) = src.file_name() else {
-            continue;
-        };
-        fs::copy(&src, target.join(name)).map_err(|e| format!("{} : {e}", src.display()))?;
+/// Recopie sur la partition d'export les lots clôturés qui n'y sont pas
+/// (`only` : ce lot, même s'il y est déjà). Texte pour l'opérateur.
+pub(super) fn export_archived_text(only: Option<&str>) -> String {
+    let Some(mount) = lot::export_mount_on_key() else {
+        return tr("Partition d'export absente (SECMET-EXP) : rien n'a été copié.");
+    };
+    let sync = lot::export_archived(&paths::archive_dir(), &mount, only);
+    let mut parts = vec![trf(
+        "{copied} lot(s) copié(s), {present} déjà présent(s) sur {mount}",
+        &[
+            ("copied", &sync.copied.len().to_string()),
+            ("present", &sync.present.len().to_string()),
+            ("mount", &mount.display().to_string()),
+        ],
+    )];
+    for (id, e) in &sync.errors {
+        parts.push(format!("{id} : {e}"));
     }
-    Ok(())
+    parts.join("\n")
 }
 
 /// Dialogue de clôture ; `after` est appelé une fois le lot clôturé ou la
@@ -1028,7 +1028,7 @@ fn abandon_active(window: &ApplicationWindow) {
                 "Lot abandonné sans certificat ; son journal est conservé.\nArchive : {dir}",
                 &[("dir", &archived.display().to_string())],
             );
-            show_closed_dialog(window, &tr("Lot abandonné"), &text, archived);
+            show_closed_dialog(window, &tr("Lot abandonné"), &text, archived, None);
         }
         Err(e) => {
             set_active(Lot::load(&old_dir).ok());
@@ -1125,6 +1125,7 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
         match result {
             Ok(report) => {
                 set_active(None);
+                let retry = report.export_error.is_some().then(|| report.lot_id.clone());
                 let mut text = trf(
                     "Certificat groupé : {pdf}\nManifeste signé : {manifest}\nArchive : {dir}",
                     &[
@@ -1152,7 +1153,7 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
                     .exported_to
                     .clone()
                     .unwrap_or_else(|| report.archived.clone());
-                show_closed_dialog(&window, &tr("Lot clôturé"), &text, folder);
+                show_closed_dialog(&window, &tr("Lot clôturé"), &text, folder, retry);
             }
             Err(boxed) => {
                 let (lot, e) = *boxed;
@@ -1170,14 +1171,29 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
 }
 
 /// Résultat de la clôture, avec un accès direct aux livrables (export si
-/// copié, sinon archive).
-fn show_closed_dialog(window: &ApplicationWindow, title: &str, text: &str, folder: PathBuf) {
+/// copié, sinon archive). `retry_export` : lot dont la copie sur la
+/// partition d'export a échoué, à retenter depuis l'archive.
+fn show_closed_dialog(
+    window: &ApplicationWindow,
+    title: &str,
+    text: &str,
+    folder: PathBuf,
+    retry_export: Option<String>,
+) {
     let (dialog, content, buttons) = dialog_frame(window, title);
     content.append(&note(text));
     let status = Label::new(None);
     status.set_xalign(0.0);
     status.set_wrap(true);
     content.append(&status);
+    if let Some(lot_id) = retry_export {
+        let retry = Button::with_label(&tr("Réessayer la copie sur la partition d'export"));
+        buttons.append(&retry);
+        let status = status.clone();
+        retry.connect_clicked(move |_| {
+            status.set_text(&export_archived_text(Some(&lot_id)));
+        });
+    }
     let open = Button::with_label(&tr("Ouvrir le dossier"));
     let ok = Button::with_label(&tr("Valider"));
     ok.add_css_class("suggested-action");

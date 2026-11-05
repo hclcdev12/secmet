@@ -20,7 +20,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rand::Rng;
-use secmet_attest::{canonical, sha256_hex};
+use secmet_attest::sign::SignedAttestation;
+use secmet_attest::{canonical, export, sha256_hex};
 use serde::{Deserialize, Serialize};
 
 /// Instantané du lot.
@@ -66,6 +67,96 @@ pub fn find_export_mount() -> Option<PathBuf> {
         (fs::canonicalize(source).ok()? == device)
             .then(|| PathBuf::from(target.replace("\\040", " ")))
     })
+}
+
+/// Partition d'export quand l'application tourne depuis la clé (dossier
+/// de données dédié), sinon `None` : sur un poste installé, une clé SecMet
+/// branchée n'est qu'un disque parmi d'autres.
+pub fn export_mount_on_key() -> Option<PathBuf> {
+    crate::paths::dedicated_data_dir()
+        .then(find_export_mount)
+        .flatten()
+}
+
+/// Copie `files` (ceux qui existent) dans `<mount>/<name>/`, à plat, sous
+/// leur nom de fichier. Rend le dossier cible.
+pub fn copy_to_export(mount: &Path, name: &str, files: &[PathBuf]) -> Result<PathBuf, String> {
+    let target = mount.join(name);
+    fs::create_dir_all(&target).map_err(|e| format!("{} : {e}", target.display()))?;
+    for src in files.iter().filter(|p| p.is_file()) {
+        let Some(file_name) = src.file_name() else {
+            continue;
+        };
+        fs::copy(src, target.join(file_name)).map_err(|e| format!("{} : {e}", src.display()))?;
+    }
+    Ok(target)
+}
+
+/// Livrables d'un lot clôturé, tels que la clôture les copie : PDF groupé,
+/// JSON du lot, attestation et PDF de session de chaque certificat du
+/// manifeste (les entrées remplacées restent dans l'archive), manifeste.
+pub fn deliverables(lot: &Lot) -> Result<Vec<PathBuf>, String> {
+    let dir = lot.certificates_dir();
+    let id = lot.id();
+    let mut files = vec![
+        dir.join(format!("{id}-lot.pdf")),
+        dir.join(format!("{id}.json")),
+    ];
+    for r in lot.certificates() {
+        let path = dir.join(&r.file);
+        let text = fs::read_to_string(&path).map_err(|e| format!("{} : {e}", path.display()))?;
+        let envelope: SignedAttestation =
+            serde_json::from_str(&text).map_err(|e| format!("{} : {e}", path.display()))?;
+        files.push(path);
+        files.push(dir.join(format!(
+            "{}.pdf",
+            export::safe_filename(&envelope.payload.session_id)
+        )));
+    }
+    files.push(lot.manifest_path());
+    Ok(files)
+}
+
+/// Bilan d'une recopie des lots archivés sur la partition d'export.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ExportSync {
+    /// Lots copiés cette fois.
+    pub copied: Vec<String>,
+    /// Lots déjà présents (manifeste trouvé dans l'export), laissés tels quels.
+    pub present: Vec<String>,
+    /// Lots en erreur : `(identifiant, cause)`.
+    pub errors: Vec<(String, String)>,
+}
+
+/// Recopie sur `mount` les lots clôturés de `archive_root` dont le
+/// manifeste manque dans l'export (`only` : un seul lot, recopié même s'il
+/// est déjà présent). Les lots abandonnés n'ont pas de livrable.
+pub fn export_archived(archive_root: &Path, mount: &Path, only: Option<&str>) -> ExportSync {
+    let mut sync = ExportSync::default();
+    let Ok(entries) = fs::read_dir(archive_root) else {
+        return sync;
+    };
+    let mut lots: Vec<Lot> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().join(LOT_FILE).is_file())
+        .filter_map(|e| Lot::load(&e.path()).ok())
+        .filter(|lot| lot.state.status == LotStatus::Closed)
+        .filter(|lot| only.is_none_or(|id| id == lot.id()))
+        .collect();
+    lots.sort_by(|a, b| a.state.id.cmp(&b.state.id));
+    for lot in lots {
+        let id = lot.id().to_string();
+        let manifest_name = format!("{id}-manifest.json");
+        if only.is_none() && mount.join(&id).join(&manifest_name).is_file() {
+            sync.present.push(id);
+            continue;
+        }
+        match deliverables(&lot).and_then(|files| copy_to_export(mount, &id, &files)) {
+            Ok(_) => sync.copied.push(id),
+            Err(e) => sync.errors.push((id, e)),
+        }
+    }
+    sync
 }
 
 /// Statut du lot.
@@ -486,6 +577,11 @@ impl Lot {
         self.dir.join(CERTIFICATES_DIR)
     }
 
+    /// Manifeste signé (`<LOT-ID>-manifest.json`), écrit à la clôture.
+    pub fn manifest_path(&self) -> PathBuf {
+        self.dir.join(format!("{}-manifest.json", self.state.id))
+    }
+
     /// Dossier des journaux de session.
     pub fn sessions_dir(&self) -> PathBuf {
         self.dir.join(SESSIONS_DIR)
@@ -873,12 +969,135 @@ mod tests {
         }
     }
 
+    fn test_attestation() -> secmet_attest::model::Attestation {
+        use secmet_attest::model::*;
+        Attestation {
+            version: secmet_attest::model::SCHEMA_VERSION,
+            certificate_id: "SEC-20261105-TEST-sda".into(),
+            session_id: "SEC-20261105-TEST".into(),
+            issued_at: "2026-11-05 10:00:00".into(),
+            operator: "Jean".into(),
+            software: "secmet 0.3.9".into(),
+            disk: DiskFacts {
+                name: "sda".into(),
+                model: "Disk".into(),
+                serial: "S1".into(),
+                firmware: "F1".into(),
+                media: "SSD SATA".into(),
+                transport: "sata".into(),
+                capacity: "500 GB".into(),
+                size_bytes: Some(500_000_000_000),
+                block_size: Some(512),
+            },
+            erasure: ErasureFacts {
+                method_code: "ATA_SANITIZE_BLOCK_ERASE".into(),
+                method_label: "ATA SANITIZE".into(),
+                nist_level: NistLevel::Purge,
+                policy: "nist-800-88r1".into(),
+                outcome: Outcome::Success,
+                started_at: None,
+                finished_at: None,
+                duration_seconds: None,
+                caveats: vec![],
+                disposition: None,
+                disposition_reasons: vec![],
+            },
+            validation: ValidationFacts {
+                kind: "canaries".into(),
+                seed: Some("ab".repeat(32)),
+                samples: 1003,
+                anomalies: 0,
+                evidence_sha256: "00".repeat(32),
+                residual_signatures: vec![],
+                verify_status: "OK".into(),
+            },
+            bench: BenchFacts {
+                manufacturer: "Dell".into(),
+                model: "Latitude".into(),
+                serial: "M1".into(),
+            },
+            report_sha256: None,
+        }
+    }
+
     fn cert(id: &str) -> CertificateRef {
         CertificateRef {
             certificate_id: id.into(),
             file: format!("{id}.json"),
             sha256: "ab".repeat(32),
         }
+    }
+
+    #[test]
+    fn export_archived_copies_closed_lots_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("lots");
+        let archive = tmp.path().join("archive");
+        let mount = tmp.path().join("export");
+        fs::create_dir_all(&mount).unwrap();
+
+        // Un lot clôturé avec une attestation réelle et un PDF de session.
+        let mut lot = Lot::open(&root, "Jean", "", "secmet 0.3.9", LotScope::Machines).unwrap();
+        let identity = secmet_attest::sign::SigningIdentity::from_seed(&[7u8; 32]);
+        let envelope = identity.sign(&test_attestation()).unwrap();
+        let cert_dir = lot.certificates_dir();
+        let cert_file = format!(
+            "{}.json",
+            export::safe_filename(&envelope.payload.certificate_id)
+        );
+        let json = serde_json::to_string(&envelope).unwrap();
+        fs::write(cert_dir.join(&cert_file), &json).unwrap();
+        let session_pdf = format!(
+            "{}.pdf",
+            export::safe_filename(&envelope.payload.session_id)
+        );
+        fs::write(cert_dir.join(&session_pdf), b"%PDF").unwrap();
+        fs::write(cert_dir.join(format!("{}-lot.pdf", lot.id())), b"%PDF").unwrap();
+        let entry = lot
+            .start_machine(
+                machine("M1"),
+                vec![disk("D1")],
+                &envelope.payload.session_id,
+            )
+            .unwrap();
+        let r = CertificateRef {
+            certificate_id: envelope.payload.certificate_id.clone(),
+            file: cert_file.clone(),
+            sha256: secmet_attest::manifest::envelope_sha256(&envelope).unwrap(),
+        };
+        lot.finish_machine(entry, EntryStatus::Finished, vec![r])
+            .unwrap();
+        fs::write(lot.manifest_path(), b"{}").unwrap();
+        lot.close("00").unwrap();
+        let id = lot.id().to_string();
+        lot.archive(&archive).unwrap();
+
+        // Un lot abandonné : rien à copier.
+        let mut dropped = Lot::open(&root, "Jean", "", "secmet 0.3.9", LotScope::Machines).unwrap();
+        dropped.abandon().unwrap();
+        let dropped_id = dropped.id().to_string();
+        dropped.archive(&archive).unwrap();
+
+        let sync = export_archived(&archive, &mount, None);
+        assert_eq!(sync.copied, vec![id.clone()]);
+        assert!(sync.errors.is_empty());
+        let out = mount.join(&id);
+        for f in [
+            format!("{id}-lot.pdf"),
+            format!("{id}-manifest.json"),
+            cert_file.clone(),
+            session_pdf.clone(),
+        ] {
+            assert!(out.join(&f).is_file(), "{f} attendu dans l'export");
+        }
+        assert!(!mount.join(&dropped_id).exists());
+
+        // Deuxième passage : déjà présent ; `only` force la recopie.
+        let again = export_archived(&archive, &mount, None);
+        assert_eq!(again.present, vec![id.clone()]);
+        assert!(again.copied.is_empty());
+        let forced = export_archived(&archive, &mount, Some(&id));
+        assert_eq!(forced.copied, vec![id]);
     }
 
     #[test]

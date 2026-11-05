@@ -240,6 +240,31 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
             Err(e) => folder_status.set_text(&e),
         }
     });
+    // Sur la clé : recopie des lots clôturés absents de la partition
+    // d'export (partition absente ou pleine à la clôture, clé réécrite…).
+    if crate::paths::dedicated_data_dir() {
+        let export_note = Label::new(Some(&tr(
+            "Les lots clôturés sont copiés sur la partition d'export (SECMET-EXP) à la \
+             clôture ; ceux qui y manquent peuvent être recopiés depuis l'archive de la clé.",
+        )));
+        export_note.set_wrap(true);
+        export_note.set_xalign(0.0);
+        export_note.add_css_class("dim-label");
+        content.append(&export_note);
+        let export_row = GtkBox::new(Orientation::Horizontal, 8);
+        let export_btn =
+            Button::with_label(&tr("Recopier les lots clôturés sur la partition d'export"));
+        export_row.append(&export_btn);
+        let export_status = Label::new(None);
+        export_status.set_xalign(0.0);
+        export_status.set_wrap(true);
+        export_status.add_css_class("dim-label");
+        export_row.append(&export_status);
+        content.append(&export_row);
+        export_btn.connect_clicked(move |_| {
+            export_status.set_text(&super::lot_ui::export_archived_text(None));
+        });
+    }
 
     // ── Lots (poste installé ; sur la clé live les lots sont toujours actifs) ──
     let lots_check = CheckButton::with_label(&tr("Mode lot : regrouper les effacements en lots"));

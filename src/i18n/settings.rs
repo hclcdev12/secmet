@@ -33,6 +33,16 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("Choisir le logo", "Choose the logo", "Logo auswählen"),
     ("Dossier des certificats", "Certificates folder", "Zertifikatsordner"),
     (
+        "Les lots clôturés sont copiés sur la partition d'export (SECMET-EXP) à la clôture ; ceux qui y manquent peuvent être recopiés depuis l'archive de la clé.",
+        "Closed batches are copied to the export partition (SECMET-EXP) when closed; those missing there can be copied again from the key's archive.",
+        "Abgeschlossene Chargen werden beim Abschluss auf die Exportpartition (SECMET-EXP) kopiert; dort fehlende können aus dem Archiv des Sticks erneut kopiert werden.",
+    ),
+    (
+        "Recopier les lots clôturés sur la partition d'export",
+        "Copy closed batches to the export partition again",
+        "Abgeschlossene Chargen erneut auf die Exportpartition kopieren",
+    ),
+    (
         "Certificats PDF et attestations signées déjà produits : lot en cours, ou lots clôturés et certificats du poste.",
         "PDF certificates and signed attestations already produced: current batch, or closed batches and the machine's certificates.",
         "Bereits erzeugte PDF-Zertifikate und signierte Bescheinigungen: laufende Charge, sonst abgeschlossene Chargen und Zertifikate des Rechners.",

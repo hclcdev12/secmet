@@ -10,7 +10,7 @@ use secmet_attest::sign::SigningIdentity;
 use secmet_attest::{export, keystore};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use crate::i18n::{self, tr_in, Lang};
@@ -157,7 +157,7 @@ pub fn render_pdf_bundle(
     selected_disk_names: &[String],
     operator_name: &str,
     mode: CertificatePdfMode,
-) -> Result<PathBuf, String> {
+) -> Result<export::Exported, String> {
     render_pdf_bundle_in(
         &certificates_dir(),
         session,
@@ -165,7 +165,6 @@ pub fn render_pdf_bundle(
         operator_name,
         mode,
     )
-    .map(|e| e.pdf)
 }
 
 /// Comme [`render_pdf_bundle`], dans le dossier `dir`, en rendant les

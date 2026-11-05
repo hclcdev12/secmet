@@ -9,6 +9,7 @@ use std::rc::Rc;
 
 use crate::certificate;
 use crate::i18n::{tr, trf};
+use crate::lot;
 
 use super::app_theme::apply_color_scheme_class;
 use super::auth::authorize_for_action;
@@ -218,13 +219,30 @@ pub(super) fn show_pdf_generation_dialog(
         let (tx, rx) = std::sync::mpsc::channel();
         let operator_trimmed = operator_name.trim().to_string();
         let session_for_thread = session_clone.clone();
+        // Sans lot sur la clé, le certificat part aussi sur la partition
+        // d'export, dans un dossier au nom de la session (avec un lot, il
+        // est exporté à la clôture ; sur un poste installé, jamais).
+        let export_mount = if lot::active_dir().is_none() {
+            lot::export_mount_on_key()
+        } else {
+            None
+        };
         std::thread::spawn(move || {
             let result = certificate::render_pdf_bundle(
                 &session_for_thread,
                 &selected,
                 &operator_trimmed,
                 pdf_mode,
-            );
+            )
+            .map(|exported| {
+                let export = export_mount.map(|mount| {
+                    let mut files = vec![exported.pdf.clone()];
+                    files.extend(exported.json.iter().cloned());
+                    files.extend(exported.lot_json.iter().cloned());
+                    lot::copy_to_export(&mount, &session_for_thread.certificate_id, &files)
+                });
+                (exported.pdf, export)
+            });
             let _ = tx.send((result, selected.len(), pdf_mode));
         });
 
@@ -232,9 +250,25 @@ pub(super) fn show_pdf_generation_dialog(
         let global_status_for_poll = global_status_clone.clone();
         glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
             match rx.try_recv() {
-                Ok((Ok(path), disk_count, mode)) => {
+                Ok((Ok((path, export)), disk_count, mode)) => {
                     global_status_for_poll.set_text("");
-                    show_pdf_created_dialog(&parent_for_poll, &path, disk_count, mode);
+                    let export_note = export.map(|r| match r {
+                        Ok(dir) => trf(
+                            "Copié sur la partition d'export : {dir}",
+                            &[("dir", &dir.display().to_string())],
+                        ),
+                        Err(e) => trf(
+                            "Copie sur la partition d'export impossible : {error}",
+                            &[("error", &e)],
+                        ),
+                    });
+                    show_pdf_created_dialog(
+                        &parent_for_poll,
+                        &path,
+                        disk_count,
+                        mode,
+                        export_note.as_deref(),
+                    );
                     glib::ControlFlow::Break
                 }
                 Ok((Err(e), _, _)) => {
@@ -259,6 +293,7 @@ pub(super) fn show_pdf_created_dialog(
     pdf_path: &std::path::Path,
     disk_count: usize,
     mode: certificate::CertificatePdfMode,
+    export_note: Option<&str>,
 ) {
     let args = [
         ("count", disk_count.to_string()),
@@ -280,6 +315,10 @@ pub(super) fn show_pdf_created_dialog(
              dans le même dossier.",
             &args,
         ),
+    };
+    let message = match export_note {
+        Some(note) => format!("{message}\n\n{note}"),
+        None => message,
     };
     let dialog = MessageDialog::new(
         Some(parent),
