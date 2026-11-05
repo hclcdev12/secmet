@@ -40,7 +40,7 @@ fn lot_floors() -> Vec<(DateTime<Local>, &'static str)> {
                         .chain(s.entries.iter().filter_map(|e| e.finished_at.as_ref()))
                         .collect(),
                 ),
-                LotStatus::Closed if !open_only => {
+                LotStatus::Closed | LotStatus::Abandoned if !open_only => {
                     ("dernier lot clôturé", s.closed_at.iter().collect())
                 }
                 _ => continue,

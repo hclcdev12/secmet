@@ -117,6 +117,23 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Kein Zertifikat in dieser Charge: Abschluss nicht möglich.",
     ),
     ("Lot clôturé", "Batch closed", "Charge abgeschlossen"),
+    (
+        "Aucun disque effacé dans ce lot : il ne peut pas être clôturé (pas de certificat groupé), mais il peut être abandonné. Le lot est alors archivé tel quel, avec son journal, sans certificat ni manifeste ; ses entrées en échec ou interrompues y restent consignées.",
+        "No disk erased in this batch: it cannot be closed (no grouped certificate), but it can be abandoned. The batch is then archived as is, with its journal, without certificate or manifest; its failed or interrupted entries stay recorded in it.",
+        "Kein Datenträger in dieser Charge gelöscht: Sie kann nicht abgeschlossen werden (kein Sammelzertifikat), aber aufgegeben. Die Charge wird dann unverändert mit ihrem Journal archiviert, ohne Zertifikat und Manifest; ihre fehlgeschlagenen oder unterbrochenen Einträge bleiben darin erfasst.",
+    ),
+    ("Abandonner le lot", "Abandon the batch", "Charge aufgeben"),
+    ("Lot abandonné", "Batch abandoned", "Charge aufgegeben"),
+    (
+        "Lot abandonné sans certificat ; son journal est conservé.\nArchive : {dir}",
+        "Batch abandoned without certificate; its journal is kept.\nArchive: {dir}",
+        "Charge ohne Zertifikat aufgegeben; ihr Journal bleibt erhalten.\nArchiv: {dir}",
+    ),
+    (
+        "Abandon impossible : {error}",
+        "Could not abandon: {error}",
+        "Aufgeben nicht möglich: {error}",
+    ),
     ("Ouvrir le dossier", "Open folder", "Ordner öffnen"),
     (
         "Certificat groupé : {pdf}\nManifeste signé : {manifest}\nArchive : {dir}",

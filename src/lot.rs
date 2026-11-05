@@ -76,6 +76,9 @@ pub enum LotStatus {
     Open,
     /// Clôturé : PDF groupé et manifeste produits, plus aucune écriture.
     Closed,
+    /// Abandonné sans aucun certificat : archivé tel quel, avec son
+    /// journal, sans certificat groupé ni manifeste.
+    Abandoned,
 }
 
 /// Machine traitée (DMI lu par le helper sur le poste où tourne SecMet).
@@ -274,6 +277,12 @@ pub enum Event {
         certificates: u32,
         /// Empreinte SHA-256 du manifeste signé.
         manifest_sha256: String,
+    },
+    /// Abandon : aucun certificat, aucun livrable ; le lot est archivé
+    /// tel quel avec ses entrées en échec ou interrompues.
+    LotAbandoned {
+        /// Entrées (hors remplacées) présentes au moment de l'abandon.
+        entries: u32,
     },
 }
 
@@ -727,9 +736,36 @@ impl Lot {
         self.save()
     }
 
-    /// Déplace un lot clôturé sous `archive_root` (même support : renommage).
+    /// Abandon d'un lot sans certificat : journalisé, plus aucune écriture
+    /// ensuite. Refusé dès qu'un certificat est enregistré (il faut alors
+    /// clôturer, pour que le certificat figure dans un manifeste).
+    pub fn abandon(&mut self) -> Result<(), String> {
+        self.ensure_open()?;
+        let certificates = self.certificates().len();
+        if certificates > 0 {
+            return Err(format!(
+                "Lot {} : {certificates} certificat(s) enregistré(s), abandon impossible",
+                self.state.id
+            ));
+        }
+        let entries = self
+            .state
+            .entries
+            .iter()
+            .filter(|e| e.status != EntryStatus::Replaced)
+            .count();
+        self.append(Event::LotAbandoned {
+            entries: u32::try_from(entries).unwrap_or(u32::MAX),
+        })?;
+        self.state.status = LotStatus::Abandoned;
+        self.state.closed_at = Some(now_stamp());
+        self.save()
+    }
+
+    /// Déplace un lot clôturé ou abandonné sous `archive_root` (même
+    /// support : renommage).
     pub fn archive(self, archive_root: &Path) -> Result<PathBuf, String> {
-        if self.state.status != LotStatus::Closed {
+        if self.state.status == LotStatus::Open {
             return Err(format!("Lot {} non clôturé", self.state.id));
         }
         create_private_dir(archive_root)?;
@@ -843,6 +879,47 @@ mod tests {
             file: format!("{id}.json"),
             sha256: "ab".repeat(32),
         }
+    }
+
+    #[test]
+    fn abandon_only_without_certificates_then_archive() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("lots");
+        let mut lot = Lot::open(&root, "Jean", "", "secmet 0.3.9", LotScope::Machines).unwrap();
+        let entry = lot
+            .start_machine(machine("M1"), vec![disk("D1")], "S1")
+            .unwrap();
+        lot.finish_machine(entry, EntryStatus::Failed, vec![])
+            .unwrap();
+        lot.abandon().unwrap();
+        assert_eq!(lot.state().status, LotStatus::Abandoned);
+        assert!(lot.state().closed_at.is_some());
+        assert!(lot.abandon().is_err(), "plus d'écriture après l'abandon");
+        let lines = read_journal(&lot.dir().join(JOURNAL_FILE)).unwrap();
+        assert_eq!(
+            lines.last().unwrap().event,
+            Event::LotAbandoned { entries: 1 }
+        );
+        assert!(Lot::find_open(&root).unwrap().is_none());
+        let archived = lot.archive(&tmp.path().join("archive")).unwrap();
+        assert_eq!(
+            Lot::load(&archived).unwrap().state().status,
+            LotStatus::Abandoned
+        );
+
+        let mut with_cert =
+            Lot::open(&root, "Jean", "", "secmet 0.3.9", LotScope::Machines).unwrap();
+        let entry = with_cert
+            .start_machine(machine("M2"), vec![disk("D2")], "S2")
+            .unwrap();
+        with_cert
+            .finish_machine(entry, EntryStatus::Finished, vec![cert("C1")])
+            .unwrap();
+        assert!(
+            with_cert.abandon().is_err(),
+            "un certificat impose la clôture"
+        );
+        assert_eq!(with_cert.state().status, LotStatus::Open);
     }
 
     #[test]

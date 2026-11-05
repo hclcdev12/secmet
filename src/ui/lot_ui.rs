@@ -927,18 +927,8 @@ pub(super) fn close_dialog(window: &ApplicationWindow, after: Option<Box<dyn FnO
             ("interrupted", &interrupted.to_string()),
         ],
     )));
-    if certificates == 0 {
-        let warn = note(&tr("Aucun certificat dans ce lot : clôture impossible."));
-        warn.add_css_class("host-notice");
-        content.append(&warn);
-    }
     let cancel = Button::with_label(&tr("Annuler"));
-    let confirm = Button::with_label(&tr("Clôturer"));
-    confirm.add_css_class("destructive-action");
-    confirm.set_sensitive(certificates > 0);
     buttons.append(&cancel);
-    buttons.append(&confirm);
-    content.append(&buttons);
     {
         let dialog = dialog.clone();
         let after = after.clone();
@@ -947,6 +937,38 @@ pub(super) fn close_dialog(window: &ApplicationWindow, after: Option<Box<dyn FnO
             once(&after);
         });
     }
+    // Sans certificat il n'y a rien à grouper ni à signer : le lot ne se
+    // clôture pas, il s'abandonne (journalisé, archivé tel quel).
+    if certificates == 0 {
+        let warn = note(&tr(
+            "Aucun disque effacé dans ce lot : il ne peut pas être clôturé (pas de certificat \
+             groupé), mais il peut être abandonné. Le lot est alors archivé tel quel, avec son \
+             journal, sans certificat ni manifeste ; ses entrées en échec ou interrompues y \
+             restent consignées.",
+        ));
+        warn.add_css_class("host-notice");
+        content.append(&warn);
+        let abandon = Button::with_label(&tr("Abandonner le lot"));
+        abandon.add_css_class("destructive-action");
+        buttons.append(&abandon);
+        content.append(&buttons);
+        {
+            let dialog = dialog.clone();
+            let window = window.clone();
+            abandon.connect_clicked(move |btn| {
+                btn.set_sensitive(false);
+                dialog.close();
+                abandon_active(&window);
+                once(&after);
+            });
+        }
+        dialog.present();
+        return;
+    }
+    let confirm = Button::with_label(&tr("Clôturer"));
+    confirm.add_css_class("destructive-action");
+    buttons.append(&confirm);
+    content.append(&buttons);
     {
         let dialog = dialog.clone();
         let window = window.clone();
@@ -978,6 +1000,44 @@ fn take_and_close(window: &ApplicationWindow, after: Done) {
     match ACTIVE.with(|a| a.borrow_mut().take()) {
         Some(lot) => run_closure(window, lot, after),
         None => once(&after),
+    }
+}
+
+/// Abandonne le lot actif (aucun certificat) : journal, archive, compte
+/// rendu. Rapide (pas de PDF ni de manifeste), donc sur le fil GTK. En cas
+/// d'échec le lot reste actif, ou est rechargé tel quel s'il est abandonné
+/// sur disque mais pas archivé.
+fn abandon_active(window: &ApplicationWindow) {
+    let Some(mut lot) = ACTIVE.with(|a| a.borrow_mut().take()) else {
+        return;
+    };
+    if let Err(e) = lot.abandon() {
+        set_active(Some(lot));
+        show_error_dialog(
+            window,
+            &tr("Lot"),
+            &trf("Abandon impossible : {error}", &[("error", &e)]),
+        );
+        return;
+    }
+    let old_dir = lot.dir().to_path_buf();
+    match lot.archive(&paths::archive_dir()) {
+        Ok(archived) => {
+            set_active(None);
+            let text = trf(
+                "Lot abandonné sans certificat ; son journal est conservé.\nArchive : {dir}",
+                &[("dir", &archived.display().to_string())],
+            );
+            show_closed_dialog(window, &tr("Lot abandonné"), &text, archived);
+        }
+        Err(e) => {
+            set_active(Lot::load(&old_dir).ok());
+            show_error_dialog(
+                window,
+                &tr("Lot"),
+                &trf("Abandon impossible : {error}", &[("error", &e)]),
+            );
+        }
     }
 }
 
@@ -1092,7 +1152,7 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
                     .exported_to
                     .clone()
                     .unwrap_or_else(|| report.archived.clone());
-                show_closed_dialog(&window, &text, folder);
+                show_closed_dialog(&window, &tr("Lot clôturé"), &text, folder);
             }
             Err(boxed) => {
                 let (lot, e) = *boxed;
@@ -1111,8 +1171,8 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
 
 /// Résultat de la clôture, avec un accès direct aux livrables (export si
 /// copié, sinon archive).
-fn show_closed_dialog(window: &ApplicationWindow, text: &str, folder: PathBuf) {
-    let (dialog, content, buttons) = dialog_frame(window, &tr("Lot clôturé"));
+fn show_closed_dialog(window: &ApplicationWindow, title: &str, text: &str, folder: PathBuf) {
+    let (dialog, content, buttons) = dialog_frame(window, title);
     content.append(&note(text));
     let status = Label::new(None);
     status.set_xalign(0.0);
