@@ -257,7 +257,10 @@ cp "$(ls -1 "$ROOTFS"/boot/initrd.img-* | sort -V | tail -1)" "$OUT/initrd.img"
 # /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
 # embarqué : la clé démarre sur les copies de la partition système.
 # -wildcards : sans lui, les motifs -e sont pris au pied de la lettre.
-mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp xz -b 1M -Xdict-size 100% -noappend -quiet \
+# zstd 19 plutôt que xz : 19 Mo de plus à copier (725 contre 706), mais une
+# décompression trois fois plus rapide, et c'est elle qui coûte sur les
+# processeurs lents (session XFCE, base dpkg, services) : mesuré le 2026-11-05.
+mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
     -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
 cp /usr/lib/shim/shimx64.efi.signed "$OUT/efi/shimx64.efi"
 # MokManager : selon la version de shim-signed, signé ou non, ou absent.
