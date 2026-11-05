@@ -209,6 +209,22 @@ button.info-unknown:hover,
 button.info-unknown:active {
     background: alpha(@theme_fg_color, 0.08);
 }
+/* ── Marquer à détruire (ligne de disque) ───────────────────── */
+button.condemn-button {
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 13px;
+    min-height: 28px;
+    color: #dc2626;
+    background: transparent;
+    border: 1px solid alpha(#dc2626, 0.6);
+    box-shadow: none;
+}
+button.condemn-button:hover,
+button.condemn-button:active {
+    background: alpha(#dc2626, 0.12);
+    color: #dc2626;
+}
 /* ── Badge statut ────────────────────────────────────────────── */
 button.status-badge {
     border-radius: 4px;

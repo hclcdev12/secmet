@@ -29,7 +29,7 @@ use super::erase::launch_erase_operations;
 use super::pdf_ui::show_pdf_generation_dialog;
 use super::settings_ui::show_settings_dialog;
 use super::testdisk_ui::{show_testdisk_dialog, update_testdisk_button_state, TestDiskController};
-use super::types::{DiskWidget, JobRecord, JobState};
+use super::types::{CondemnContext, DiskWidget, JobRecord, JobState};
 
 /// Structure principale de l'application
 pub struct SecMetApp {
@@ -307,7 +307,20 @@ pub(super) fn build_ui(app: &Application) {
     // Rafraîchissement : vidage de session + rechargement de la liste.
     // Facteur en closure clonable pour pouvoir passer par une confirmation
     // quand des résultats d'effacement sont affichés.
+    // « Marquer à détruire » depuis une ligne de disque : même suite qu'une
+    // fin d'effacement (session, lot, PDF, relance).
+    let condemn_ctx = CondemnContext {
+        window: window.clone(),
+        disk_widgets: disk_widgets.clone(),
+        job_states: job_states.clone(),
+        global_status: global_status_label.clone(),
+        pdf_button: pdf_button.clone(),
+        retry_failed_button: retry_failed_button.clone(),
+        operations_active: operations_active.clone(),
+    };
+
     let run_refresh = {
+        let condemn = condemn_ctx.clone();
         let pdf_button = pdf_button_for_refresh.clone();
         let testdisk_button = testdisk_button_for_refresh.clone();
         let refresh_button = refresh_button_for_refresh.clone();
@@ -346,6 +359,7 @@ pub(super) fn build_ui(app: &Application) {
                 &select_all_updating,
                 &selected_total_label,
                 &operations_active,
+                &condemn,
                 Box::new(move |outcome| {
                     refresh_button.set_sensitive(true);
                     match &outcome {
@@ -714,5 +728,6 @@ pub(super) fn build_ui(app: &Application) {
         &testdisk_button,
         &refresh_button,
         &host_notice,
+        &condemn_ctx,
     );
 }

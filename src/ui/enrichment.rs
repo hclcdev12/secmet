@@ -15,7 +15,9 @@ use crate::helper_client::{self, CallError, ScanResult};
 use crate::i18n::tr;
 
 use super::app_theme::set_info_button_style;
-use super::disk_list::{disk_subtitle_text, set_status_badge, update_select_all_state};
+use super::disk_list::{
+    disk_subtitle_text, refresh_condemn_button, set_status_badge, update_select_all_state,
+};
 use super::types::DiskWidget;
 
 enum EnrichEvent {
@@ -77,6 +79,7 @@ fn apply_enrichment_to_widget(
         } else {
             set_status_badge(&widget.status_badge, &tr("INDISPONIBLE"), "status-failed");
         }
+        refresh_condemn_button(widget);
         set_info_button_style(&widget.info_button, info_style);
     }
 }
@@ -90,6 +93,7 @@ fn mark_cards_analyzing(disk_widgets: &Rc<RefCell<Vec<DiskWidget>>>) {
         sub.push_str(&tr(" — Inspection…"));
         widget.subtitle_label.set_text(&sub);
         widget.checkbox.set_sensitive(false);
+        widget.condemn_button.set_visible(false);
     }
 }
 

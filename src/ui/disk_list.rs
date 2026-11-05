@@ -14,6 +14,7 @@ use crate::disk::{detect_disks, DetectedDisks, Disk};
 use crate::i18n::{tr, trf};
 
 use super::enrichment::{cancel_enrichment, spawn_disk_enrichment};
+use super::types::CondemnContext;
 use super::types::{DiskWidget, JobRecord};
 use super::verify::attach_verify_details_button;
 
@@ -61,6 +62,18 @@ pub(super) fn create_disk_widget(disk: &Disk) -> DiskWidget {
     stop_button.set_visible(false);
     stop_button.set_valign(gtk4::Align::Center);
     row1.append(&stop_button);
+
+    // « Marquer à détruire » : disque que l'effacement ne peut pas atteindre
+    // (verrou ATA sans mot de passe, lecture seule). Caché sinon.
+    let condemn_button = Button::with_label(&tr("Marquer à détruire"));
+    condemn_button.add_css_class("condemn-button");
+    condemn_button.set_tooltip_text(Some(&tr(
+        "Sortir ce disque du circuit de réemploi sans effacement : le certificat et le lot \
+         porteront « destruction physique requise ».",
+    )));
+    condemn_button.set_valign(gtk4::Align::Center);
+    condemn_button.set_visible(condemn_offer(disk).is_some());
+    row1.append(&condemn_button);
 
     // Badge statut — toujours visible
     let status_badge = Button::with_label(&if can_shred {
@@ -150,10 +163,61 @@ pub(super) fn create_disk_widget(disk: &Disk) -> DiskWidget {
         verify_details_button,
         info_button,
         stop_button,
+        condemn_button,
         container: main_container,
         stop_handler: Rc::new(RefCell::new(None)),
         is_ata_locked: Rc::new(Cell::new(disk.is_locked == Some(true))),
     }
+}
+
+/// Explication donnée à l'opérateur pour un disque verrouillé par un mot de
+/// passe ATA inconnu (dialogue d'échec et « Marquer à détruire »).
+pub(super) fn locked_disk_notice() -> String {
+    tr(
+        "Ce disque est verrouillé par un mot de passe ATA que SecMet ne contourne jamais. Si vous \
+        connaissez le mot de passe du propriétaire, fermez ce dialogue, utilisez le bouton \
+        « Déverrouiller » puis relancez l'effacement. Sans ce mot de passe, vous pouvez le sortir \
+        du circuit de réemploi : le certificat et le lot porteront « destruction physique \
+        requise ».",
+    )
+}
+
+/// Sortie du circuit de réemploi proposée depuis la liste : code de raison
+/// du verdict et explication, pour un disque que l'effacement ne peut pas
+/// atteindre. `None` pour tout disque effaçable, système ou monté.
+pub(super) fn condemn_offer(disk: &Disk) -> Option<(&'static str, String)> {
+    if disk.is_system || disk.is_mounted {
+        return None;
+    }
+    if disk.is_locked == Some(true) {
+        return Some(("LockedWithoutPassword", locked_disk_notice()));
+    }
+    if disk.is_read_only {
+        return Some((
+            "ReadOnlyMedia",
+            tr(
+                "Ce disque est en lecture seule : aucune écriture n'est possible et aucun \
+                effacement logiciel ne peut aboutir. Vous pouvez le sortir du circuit de \
+                réemploi : le certificat et le lot porteront « destruction physique requise ».",
+            ),
+        ));
+    }
+    None
+}
+
+/// Montre ou cache « Marquer à détruire » selon l'état courant du disque.
+pub(super) fn refresh_condemn_button(widget: &DiskWidget) {
+    widget
+        .condemn_button
+        .set_visible(condemn_offer(&widget.disk).is_some());
+}
+
+fn attach_condemn_button(ctx: &CondemnContext, disk_widget: &DiskWidget) {
+    let ctx = ctx.clone();
+    let disk_name = disk_widget.disk.name.clone();
+    disk_widget.condemn_button.connect_clicked(move |_| {
+        super::erase::condemn_from_list(&ctx, &disk_name);
+    });
 }
 
 /// Récupère les disques sélectionnés
@@ -383,6 +447,7 @@ pub(super) fn load_disks_into_list(
     select_all_updating: &Rc<Cell<bool>>,
     selected_total_label: &Label,
     operations_active: &Rc<Cell<bool>>,
+    condemn: &CondemnContext,
     on_done: Box<dyn FnOnce(LoadOutcome)>,
 ) {
     cancel_enrichment();
@@ -423,6 +488,7 @@ pub(super) fn load_disks_into_list(
     let select_all_updating = select_all_updating.clone();
     let selected_total_label = selected_total_label.clone();
     let operations_active = operations_active.clone();
+    let condemn = condemn.clone();
     let mut on_done = Some(on_done);
     glib::timeout_add_local(Duration::from_millis(100), move || {
         let result = match rx.try_recv() {
@@ -445,6 +511,7 @@ pub(super) fn load_disks_into_list(
             &select_all_updating,
             &selected_total_label,
             &operations_active,
+            &condemn,
             result,
         );
         if let Some(done) = on_done.take() {
@@ -467,6 +534,7 @@ fn render_disks(
     select_all_updating: &Rc<Cell<bool>>,
     selected_total_label: &Label,
     operations_active: &Rc<Cell<bool>>,
+    condemn: &CondemnContext,
     result: Result<DetectedDisks, LoadOutcome>,
 ) -> LoadOutcome {
     clear_list(disk_list_box);
@@ -511,6 +579,7 @@ fn render_disks(
             let disk_widget = create_disk_widget(&disk);
             attach_disk_info_button(window, &disk_widget);
             attach_verify_details_button(window, job_states, &disk_widget);
+            attach_condemn_button(condemn, &disk_widget);
             disk_list_box.append(&disk_widget.container);
             disk_widgets.borrow_mut().push(disk_widget);
         }

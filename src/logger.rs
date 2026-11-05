@@ -98,11 +98,11 @@ pub fn log_job_report(disk_name: &str, report: &JobReport) {
 
 /// Le job n'a pas pu être lancé ou la liaison a été perdue.
 /// Décision de l'opérateur : disque sorti du circuit de réemploi.
-pub fn log_disk_condemned(disk_name: &str) {
+pub fn log_disk_condemned(disk_name: &str, reason: &str) {
     trace_log::log_erase_finished(
         disk_name,
         "échec",
-        "marqué à détruire par l'opérateur : verrou ATA Security sans mot de passe",
+        &format!("marqué à détruire par l'opérateur : {reason}"),
     );
 }
 

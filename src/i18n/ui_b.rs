@@ -81,6 +81,36 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     (" Consigne : {guidance}.", " Guidance: {guidance}.", " Hinweis: {guidance}."),
     ("Marquer à détruire", "Mark for destruction", "Zur Vernichtung markieren"),
     (
+        "Sortir ce disque du circuit de réemploi sans effacement : le certificat et le lot \
+         porteront « destruction physique requise ».",
+        "Withdraw this disk from reuse without erasing it: the certificate and the batch will \
+         state \"physical destruction required\".",
+        "Diesen Datenträger ohne Löschung aus der Wiederverwendung nehmen: Zertifikat und Charge \
+         tragen dann „physische Vernichtung erforderlich“.",
+    ),
+    (
+        "Ce disque est en lecture seule : aucune écriture n'est possible et aucun effacement \
+         logiciel ne peut aboutir. Vous pouvez le sortir du circuit de réemploi : le certificat et \
+         le lot porteront « destruction physique requise ».",
+        "This disk is read-only: nothing can be written to it and no software erasure can \
+         succeed. You can withdraw it from reuse: the certificate and the batch will state \
+         \"physical destruction required\".",
+        "Dieser Datenträger ist schreibgeschützt: Es kann nichts geschrieben werden und keine \
+         Software-Löschung kann gelingen. Sie können ihn aus der Wiederverwendung nehmen: \
+         Zertifikat und Charge tragen dann „physische Vernichtung erforderlich“.",
+    ),
+    (
+        "Sortir {disk} du circuit de réemploi ?",
+        "Withdraw {disk} from reuse?",
+        "{disk} aus der Wiederverwendung nehmen?",
+    ),
+    (
+        "Terminez ou attendez la fin des effacements avant de marquer un disque à détruire.",
+        "Finish or wait for the erasures to end before marking a disk for destruction.",
+        "Beenden Sie die Löschungen oder warten Sie deren Ende ab, bevor Sie einen Datenträger \
+         zur Vernichtung markieren.",
+    ),
+    (
         "Ce disque est verrouillé par un mot de passe ATA que SecMet ne contourne jamais. Si vous \
          connaissez le mot de passe du propriétaire, fermez ce dialogue, utilisez le bouton \
          « Déverrouiller » puis relancez l'effacement. Sans ce mot de passe, vous pouvez le sortir \

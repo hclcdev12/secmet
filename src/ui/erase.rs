@@ -19,10 +19,13 @@ use crate::i18n::{tr, trf};
 use crate::logger;
 
 use super::dialogs::{show_condemn_dialog, show_error_dialog};
-use super::disk_list::{disk_trace_subtitle, set_status_badge, update_select_all_state};
+use super::disk_list::{
+    condemn_offer, disk_trace_subtitle, locked_disk_notice, set_status_badge,
+    update_select_all_state,
+};
 use super::pdf_ui::update_pdf_button_state;
 use super::testdisk_ui::update_testdisk_button_state;
-use super::types::{DiskWidget, JobRecord, JobState};
+use super::types::{CondemnContext, DiskWidget, JobRecord, JobState};
 use super::verify::{apply_job_validation, set_verification_message};
 
 pub(super) fn erase_method_description(disk: &Disk, passes: u8) -> String {
@@ -757,24 +760,17 @@ pub(super) fn launch_erase_operations_with_passes(
                         // Sans mot de passe, SecMet ne contourne jamais un
                         // verrou ATA : l'opérateur peut sortir le disque du
                         // circuit, le certificat et le lot le porteront.
-                        let message =
-                            format!(
-                            "{}\n\n{}",
-                            error.message,
-                            tr("Ce disque est verrouillé par un mot de passe ATA que SecMet ne \
-                                contourne jamais. Si vous connaissez le mot de passe du \
-                                propriétaire, fermez ce dialogue, utilisez le bouton \
-                                « Déverrouiller » puis relancez l'effacement. Sans ce mot de \
-                                passe, vous pouvez le sortir du circuit de réemploi : le \
-                                certificat et le lot porteront « destruction physique requise ».")
-                        );
+                        let message = format!("{}\n\n{}", error.message, locked_disk_notice());
                         let job_states = job_states_clone.clone();
                         let badge_button = widget.status_badge.clone();
                         let name = disk_name.clone();
                         show_condemn_dialog(&window_clone, &title, &message, move || {
                             certificate::condemn_disk(&name, "LockedWithoutPassword");
                             set_status_badge(&badge_button, &tr("À DÉTRUIRE"), "status-failed");
-                            logger::log_disk_condemned(&name);
+                            logger::log_disk_condemned(
+                                &name,
+                                "verrou ATA Security sans mot de passe",
+                            );
                             update_job_state(
                                 &job_states,
                                 &name,
@@ -858,6 +854,89 @@ pub(super) fn launch_erase_operations_with_passes(
             glib::ControlFlow::Continue
         }
     });
+}
+
+/// « Marquer à détruire » depuis la liste : un disque que l'effacement ne
+/// peut pas atteindre (verrou ATA sans mot de passe, lecture seule) sort du
+/// circuit de réemploi sans qu'aucune étape soit lancée. Même suite qu'une
+/// fin d'effacement : session, entrée de lot et certificats (sort
+/// « destruction physique requise »), journal, bouton PDF.
+pub(super) fn condemn_from_list(ctx: &CondemnContext, disk_name: &str) {
+    if ctx.operations_active.get() {
+        show_error_dialog(
+            &ctx.window,
+            &tr("Opération en cours"),
+            &tr("Terminez ou attendez la fin des effacements avant de marquer un disque à détruire."),
+        );
+        return;
+    }
+    let Some(widget) = find_widget(&ctx.disk_widgets, disk_name) else {
+        return;
+    };
+    let Some((code, notice)) = condemn_offer(&widget.disk) else {
+        return;
+    };
+    let disk = widget.disk.clone();
+    let (_, reason) = disk.can_be_shredded();
+    let title = trf(
+        "Sortir {disk} du circuit de réemploi ?",
+        &[("disk", &disk.name)],
+    );
+    let message = format!("{reason}\n\n{notice}");
+    let window = ctx.window.clone();
+    let ctx = ctx.clone();
+    let disks = vec![disk.clone()];
+    super::lot_ui::check_before_erase(
+        &window,
+        &disks,
+        Box::new(move || {
+            let apply = ctx.clone();
+            show_condemn_dialog(&ctx.window, &title, &message, move || {
+                apply_condemnation(&apply, &widget, &disk, code, &reason);
+            });
+        }),
+    );
+}
+
+fn apply_condemnation(
+    ctx: &CondemnContext,
+    widget: &DiskWidget,
+    disk: &Disk,
+    code: &str,
+    reason: &str,
+) {
+    let name = disk.name.clone();
+    let disks = std::slice::from_ref(disk);
+    certificate::ensure_session_for_disks(disks);
+    certificate::mark_disk_started(&name, disk);
+    certificate::finish_disk_unrunnable(&name, reason, "destroy_required", &[code.to_string()]);
+    super::lot_ui::register_start(disks);
+    logger::log_operation_start(std::slice::from_ref(&name));
+    logger::log_disk_section_begin(&name, &disk.path, &disk_trace_subtitle(disk));
+    logger::log_disk_condemned(&name, reason);
+    logger::log_disk_result(&name, false, reason);
+    if let Some(log_path) = logger::log_operation_end() {
+        certificate::attach_session_log(log_path.display().to_string());
+    }
+    certificate::finalize_session();
+    super::lot_ui::register_end(&ctx.window, &ctx.global_status);
+
+    set_status_badge(&widget.status_badge, &tr("À DÉTRUIRE"), "status-failed");
+    widget.condemn_button.set_visible(false);
+    widget.checkbox.set_sensitive(false);
+    set_verification_message(
+        &widget.verify_label,
+        &tr("Vérification : non effectuée"),
+        "verify-fail",
+    );
+    update_job_state(
+        &ctx.job_states,
+        &name,
+        JobState::DestroyRequired,
+        &format!("Marqué à détruire : {reason}"),
+    );
+    update_retry_button_state(&ctx.job_states, &ctx.retry_failed_button);
+    update_pdf_button_state(&ctx.pdf_button);
 }
 
 pub(super) fn update_job_state(

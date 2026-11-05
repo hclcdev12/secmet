@@ -8,7 +8,7 @@ use std::rc::Rc;
 use super::dialogs::{confirm_action_dual, show_error_dialog, show_fatal_dialog};
 use super::disk_list::{load_disks_into_list, update_host_notice, LoadOutcome};
 use super::testdisk_ui::update_testdisk_button_state;
-use super::types::{DiskWidget, JobRecord};
+use super::types::{CondemnContext, DiskWidget, JobRecord};
 use gtk4::Button;
 
 use crate::i18n::{tr, trf};
@@ -187,6 +187,7 @@ fn finish_startup(
     testdisk_button: &Button,
     refresh_button: &Button,
     host_notice: &Label,
+    condemn: &CondemnContext,
 ) {
     let window_done = window.clone();
     let disk_widgets_done = disk_widgets.clone();
@@ -203,6 +204,7 @@ fn finish_startup(
     let select_all_updating = select_all_updating.clone();
     let selected_total_label = selected_total_label.clone();
     let operations_active = operations_active.clone();
+    let condemn = condemn.clone();
     // Clé USB : lot à reprendre ou à ouvrir avant l'inventaire (annexe M).
     super::lot_ui::startup(
         window,
@@ -217,6 +219,7 @@ fn finish_startup(
                 &select_all_updating,
                 &selected_total_label,
                 &operations_active,
+                &condemn,
                 Box::new(move |outcome| match outcome {
                     LoadOutcome::Loaded { root_traced } => {
                         update_host_notice(&host_notice, root_traced);
@@ -269,6 +272,7 @@ pub(super) fn run_startup_authorization(
     testdisk_button: &Button,
     refresh_button: &Button,
     host_notice: &Label,
+    condemn: &CondemnContext,
 ) {
     let window = window.clone();
     let disk_list_box = disk_list_box.clone();
@@ -282,6 +286,7 @@ pub(super) fn run_startup_authorization(
     let testdisk_button = testdisk_button.clone();
     let refresh_button = refresh_button.clone();
     let host_notice = host_notice.clone();
+    let condemn = condemn.clone();
 
     glib::idle_add_local_once(move || {
         let finish = {
@@ -297,6 +302,7 @@ pub(super) fn run_startup_authorization(
             let testdisk_button = testdisk_button.clone();
             let refresh_button = refresh_button.clone();
             let host_notice = host_notice.clone();
+            let condemn = condemn.clone();
             move || {
                 finish_startup(
                     &window,
@@ -311,6 +317,7 @@ pub(super) fn run_startup_authorization(
                     &testdisk_button,
                     &refresh_button,
                     &host_notice,
+                    &condemn,
                 );
             }
         };
