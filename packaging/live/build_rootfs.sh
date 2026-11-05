@@ -197,6 +197,10 @@ in_chroot depmod -a "$KVER"
 # systemd y voit un périphérique bloc et journalise trente fois « Failed to
 # open /dev/shm device » à chaque démarrage. Nom de source neutre.
 sed -i 's|dev="/dev/shm"|dev="tmpfs"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
+# Pendant la copie en mémoire (30 à 40 s sur une clé à 25 Mo/s), l'écran de
+# démarrage ne montrait rien : message sous le logo, retiré à la fin.
+sed -i 's|^\t\t\t\tcp ${MODULETORAMFILE} ${copyto}|\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth message --text="Copie du système en mémoire (environ 30 s)…"\n\t\t\t\tcp ${MODULETORAMFILE} ${copyto}\n\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth hide-message --text="Copie du système en mémoire (environ 30 s)…"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
+grep -q 'plymouth message' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch toram-todisk.sh non appliqué" >&2; exit 1; }
 step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
 in_chroot apt-get clean
