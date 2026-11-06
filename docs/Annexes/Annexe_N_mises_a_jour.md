@@ -130,6 +130,8 @@ Outil `secmet-release` (crate `secmet-attest`, non livré dans les paquets) :
 
 Prérequis GitHub : une release exige un tag, donc le tag `vX.Y.Z` doit exister sur le dépôt ; `package.yml` (GitHub Actions, gratuit sur un dépôt public) construit, signe et publie à chaque push de tag, `make release` restant la voie locale.
 
+**Image de la clé USB dans la release (réalisé 2026-11-06).** La chaîne construit aussi l'image de la clé (`make live`, conteneur privilégié) et son livrable `secmet-live_<version>_x86_64.tar` (`packaging/live/bundle_live.sh` : image, `secmet-make-key.sh`, `grub.cfg`, `secmet-release` pour Ubuntu 24.04, `LISEZMOI.txt`), refusé si l'image n'est pas de la version de `Cargo.toml`. Le livrable est listé dans `SHA256SUMS` signé comme les paquets (`secmet-release` accepte `.tar`) ; l'application, qui cherche ses paquets par nom, l'ignore. Dans `package.yml`, le travail `live` tourne sur un tag ou à la main (`docker --privileged`, 20 à 30 min) et `publish` l'attend. Sur le poste du responsable des versions, `packaging/release.sh` fait de même (`--skip-live` pour s'en passer) et, si KVM est disponible, exige que la clé virtuelle déploie la version la plus récente de son magasin au démarrage (`packaging/live/qemu-check.sh`, voir `packaging/live/README.md`). Ainsi chaque clé fabriquée depuis une release part avec la version publiée, et le script de mise à jour au démarrage est testé avant publication.
+
 ### Intégration continue
 
 - Les workflows GitHub Actions (`ci.yml`, `fuzz.yml`, `package.yml`) restent dans le dépôt ; ils ne sont **pas** nécessaires pour publier.

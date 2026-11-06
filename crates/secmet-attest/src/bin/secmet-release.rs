@@ -10,7 +10,7 @@
 //! ```
 //! `sign` écrit `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` dans le
 //! dossier ; sans liste de fichiers, il prend les `.deb`, `.rpm`,
-//! `.AppImage` et `.img.xz` (image de clé USB) qui s'y trouvent. `verify` contrôle les deux signatures,
+//! `.AppImage`, `.tar` (livrable de la clé USB) et `.img.xz` (image de clé USB) qui s'y trouvent. `verify` contrôle les deux signatures,
 //! l'empreinte de chaque fichier et la cohérence de la version ; code 0 si
 //! tout est valide **et** signé par une clé de confiance (`--trust` ou
 //! `$SECMET_RELEASE_TRUSTED_KEYS`, séparateur `:`), 1 sinon, 2 sur usage.
@@ -96,6 +96,7 @@ fn package_files(dir: &Path) -> Result<Vec<String>, AttestError> {
                 || name.ends_with(".rpm")
                 || name.ends_with(".AppImage")
                 || name.ends_with(".img.xz")
+                || name.ends_with(".tar")
         })
         .collect();
     names.sort();

@@ -4,7 +4,7 @@
 # clé de version, latest.json. Rien ne quitte la machine sans --publish, qui
 # demande confirmation avant d'envoyer la release sur le dépôt public.
 #
-# usage : packaging/release.sh [--publish] [--skip-checks] [--skip-build]
+# usage : packaging/release.sh [--publish] [--skip-checks] [--skip-build] [--skip-live]
 #                              [--allow-dirty] [--allow-untagged]
 #                              [--notes <fr.md>] [--notes-en <en.md>] [--notes-de <de.md>]
 #
@@ -13,21 +13,24 @@
 #         SECMET_RELEASES_URL   base des téléchargements (défaut https://github.com/<repo>/releases/download)
 #         SECMET_ENGINE         podman ou docker (détecté)
 #
-# Sortie : dist/release/<version>/ avec les 4 paquets, SHA256SUMS, SHA256SUMS.sig,
-#          latest.json et les journaux de construction (logs/).
+# Sortie : dist/release/<version>/ avec les 4 paquets, le livrable de la clé USB
+#          (secmet-live_<version>_x86_64.tar, sauf --skip-live), SHA256SUMS,
+#          SHA256SUMS.sig, latest.json et les journaux de construction (logs/).
+#          Avec KVM, l'image passe le contrôle QEMU (packaging/live/qemu-check.sh).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="$ROOT_DIR/packaging"
 cd "$ROOT_DIR"
 
-PUBLISH=0 SKIP_CHECKS=0 SKIP_BUILD=0 ALLOW_DIRTY=0 ALLOW_UNTAGGED=0
+PUBLISH=0 SKIP_CHECKS=0 SKIP_BUILD=0 SKIP_LIVE=0 ALLOW_DIRTY=0 ALLOW_UNTAGGED=0
 NOTES_FR="" NOTES_EN="" NOTES_DE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --publish) PUBLISH=1 ;;
         --skip-checks) SKIP_CHECKS=1 ;;
         --skip-build) SKIP_BUILD=1 ;;
+        --skip-live) SKIP_LIVE=1 ;;
         --allow-dirty) ALLOW_DIRTY=1 ;;
         --allow-untagged) ALLOW_UNTAGGED=1 ;;
         --notes) NOTES_FR="$2"; shift ;;
@@ -175,6 +178,25 @@ cp dist/*.rpm /out/
         echo "glibc max requise par GTK : $max"
     fi
     rm -rf "$extract"
+fi
+
+# --- 2c. Image de la clé USB --------------------------------------------------
+# Conteneur privilégié (20 à 30 min). Le livrable rejoint les paquets et
+# SHA256SUMS ; avec KVM, la clé virtuelle doit déployer la version la plus
+# récente de son magasin au démarrage (packaging/live/qemu-check.sh).
+if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
+    step "Image de la clé USB (conteneur privilégié)"
+    "$PKG_DIR/live/build_live.sh" > "$LOG_DIR/live.log" 2>&1 || die "image de la clé échouée, voir $LOG_DIR/live.log"
+    "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
+    cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$OUT_DIR/"
+    "$PKG_DIR/live/tests/app-update.sh" > "$LOG_DIR/live-script-test.log" 2>&1 || die "test du script de mise à jour échoué, voir $LOG_DIR/live-script-test.log"
+    if [[ -r /dev/kvm ]]; then
+        step "Contrôle QEMU de la mise à jour au démarrage de la clé"
+        "$PKG_DIR/live/qemu-check.sh" > "$LOG_DIR/live-check.log" 2>&1 || die "contrôle QEMU échoué, voir $LOG_DIR/live-check.log"
+        tail -1 "$LOG_DIR/live-check.log"
+    else
+        echo "pas de KVM : contrôle QEMU sauté (make live-check sur un poste qui l'a)"
+    fi
 fi
 
 # --- 2b. Noms publiés ---------------------------------------------------------

@@ -63,6 +63,9 @@ rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)
 live: ## Construit l'image de la clé USB SecMet (conteneur Ubuntu 24.04 privilégié) → dist/live/
 	@./packaging/live/build_live.sh
 
+live-bundle: ## Livrable de la clé USB dist/secmet-live_<version>_x86_64.tar (après make live)
+	@./packaging/live/bundle_live.sh
+
 live-image: ## Clé SecMet virtuelle dist/live/secmet-key.img (conteneur privilégié), pour QEMU
 	@./packaging/live/make_key_image.sh
 

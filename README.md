@@ -244,6 +244,8 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make rpm` | Construit le paquet `.rpm` (Fedora : rpm-build, gtk4-devel, testdisk) |
 | `make appimage` | Construit l'AppImage dans un conteneur Ubuntu 24.04 |
 | `make live` | Construit l'image de la clé USB SecMet dans un conteneur privilégié Ubuntu 24.04 → `dist/live/` ([packaging/live/README.md](packaging/live/README.md)) |
+| `make live-bundle` | Livrable de la clé USB `dist/secmet-live_<version>_x86_64.tar` (après `make live`) |
+| `make live-check` | Contrôle QEMU sans écran : la clé virtuelle déploie la version la plus récente de son magasin `app/` |
 | `make live-key DEV=/dev/sdX` | Écrit une clé USB SecMet (root ; efface la clé) |
 | `make release` | Chaîne de publication : contrôles, 4 paquets construits et fumés en conteneurs, `SHA256SUMS` et `latest.json` signés avec la clé de version ; rien n'est publié |
 | `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation |
@@ -265,13 +267,13 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 |----------|-------------|---------|
 | `ci.yml` | push / PR sur `main` et `I/O_SecMet` | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, shellcheck des scripts, compilation des cibles de fuzz |
 | `fuzz.yml` | push / PR touchant `crates/` ou `fuzz/` (60 s par cible), hebdomadaire (30 min), manuel (durée au choix) | cargo-fuzz (nightly, libFuzzer) sur neuf décodeurs purs : sense ATA, IDENTIFY, SMART, NVMe, trames IPC, QR et JSON d'attestation, mountinfo, canaris ; entrées fautives publiées en artefact |
-| `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `<version>~ubuntu22.04`, publiée sous `secmet_<version>.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; sur un tag, signature et release GitHub |
+| `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `<version>~ubuntu22.04`, publiée sous `secmet_<version>.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; sur un tag ou à la main, image de la clé USB et son livrable `.tar` ; sur un tag, signature et release GitHub |
 
 Les cibles de fuzz vivent dans `fuzz/` (crate hors workspace) : `cargo +nightly fuzz run ata_sense` en local après `cargo install cargo-fuzz`.
 
 ### Publication d'une version
 
-Le push d'un tag `vX.Y.Z` suffit : `package.yml` construit les quatre paquets, les signe avec la **clé de version** (secret du dépôt, distincte des clés d'attestation des certificats) et crée la release. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis). Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
+Le push d'un tag `vX.Y.Z` suffit : `package.yml` construit les quatre paquets et l'image de la clé USB (livrable `secmet-live_<version>_x86_64.tar` : image, `secmet-make-key.sh`, `secmet-release`), signe le tout avec la **clé de version** (secret du dépôt, distincte des clés d'attestation des certificats) et crée la release. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis), où l'image passe en plus le contrôle QEMU `make live-check`. Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
 
 ```bash
 secmet-release keygen ~/.config/secmet/release-key.hex   # une fois ; sauvegarder la clé hors ligne

@@ -38,6 +38,8 @@ sudo packaging/live/secmet-make-key.sh /dev/sdX --system-only   # mise à jour d
 | 3 `SECMET-EXPORT` | Microsoft basic data | exFAT `SECMET-EXP` | Livrables des lots clôturés |
 | 4 `BIOS boot` (1 Mio, placée à 1 Mio, avant la partition 1) | BIOS boot | — | Code de GRUB i386-pc pour les postes sans UEFI |
 
+Chaque release GitHub publie le livrable `secmet-live_<version>_x86_64.tar` (`make live-bundle`, travail `live` de `package.yml`), listé dans `SHA256SUMS` signé : un dossier `secmet-live-<version>/` avec `dist/live/`, `packaging/live/{secmet-make-key.sh,grub.cfg}`, `target/release/secmet-release` (Ubuntu 24.04) et un `LISEZMOI.txt`. Une fois extrait, `sudo secmet-live-<version>/packaging/live/secmet-make-key.sh /dev/sdX` fabrique une clé, `--system-only` met à jour une clé existante.
+
 Sur une machine qui n'a pas le dépôt (banc, atelier), il suffit de copier `dist/live/`, `packaging/live/secmet-make-key.sh`, `packaging/live/grub.cfg` et un `secmet-release` compilé pour Ubuntu 24.04 (`target-appimage/release/secmet-release`) dans une arborescence `<dossier>/{dist/live,packaging/live,target/release}` et de lancer `sudo <dossier>/packaging/live/secmet-make-key.sh /dev/sdX`. La partition d'export d'une clé existante peut servir de dossier de transfert : en `--system-only`, seule la partition système est démontée.
 
 Le script crée la clé de signature des certificats (`config/attestation-key.hex`, même format que celle créée par l'application) et affiche son **`key_id`** : à enregistrer chez le client comme clé de confiance (`secmet-verify --trust`). `--system-only` réécrit la partition 1 seulement.
