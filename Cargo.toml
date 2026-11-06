@@ -7,7 +7,7 @@ exclude = ["fuzz"]
 
 [package]
 name = "secmet"
-version = "0.3.9"
+version = "0.3.10"
 edition = "2021"
 license = "GPL-3.0-or-later"
 
