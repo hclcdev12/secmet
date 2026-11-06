@@ -69,6 +69,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Bits d'exécution (un script ou un crochet non exécutable est ignoré en silence)
+        run: |
+          for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh \
+                   packaging/live/overlay/usr/local/bin/* packaging/live/overlay/etc/initramfs-tools/hooks/* \
+                   packaging/live/overlay/usr/lib/systemd/system-sleep/*; do
+            test -x "$f" || { echo "non exécutable : $f"; exit 1; }
+          done
       - name: Syntaxe bash
         run: |
           for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh; do bash -n "$f"; done

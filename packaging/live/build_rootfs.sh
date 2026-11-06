@@ -122,6 +122,11 @@ echo "secmet:$PASSWORD" | in_chroot chpasswd
 mkdir -p "$ROOTFS/media/secmet-data" "$ROOTFS/media/secmet-export"
 
 cp -a "$SRC/packaging/live/overlay/." "$ROOTFS/"
+# Bits d'exécution posés ici, quel que soit l'état du dépôt d'origine : un
+# crochet initramfs ou de veille non exécutable est ignoré en silence
+# (constaté le 2026-11-06 : initrd de 184 Mo au lieu de 75 sur GitHub).
+chmod 0755 "$ROOTFS"/usr/local/bin/secmet-* "$ROOTFS"/etc/initramfs-tools/hooks/* \
+    "$ROOTFS"/usr/lib/systemd/system-sleep/*
 # Fond d'écran SecMet pour tout écran : les fonds XFCE par défaut sont remplacés
 # (xfdesktop les prend pour un moniteur qu'il ne connaît pas encore).
 for bg in "$ROOTFS"/usr/share/backgrounds/xfce/*; do cp "$ROOTFS/usr/share/backgrounds/secmet.png" "$bg"; done
@@ -254,6 +259,12 @@ mkdir -p "$OUT/efi" "$OUT/bios"
 rm -f "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs
 cp "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)" "$OUT/vmlinuz"
 cp "$(ls -1 "$ROOTFS"/boot/initrd.img-* | sort -V | tail -1)" "$OUT/initrd.img"
+# L'initrd est lu par GRUB depuis la clé avant tout affichage : au-delà de
+# 120 Mo, le crochet zz-secmet-trim n'a pas tourné (190 Mo avec nouveau et
+# le firmware NVIDIA, 75 à 85 Mo sans).
+initrd_mb=$(( $(stat -c %s "$OUT/initrd.img") / 1048576 ))
+echo "initrd : ${initrd_mb} Mo"
+[[ "$initrd_mb" -le 120 ]] || { echo "initrd de ${initrd_mb} Mo : crochet zz-secmet-trim non appliqué ?" >&2; exit 1; }
 # /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
 # embarqué : la clé démarre sur les copies de la partition système.
 # -wildcards : sans lui, les motifs -e sont pris au pied de la lettre.
