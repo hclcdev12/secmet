@@ -13,10 +13,12 @@
 #         SECMET_RELEASES_URL   base des téléchargements (défaut https://github.com/<repo>/releases/download)
 #         SECMET_ENGINE         podman ou docker (détecté)
 #
-# Sortie : dist/release/<version>/ avec les 4 paquets, le livrable de la clé USB
-#          (secmet-live_<version>_x86_64.tar, sauf --skip-live), SHA256SUMS,
-#          SHA256SUMS.sig, latest.json et les journaux de construction (logs/).
-#          Avec KVM, l'image passe le contrôle QEMU (packaging/live/qemu-check.sh).
+# Sortie : dist/release/<version>/ avec les 4 paquets, le livrable de fabrication
+#          de la clé USB (secmet-live_<version>_x86_64.tar) et l'image prête à
+#          écrire (secmet-key_<version>_x86_64.img.xz), sauf --skip-live,
+#          SHA256SUMS, SHA256SUMS.sig, latest.json et les journaux de
+#          construction (logs/). Avec KVM, la clé passe les contrôles QEMU
+#          (packaging/live/qemu-check.sh et image-check.sh).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -183,19 +185,27 @@ fi
 # --- 2c. Image de la clé USB --------------------------------------------------
 # Conteneur privilégié (20 à 30 min). Le livrable rejoint les paquets et
 # SHA256SUMS ; avec KVM, la clé virtuelle doit déployer la version la plus
-# récente de son magasin au démarrage (packaging/live/qemu-check.sh).
+# récente de son magasin au démarrage (packaging/live/qemu-check.sh) et
+# l'image publiable (.img.xz) doit passer son premier démarrage en BIOS
+# (packaging/live/image-check.sh : clé de signature créée, export agrandi).
 if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
     step "Image de la clé USB (conteneur privilégié)"
     "$PKG_DIR/live/build_live.sh" > "$LOG_DIR/live.log" 2>&1 || die "image de la clé échouée, voir $LOG_DIR/live.log"
     "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
     cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$OUT_DIR/"
     "$PKG_DIR/live/tests/app-update.sh" > "$LOG_DIR/live-script-test.log" 2>&1 || die "test du script de mise à jour échoué, voir $LOG_DIR/live-script-test.log"
+    step "Image publiable de la clé USB (.img.xz)"
+    "$PKG_DIR/live/make_key_image.sh" --dist > "$LOG_DIR/live-dist.log" 2>&1 || die "image publiable échouée, voir $LOG_DIR/live-dist.log"
+    cp -f "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" "$OUT_DIR/"
     if [[ -r /dev/kvm ]]; then
         step "Contrôle QEMU de la mise à jour au démarrage de la clé"
         "$PKG_DIR/live/qemu-check.sh" > "$LOG_DIR/live-check.log" 2>&1 || die "contrôle QEMU échoué, voir $LOG_DIR/live-check.log"
         tail -1 "$LOG_DIR/live-check.log"
+        step "Contrôle QEMU du premier démarrage de l'image publiable (BIOS)"
+        "$PKG_DIR/live/image-check.sh" > "$LOG_DIR/live-dist-check.log" 2>&1 || die "contrôle de l'image publiable échoué, voir $LOG_DIR/live-dist-check.log"
+        tail -1 "$LOG_DIR/live-dist-check.log"
     else
-        echo "pas de KVM : contrôle QEMU sauté (make live-check sur un poste qui l'a)"
+        echo "pas de KVM : contrôles QEMU sautés (make live-check et make live-dist-check sur un poste qui l'a)"
     fi
 fi
 

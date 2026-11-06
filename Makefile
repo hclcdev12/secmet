@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage install-deb test build release publish live live-image live-test live-key fix-pkexec verify-polkit fuzz-check
+.PHONY: help deps dev run clean deb rpm appimage install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -68,6 +68,12 @@ live-bundle: ## Livrable de la clé USB dist/secmet-live_<version>_x86_64.tar (a
 
 live-image: ## Clé SecMet virtuelle dist/live/secmet-key.img (conteneur privilégié), pour QEMU
 	@./packaging/live/make_key_image.sh
+
+live-dist: ## Image publiable de la clé dist/secmet-key_<version>_x86_64.img.xz (après make live ; Etcher, Rufus, dd)
+	@./packaging/live/make_key_image.sh --dist
+
+live-dist-check: ## Contrôle QEMU (BIOS) du premier démarrage de l'image publiable : clé de signature créée, export agrandi (4 min)
+	@./packaging/live/image-check.sh
 
 live-test: ## Démarre la clé virtuelle dans QEMU (UEFI OVMF)
 	@./packaging/live/qemu-test.sh

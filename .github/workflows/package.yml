@@ -9,9 +9,10 @@ name: Package
 # la clé de version, puis crée la release GitHub dans ce dépôt.
 #
 # Sur un tag ou à la main, le travail « live » construit aussi l'image de la
-# clé USB (conteneur privilégié, 20 à 30 min) et son livrable
-# secmet-live_<version>_x86_64.tar (image, secmet-make-key.sh, secmet-release),
-# signé et publié avec les paquets.
+# clé USB (conteneur privilégié, 20 à 30 min), son livrable de fabrication
+# secmet-live_<version>_x86_64.tar (image, secmet-make-key.sh, secmet-release)
+# et l'image prête à écrire secmet-key_<version>_x86_64.img.xz (Etcher, Rufus,
+# dd ; docs/Fabriquer_sa_cle.md), signés et publiés avec les paquets.
 #
 # Secret du dépôt : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex). Les
 # journaux sont publics : aucune étape n'affiche le secret.
@@ -209,10 +210,20 @@ jobs:
       - name: Script de mise à jour au démarrage (doublures)
         run: ./packaging/live/tests/app-update.sh
 
+      - name: Image publiable de la clé (.img.xz, Etcher / Rufus / dd)
+        env:
+          SECMET_ENGINE: docker
+        run: |
+          ./packaging/live/make_key_image.sh --dist
+          ls -la dist/secmet-key_*_x86_64.img.xz
+          xz -l dist/secmet-key_*_x86_64.img.xz
+
       - uses: actions/upload-artifact@v4
         with:
           name: live
-          path: dist/secmet-live_*_x86_64.tar
+          path: |
+            dist/secmet-live_*_x86_64.tar
+            dist/secmet-key_*_x86_64.img.xz
           if-no-files-found: error
           compression-level: 0
 
@@ -244,7 +255,7 @@ jobs:
       - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-live_*.tar' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' \) -exec mv {} release/ \;
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
@@ -278,8 +289,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
-          printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage et livrable de la clé USB (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-            "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}" "$key_id" > notes.md
+          printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : balenaEtcher, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+            "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}" "$key_id" > notes.md
           gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --title "SecMet ${{ steps.version.outputs.version }}" \
             --notes-file notes.md release/*
           gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name'

@@ -30,11 +30,11 @@ WAIT="${SECMET_CHECK_WAIT:-150}"
 OLD=9.9.8
 NEW=9.9.9
 fail() { echo "ÉCHEC : $*" >&2; exit 1; }
+# shellcheck source=packaging/live/qemu-lib.sh
+source "$LIVE/qemu-lib.sh"
 
 [[ -f "$ROOT_DIR/dist/live/filesystem.squashfs" ]] || fail "dist/live absent : make live"
-for tool in qemu-system-x86_64 e2fsck debugfs sfdisk; do
-    command -v "$tool" >/dev/null || fail "$tool introuvable"
-done
+qemu_tools_check
 deb=$(ls "$ROOT_DIR"/dist/secmet_*~ubuntu24.04_amd64.deb 2>/dev/null | sort -V | tail -1 || true)
 [[ -n "$deb" ]] || fail "aucun dist/secmet_*~ubuntu24.04_amd64.deb : make deb"
 
@@ -58,41 +58,8 @@ echo "== magasin : $OLD et $NEW ($(basename "$deb"))$([[ $signed == 1 ]] && echo
 echo "== clé virtuelle"
 SECMET_KEY_APP_DIR="$WORK/store" "$LIVE/make_key_image.sh" | tail -1
 
-echo "== démarrage QEMU (sans affichage), attente ${WAIT} s"
-export SECMET_QEMU_WORK="$WORK/qemu" SECMET_QEMU_MON="$WORK/qemu/mon.sock" SECMET_QEMU_QMP="$WORK/qemu/qmp.sock"
-"$LIVE/qemu-test.sh" --headless &
-QEMU=$!
-trap 'kill "$QEMU" 2>/dev/null || true' EXIT
-sleep "$WAIT"
-kill -0 "$QEMU" 2>/dev/null || fail "QEMU s'est arrêté avant la fin de l'attente"
-# Extinction propre (ACPI) si la session la laisse passer, sinon arrêt sec :
-# le journal a déjà été copié par la minuterie, et e2fsck rejoue le journal
-# ext4 de la partition extraite.
-python3 "$LIVE/qemu-ctl.py" hmp system_powerdown >/dev/null 2>&1 || true
-for _ in $(seq 1 30); do
-    kill -0 "$QEMU" 2>/dev/null || break
-    sleep 2
-done
-if kill -0 "$QEMU" 2>/dev/null; then
-    python3 "$LIVE/qemu-ctl.py" hmp quit >/dev/null 2>&1 || kill "$QEMU"
-    wait "$QEMU" 2>/dev/null || true
-fi
-trap - EXIT
-
-echo "== lecture du journal sur la partition de données"
-read -r start size < <(sfdisk -J "$IMG" | python3 -c '
-import json, sys
-p = json.load(sys.stdin)["partitiontable"]["partitions"]
-d = [x for x in p if x.get("name") == "SECMET-DATA"][0]
-print(d["start"], d["size"])')
-P2="$WORK/data.img"
-dd if="$IMG" of="$P2" bs=4M iflag=skip_bytes,count_bytes skip=$((start * 512)) count=$((size * 512)) conv=sparse status=none
-e2fsck -fy "$P2" >/dev/null 2>&1 || true
-logs=$(debugfs -R "ls -p /logs/system" "$P2" 2>/dev/null | awk -F/ '$6 ~ /^[0-9a-f]{32}\.log$/ {print $6}')
-[[ -n "$logs" ]] || fail "aucun journal de démarrage dans logs/system (attente trop courte ?)"
-JOURNAL="$WORK/journal.log"
-: > "$JOURNAL"
-for l in $logs; do debugfs -R "cat /logs/system/$l" "$P2" >> "$JOURNAL" 2>/dev/null; done
+qemu_run_and_collect "$IMG" "$WORK" "$WAIT"
+JOURNAL="$QEMU_JOURNAL"
 grep -h "secmet-app-update\[" "$JOURNAL" | sed 's/.*secmet-app-update\[[0-9]*\]: /  /' || true
 lines=$(grep -c "secmet-app-update\[" "$JOURNAL" || true)
 [[ "$lines" -gt 0 ]] || fail "secmet-app-update n'a rien journalisé (voir $JOURNAL)"

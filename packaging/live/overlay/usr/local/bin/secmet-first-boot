@@ -1,10 +1,30 @@
 #!/bin/sh
-# Clé SecMet écrite depuis l'image distribuée (secmet-key-<version>.img.xz,
-# Etcher/Rufus/dd) : au premier démarrage, la partition d'export (dernière)
-# est agrandie jusqu'au bout de la clé. Conditions : la table GPT se termine
-# bien avant la fin du disque (image plus petite que la clé) et la partition
-# d'export est vide. Sinon, rien n'est touché. Idempotent.
+# Clé SecMet écrite depuis l'image publiée (secmet-key_<version>_x86_64.img.xz,
+# Etcher/Rufus/dd) : au premier démarrage,
+#   1. la clé de signature des certificats est créée sur la partition de
+#      données si elle manque (l'image publiée n'en contient pas : chaque
+#      clé a la sienne, Annexe M §M.6) ; sa clé publique et son key_id vont
+#      au journal (logs/system/) ;
+#   2. la partition d'export (dernière) est agrandie jusqu'au bout de la
+#      clé. Conditions : la table GPT se termine bien avant la fin du disque
+#      (image plus petite que la clé) et la partition d'export est vide.
+# Sinon, rien n'est touché. Idempotent (tourne à chaque démarrage).
 set -u
+DATA=/media/secmet-data
+KEY="$DATA/config/attestation-key.hex"
+if mountpoint -q "$DATA" && [ ! -f "$KEY" ] && command -v secmet-release >/dev/null 2>&1; then
+    mkdir -p "$DATA/config"
+    chown 1000:1000 "$DATA/config"
+    chmod 700 "$DATA/config"
+    # Même format que la clé créée par l'application au premier certificat
+    # (fichier 0600) ; créée par root puis donnée à l'opérateur.
+    if out=$(secmet-release keygen "$KEY" 2>&1); then
+        chown 1000:1000 "$KEY" "${KEY%.hex}.pub"
+        logger -t secmet-first-boot "clé de signature des certificats créée : $(printf '%s\n' "$out" | grep -E '^(public_key|key_id)' | tr -s ' ' | paste -sd ' ' -)"
+    else
+        logger -t secmet-first-boot "création de la clé de signature échouée : $out"
+    fi
+fi
 EXP=$(blkid -L SECMET-EXP 2>/dev/null) || exit 0
 [ -b "$EXP" ] || exit 0
 DISK=$(lsblk -no PKNAME "$EXP" 2>/dev/null | head -1)

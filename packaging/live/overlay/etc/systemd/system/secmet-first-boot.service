@@ -1,9 +1,14 @@
-# Clé écrite depuis l'image distribuée : agrandit la partition d'export au
-# premier démarrage (voir /usr/local/bin/secmet-first-boot).
+# Clé écrite depuis l'image publiée : au premier démarrage, crée la clé de
+# signature des certificats et agrandit la partition d'export (voir
+# /usr/local/bin/secmet-first-boot). Après le montage de la partition de
+# données : la clé USB apparaît après local-fs.target (montage nofail,
+# déclenché par udev), le service ne peut pas se contenter d'un After=.
 [Unit]
-Description=SecMet : agrandissement de la partition d'export (premier demarrage)
-After=local-fs.target
-Before=lightdm.service
+Description=SecMet : premier demarrage (cle de signature, partition d'export)
+After=media-secmet\x2ddata.mount
+Requires=media-secmet\x2ddata.mount
+Before=secmet-app-update.service lightdm.service
+ConditionPathIsMountPoint=/media/secmet-data
 
 [Service]
 Type=oneshot

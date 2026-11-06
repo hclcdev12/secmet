@@ -61,7 +61,7 @@ SecMet est une application **Rust** (GTK4) pour l'effacement sécurisé de disqu
 
 ### Paquets publiés
 
-Les versions publiées sont sur la page [Releases](https://github.com/hclcdev12/secmet/releases) : paquets `.deb` (Ubuntu 24.04 / Mint 22 / Debian 13 ; Ubuntu 22.04 / Mint 21 / Debian 12), `.rpm` (Fedora 42), AppImage, avec `SHA256SUMS` signé et `latest.json`. Une seule installation à la main ; ensuite SecMet se met à jour depuis ses Réglages (téléchargement, vérification de la signature, installation).
+Les versions publiées sont sur la page [Releases](https://github.com/hclcdev12/secmet/releases) : paquets `.deb` (Ubuntu 24.04 / Mint 22 / Debian 13 ; Ubuntu 22.04 / Mint 21 / Debian 12), `.rpm` (Fedora 42), AppImage, image de la clé USB prête à écrire (`secmet-key_<version>_x86_64.img.xz`, voir [Fabriquer sa clé](docs/Fabriquer_sa_cle.md)), avec `SHA256SUMS` signé et `latest.json`. Une seule installation à la main ; ensuite SecMet se met à jour depuis ses Réglages (téléchargement, vérification de la signature, installation).
 
 ```bash
 # Ubuntu 24.04, Linux Mint 22, Debian 13 (remplacer <version>)
@@ -131,7 +131,7 @@ Les réglages sont persistants dans `~/.config/secmet/settings.json` (`check_upd
 
 `SECMET_DATA_DIR=/chemin/absolu` place réglages, logo, clé d'attestation et état des mises à jour dans `/chemin/config/`, et journaux, rapports et certificats dans `/chemin/logs/`, au lieu de `~/.config/secmet/` et `~/.secmet_logs/`. C'est le mécanisme de la clé USB SecMet : les données suivent la clé d'un poste à l'autre, clé de signature comprise.
 
-Dans ce mode, SecMet travaille par **lots** : un lot regroupe les machines traitées successivement (dialogue au démarrage, bandeau, certificats générés automatiquement en fin d'effacement, journal chaîné). Sa clôture produit le certificat groupé, un manifeste signé et une copie sur la partition d'export `SECMET-EXP` ; un lot sans disque effacé peut être abandonné. Les Réglages de la clé ajoutent la recopie des lots clôturés sur la partition d'export et le nettoyage de la clé. Tout est décrit dans l'[Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md).
+Dans ce mode, SecMet travaille par **lots** : un lot regroupe les machines traitées successivement (dialogue au démarrage, bandeau, certificats générés automatiquement en fin d'effacement, journal chaîné). Sa clôture produit le certificat groupé, un manifeste signé et une copie sur la partition d'export `SECMET-EXP` ; un lot sans disque effacé peut être abandonné. Les Réglages de la clé ajoutent la recopie des lots clôturés sur la partition d'export et le nettoyage de la clé. Tout est décrit dans l'[Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md). Pour fabriquer une clé sans outillage ni Linux : [Fabriquer sa clé](docs/Fabriquer_sa_cle.md) (image `.img.xz` de chaque release, écrite avec balenaEtcher ou Rufus).
 
 ### Vérifier un certificat
 
@@ -158,7 +158,7 @@ SecMet se déploie sur un **banc Linux** : paquet `.deb` sur une machine dédié
 Le banc dédié reste la **référence** pour le traitement en volume. Live USB et PXE permettent souvent de traiter un SSD interne **sans extraire** le disque du châssis, plus vite qu'un démontage sur laptop. Le réseau PXE sert au **démarrage** du poste, pas à l'exécution de SecMet, qui reste une application locale.
 
 - Guide de déploiement : [Annexe H](docs/Annexes/Annexe_H_deploiement_banc.md).
-- Clé USB SecMet (image live, lots, partition d'export, mises à jour depuis la clé) : [Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md) et [packaging/live/README.md](packaging/live/README.md).
+- Clé USB SecMet (image live, lots, partition d'export, mises à jour depuis la clé) : [Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md) et [packaging/live/README.md](packaging/live/README.md) ; fabrication d'une clé depuis l'image publiée : [Fabriquer sa clé](docs/Fabriquer_sa_cle.md).
 
 ## Méthodes d'effacement et preuve
 
@@ -246,6 +246,8 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make live` | Construit l'image de la clé USB SecMet dans un conteneur privilégié Ubuntu 24.04 → `dist/live/` ([packaging/live/README.md](packaging/live/README.md)) |
 | `make live-bundle` | Livrable de la clé USB `dist/secmet-live_<version>_x86_64.tar` (après `make live`) |
 | `make live-check` | Contrôle QEMU sans écran : la clé virtuelle déploie la version la plus récente de son magasin `app/` |
+| `make live-dist` | Image publiable de la clé `dist/secmet-key_<version>_x86_64.img.xz`, à écrire telle quelle avec balenaEtcher, Rufus ou `dd` (après `make live`) |
+| `make live-dist-check` | Contrôle QEMU sans écran, en BIOS : premier démarrage de l'image publiable sur une clé de 16 Go (clé de signature créée, partition d'export agrandie) |
 | `make live-key DEV=/dev/sdX` | Écrit une clé USB SecMet (root ; efface la clé) |
 | `make release` | Chaîne de publication : contrôles, 4 paquets construits et fumés en conteneurs, `SHA256SUMS` et `latest.json` signés avec la clé de version ; rien n'est publié |
 | `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation |
@@ -273,7 +275,7 @@ Les cibles de fuzz vivent dans `fuzz/` (crate hors workspace) : `cargo +nightly 
 
 ### Publication d'une version
 
-Le push d'un tag `vX.Y.Z` suffit : `package.yml` construit les quatre paquets et l'image de la clé USB (livrable `secmet-live_<version>_x86_64.tar` : image, `secmet-make-key.sh`, `secmet-release`), signe le tout avec la **clé de version** (secret du dépôt, distincte des clés d'attestation des certificats) et crée la release. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis), où l'image passe en plus le contrôle QEMU `make live-check`. Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
+Le push d'un tag `vX.Y.Z` suffit : `package.yml` construit les quatre paquets et l'image de la clé USB, sous deux formes (image prête à écrire `secmet-key_<version>_x86_64.img.xz` et livrable de fabrication `secmet-live_<version>_x86_64.tar` : image, `secmet-make-key.sh`, `secmet-release`), signe le tout avec la **clé de version** (secret du dépôt, distincte des clés d'attestation des certificats) et crée la release. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis), où la clé passe en plus les contrôles QEMU `make live-check` et `make live-dist-check`. Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
 
 ```bash
 secmet-release keygen ~/.config/secmet/release-key.hex   # une fois ; sauvegarder la clé hors ligne

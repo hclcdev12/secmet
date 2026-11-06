@@ -88,7 +88,7 @@ Le poste démarre sur une **image live** Linux contenant SecMet. Sur un banc fix
 
 SecMet **ne fournit pas** d'ISO live clé en main. L'intégrateur construit son image (`live-build`, `casper`, clé Debian live modifiée…) et y copie l'AppImage, ou y installe le `.deb`.
 
-> **Clé USB SecMet** — Une clé prête à l'emploi (Ubuntu 24.04 minimal, bureau XFCE, SecMet au démarrage, partition de données persistante, lots couvrant plusieurs laptops, certificat groupé à la clôture) est décrite dans l'[Annexe M](Annexe_M_cle_live_lots.md) et se fabrique avec `make live` puis `make live-key DEV=/dev/sdX` ([packaging/live/README.md](../../packaging/live/README.md)). Elle règle aussi la clé de signature régénérée à chaque démarrage (§8).
+> **Clé USB SecMet** — Une clé prête à l'emploi (Ubuntu 24.04 minimal, bureau XFCE, SecMet au démarrage, partition de données persistante, lots couvrant plusieurs laptops, certificat groupé à la clôture) est décrite dans l'[Annexe M](Annexe_M_cle_live_lots.md). Elle s'écrit depuis l'image `secmet-key_<version>_x86_64.img.xz` de chaque release avec balenaEtcher ou Rufus ([Fabriquer sa clé](../Fabriquer_sa_cle.md)), ou se fabrique depuis le dépôt avec `make live` puis `make live-key DEV=/dev/sdX` ([packaging/live/README.md](../../packaging/live/README.md)). Elle règle aussi la clé de signature régénérée à chaque démarrage (§8).
 
 ---
 
