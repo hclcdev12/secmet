@@ -42,6 +42,27 @@ fn human_size(bytes: u64) -> String {
     }
 }
 
+/// Libellés des trois groupes avec leurs comptes courants.
+fn relabel_groups(
+    archived: &CheckButton,
+    exports: &CheckButton,
+    standalone: &CheckButton,
+    inv: &key_cleanup::Inventory,
+) {
+    archived.set_label(Some(&trf(
+        "Lots archivés ({count})",
+        &[("count", &inv.archived.len().to_string())],
+    )));
+    exports.set_label(Some(&trf(
+        "Livrables sur la partition d'export ({count} dossier(s))",
+        &[("count", &inv.exports.len().to_string())],
+    )));
+    standalone.set_label(Some(&trf(
+        "Certificats hors lot, rapports et journaux de session ({count})",
+        &[("count", &inv.standalone_files.to_string())],
+    )));
+}
+
 /// Réglages de la clé : section « Nettoyage de la clé ». Trois groupes à
 /// cocher, inventaire affiché avant d'agir, confirmation avec les comptes
 /// réels. Refusé tant qu'un lot est ouvert, et refusé pour le groupe des lots
@@ -120,6 +141,9 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
         }
         let places = cleanup_places();
         let inv = key_cleanup::inventory(&places);
+        // Les comptes ont pu changer depuis l'ouverture des Réglages (recopie
+        // sur l'export, par exemple) : on les rafraîchit avant de décider.
+        relabel_groups(&archived, &exports, &standalone, &inv);
         let message = trf(
             "Supprimer définitivement de la clé : {archived} lot(s) archivé(s), {exports} \
              dossier(s) sur la partition d'export, {standalone} fichier(s) hors lot, soit \
@@ -189,19 +213,12 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
                     text.push_str(&format!("\n{path} : {e}"));
                 }
                 status.set_text(&text);
-                let inv = key_cleanup::inventory(&cleanup_places());
-                archived.set_label(Some(&trf(
-                    "Lots archivés ({count})",
-                    &[("count", &inv.archived.len().to_string())],
-                )));
-                exports.set_label(Some(&trf(
-                    "Livrables sur la partition d'export ({count} dossier(s))",
-                    &[("count", &inv.exports.len().to_string())],
-                )));
-                standalone.set_label(Some(&trf(
-                    "Certificats hors lot, rapports et journaux de session ({count})",
-                    &[("count", &inv.standalone_files.to_string())],
-                )));
+                relabel_groups(
+                    &archived,
+                    &exports,
+                    &standalone,
+                    &key_cleanup::inventory(&cleanup_places()),
+                );
                 button.set_sensitive(true);
             },
             move || button_declined.set_sensitive(true),
