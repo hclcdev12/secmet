@@ -37,7 +37,6 @@ while [[ $# -gt 0 ]]; do
         -h|--help) sed -n '2,19p' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*) echo "argument inconnu : $1" >&2; exit 2 ;;
         *) DEV="$1" ;;
-        *) echo "argument inconnu : $1" >&2; exit 2 ;;
     esac
     shift
 done

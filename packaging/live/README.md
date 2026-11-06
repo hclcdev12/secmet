@@ -51,11 +51,15 @@ packaging/live/qemu-test.sh --headless     # sans fenêtre : VNC :9 et moniteur 
 packaging/live/qemu-ctl.py screendump /tmp/ecran.png   # capture ; sendkey, type, click aussi
 SECMET_QEMU_SECBOOT=1 make live-test       # firmware OVMF Secure Boot
 SECMET_QEMU_MACHINE=pc make live-test      # type de machine i440fx (défaut q35)
+make test-live-scripts                      # script de mise à jour au démarrage, avec des doublures (dans make test et en CI)
+make live-check                             # contrôle QEMU sans écran : le magasin app/ est déployé dans l'ordre (5 min)
 SECMET_KERNEL_EXTRA="console=ttyS0,115200n8 console=tty0" make live-image   # clé virtuelle avec console série
 packaging/live/qemu-ctl.py serial "" secmet secmet "journalctl -b | tail"    # shell série (connexion secmet / mot de passe)
 ```
 
 La console série (`SECMET_KERNEL_EXTRA`) ne concerne que la clé virtuelle : `secmet-make-key.sh` copie `grub.cfg` tel quel.
+
+**Mise à jour au démarrage, deux niveaux de test.** `packaging/live/tests/app-update.sh` exécute le script `secmet-app-update` de l'overlay sur un magasin factice avec des doublures de `mountpoint`, `dpkg-query`, `dpkg`, `secmet-release`, `dpkg-deb` et `logger` : la version la plus récente est choisie (0.3.10 devant 0.3.9, régression du 2026-11-06 où un tri ascendant redéployait la plus ancienne), repli sur signature invalide ou installation échouée, rien à faire quand l'image est à jour. Il tourne dans `make test` et dans `ci.yml`. `packaging/live/qemu-check.sh` (`make live-check`) va jusqu'au bout : un magasin de deux versions factices (9.9.8 et 9.9.9, le même `.deb` de `dist/` renommé) signé avec la clé de version si elle est disponible, une clé virtuelle fabriquée avec ce magasin, un démarrage sans écran, puis le journal est lu depuis l'image (partition de données extraite, `e2fsck`, `debugfs`) et doit montrer 9.9.9 vérifiée et déployée sans que 9.9.8 soit examinée ; sans la clé de version, il vérifie que 9.9.9 puis 9.9.8 sont refusées et que rien n'est déployé. À lancer après `make live`, avant une release.
 
 Limite : la **veille (S3) ne se teste pas dans cette VM** : après `systemctl suspend` puis `system_wakeup`, l'invité ne reprend pas (OVMF, q35 comme pc). Le cycle Dé-frozen (veille, réveil, écran rallumé) se valide sur un portable réel.
 

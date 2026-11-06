@@ -4,7 +4,13 @@
 # à jour » (app/<version>/), si elle est plus récente que celle de l'image
 # et si ses signatures sont valides (clé de version). La précédente version
 # reste comme repli ; en cas d'échec, l'image garde sa version.
-DATA=/media/secmet-data
+#
+# Testable hors de la clé (packaging/live/tests/app-update.sh) : les deux
+# dossiers se surchargent par SECMET_APP_UPDATE_DATA et SECMET_APP_UPDATE_RUN,
+# les commandes système (mountpoint, dpkg-query, dpkg, secmet-release,
+# dpkg-deb, logger) par le PATH.
+DATA="${SECMET_APP_UPDATE_DATA:-/media/secmet-data}"
+RUN="${SECMET_APP_UPDATE_RUN:-/run}"
 STORE="$DATA/app"
 TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
 mountpoint -q "$DATA" || exit 0
@@ -34,16 +40,10 @@ for version in $(ls "$STORE" 2>/dev/null | sort -rV); do
         continue
     fi
     logger -t secmet-app-update "version $version : signature et empreinte vérifiées ($(( $(date +%s) - tv )) s)"
-    # dpkg direct, sans déclencheurs : les dépendances sont celles de
-    # l'image, et les déclencheurs (man-db, caches d'icônes et de menus)
-    # coûtaient près de 30 s sur une clé lente avant la session, pour
-    # un système en mémoire qui n'en a pas l'usage. Les déclencheurs en
-    # attente ne gênent pas dpkg par la suite.
-    # --force-unsafe-io : pas de fsync (système en mémoire) ; sans lui,
-    # dpkg attendait la clé (18 s mesurés contre 0,5 s sur un banc).
     # Le paquet est déployé par dpkg-deb -x, sans passer par dpkg : la lecture
     # de sa base de données (64 000 entrées dans le squashfs) coûtait 17 à
-    # 21 s avant la session sur un portable modeste (mesuré le 2026-11-05).
+    # 21 s avant la session sur un portable modeste (mesuré le 2026-11-05),
+    # et les déclencheurs (man-db, caches d'icônes) près de 30 s de plus.
     # Le système est en mémoire et repart de l'image à chaque démarrage : la
     # base dpkg garde la version de l'image, sans conséquence ; le script
     # postinst du paquet ne fait que retirer des fichiers d'anciennes versions
@@ -51,15 +51,21 @@ for version in $(ls "$STORE" 2>/dev/null | sort -rV); do
     LOG="$DATA/logs/system/app-update-$(tr -d - < /proc/sys/kernel/random/boot_id).log"
     t0=$(date +%s%N)
     {
+        echo "$(date +%T) version $version : $deb"
         echo "$(date +%T) cpu : $(grep -m1 'cpu MHz' /proc/cpuinfo | tr -s ' ') ; gouverneur : $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null) ; charge : $(cut -d' ' -f1-3 /proc/loadavg)"
-        /usr/bin/time -f "dpkg-deb -x : %e s réel, %U s utilisateur, %S s système" dpkg-deb -x "$deb" / 2>&1 && echo "$version" > /run/secmet-app-update.version
+        if [ -x /usr/bin/time ]; then
+            /usr/bin/time -f "dpkg-deb -x : %e s réel, %U s utilisateur, %S s système" dpkg-deb -x "$deb" / 2>&1
+        else
+            dpkg-deb -x "$deb" / 2>&1
+        fi && echo "$version" > "$RUN/secmet-app-update.version"
         echo "$(date +%T) fin"
-    } > /tmp/secmet-app-update.log 2>&1
-    cp /tmp/secmet-app-update.log "$LOG" 2>/dev/null || true
-    if [ -f /run/secmet-app-update.version ]; then
+    } > "$RUN/secmet-app-update.log" 2>&1
+    mkdir -p "$DATA/logs/system" 2>/dev/null
+    cp "$RUN/secmet-app-update.log" "$LOG" 2>/dev/null || true
+    if [ -f "$RUN/secmet-app-update.version" ]; then
         logger -t secmet-app-update "SecMet $version déployée depuis la partition de données ($(( ($(date +%s%N) - t0) / 1000000 )) ms ; détail : $LOG)"
         exit 0
     fi
-    logger -t secmet-app-update "version $version : installation échouée ($(tail -1 /tmp/secmet-app-update.log)), repli"
+    logger -t secmet-app-update "version $version : installation échouée ($(tail -1 "$RUN/secmet-app-update.log")), repli"
 done
 exit 0

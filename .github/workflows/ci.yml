@@ -71,11 +71,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Syntaxe bash
         run: |
-          for f in scripts/*.sh packaging/*.sh; do bash -n "$f"; done
+          for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh; do bash -n "$f"; done
+          for f in packaging/live/overlay/usr/local/bin/*; do sh -n "$f"; done
       - name: shellcheck
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck -S warning scripts/*.sh packaging/*.sh
+          shellcheck -S warning scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh
+          shellcheck -S warning -s sh packaging/live/overlay/usr/local/bin/*
+      - name: Script de mise à jour au démarrage de la clé (doublures)
+        run: ./packaging/live/tests/app-update.sh
 
   audit:
     name: cargo audit (RustSec)

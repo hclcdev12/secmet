@@ -69,6 +69,12 @@ live-image: ## Clé SecMet virtuelle dist/live/secmet-key.img (conteneur privil�
 live-test: ## Démarre la clé virtuelle dans QEMU (UEFI OVMF)
 	@./packaging/live/qemu-test.sh
 
+live-check: ## Contrôle QEMU de la mise à jour au démarrage de la clé (dist/live et un .deb requis, 5 min)
+	@./packaging/live/qemu-check.sh
+
+test-live-scripts: ## Test du script de mise à jour au démarrage de la clé (doublures, sans QEMU)
+	@./packaging/live/tests/app-update.sh
+
 live-key: ## Écrit la clé USB SecMet : make live-key DEV=/dev/sdX (root, efface la clé)
 	@test -n "$(DEV)" || { echo "usage : make live-key DEV=/dev/sdX"; exit 1; }
 	@sudo ./packaging/live/secmet-make-key.sh "$(DEV)"
@@ -84,5 +90,6 @@ install-deb: deb ## Installe le .deb via apt (résout Depends, dont testdisk)
 
 test: deps ## Lance les tests unitaires
 	@$(CARGO_ENV) $(CARGO) test --workspace
+	@./packaging/live/tests/app-update.sh
 
 .DEFAULT_GOAL := help
