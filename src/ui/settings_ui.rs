@@ -44,8 +44,9 @@ fn human_size(bytes: u64) -> String {
 
 /// Réglages de la clé : section « Nettoyage de la clé ». Trois groupes à
 /// cocher, inventaire affiché avant d'agir, confirmation avec les comptes
-/// réels ; avertissement (non bloquant) si un lot clôturé n'a pas sa copie
-/// sur la partition d'export. Refusé tant qu'un lot est ouvert.
+/// réels. Refusé tant qu'un lot est ouvert, et refusé pour le groupe des lots
+/// archivés tant qu'un lot clôturé n'a pas sa copie sur la partition d'export
+/// (blocage strict : l'archive est alors sa seule copie signée).
 fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
     let title = Label::new(None);
     title.set_markup(&format!("<b>{}</b>", tr("Nettoyage de la clé")));
@@ -119,7 +120,7 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
         }
         let places = cleanup_places();
         let inv = key_cleanup::inventory(&places);
-        let mut message = trf(
+        let message = trf(
             "Supprimer définitivement de la clé : {archived} lot(s) archivé(s), {exports} \
              dossier(s) sur la partition d'export, {standalone} fichier(s) hors lot, soit \
              {size} ?",
@@ -149,18 +150,20 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
                 ("size", &human_size(inv.bytes)),
             ],
         );
+        // Blocage strict (décision du 2026-11-06) : l'archive d'un lot clôturé
+        // est sa seule copie signée tant que son manifeste manque sur l'export.
         if choice.archived && !inv.not_exported.is_empty() {
-            message.push_str("\n\n");
-            message.push_str(&trf(
-                "Attention : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition \
-                 d'export ({list}). Leur archive sur la clé est la seule copie signée ; \
-                 utilisez d'abord « Recopier les lots clôturés sur la partition d'export » \
-                 si vous voulez la conserver.",
+            status.set_text(&trf(
+                "Refusé : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition \
+                 d'export ({list}). Leur archive sur la clé est la seule copie signée : \
+                 utilisez d'abord « Recopier les lots clôturés sur la partition d'export », \
+                 ou décochez les lots archivés.",
                 &[
                     ("count", &inv.not_exported.len().to_string()),
                     ("list", &inv.not_exported.join(", ")),
                 ],
             ));
+            return;
         }
         let button = button.clone();
         let button_declined = button.clone();

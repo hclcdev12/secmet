@@ -67,9 +67,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Endgültig vom Stick löschen: {archived} archivierte Charge(n), {exports} Ordner auf der Exportpartition, {standalone} Datei(en) außerhalb von Chargen, insgesamt {size}?",
     ),
     (
-        "Attention : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition d'export ({list}). Leur archive sur la clé est la seule copie signée ; utilisez d'abord « Recopier les lots clôturés sur la partition d'export » si vous voulez la conserver.",
-        "Warning: {count} closed batch(es) have no copy on the export partition ({list}). Their archive on the key is the only signed copy; use \"Copy closed batches to the export partition again\" first if you want to keep it.",
-        "Achtung: {count} abgeschlossene Charge(n) haben keine Kopie auf der Exportpartition ({list}). Ihr Archiv auf dem Stick ist die einzige signierte Kopie; verwenden Sie zuerst „Abgeschlossene Chargen erneut auf die Exportpartition kopieren“, wenn Sie sie behalten möchten.",
+        "Refusé : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition d'export ({list}). Leur archive sur la clé est la seule copie signée : utilisez d'abord « Recopier les lots clôturés sur la partition d'export », ou décochez les lots archivés.",
+        "Refused: {count} closed batch(es) have no copy on the export partition ({list}). Their archive on the key is the only signed copy: use \"Copy closed batches to the export partition again\" first, or untick the archived batches.",
+        "Abgelehnt: {count} abgeschlossene Charge(n) haben keine Kopie auf der Exportpartition ({list}). Ihr Archiv auf dem Stick ist die einzige signierte Kopie: verwenden Sie zuerst „Abgeschlossene Chargen erneut auf die Exportpartition kopieren“ oder wählen Sie die archivierten Chargen ab.",
     ),
     (
         "{removed} élément(s) supprimé(s), {size} libérés.",

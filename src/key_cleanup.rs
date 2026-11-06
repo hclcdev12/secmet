@@ -38,7 +38,7 @@ pub struct Inventory {
     /// Lots archivés, par identifiant.
     pub archived: Vec<String>,
     /// Lots clôturés dont le manifeste manque sur l'export : l'archive est
-    /// alors leur seule copie signée.
+    /// alors leur seule copie signée, et l'interface refuse de la supprimer.
     pub not_exported: Vec<String>,
     /// Dossiers de livrables sur l'export.
     pub exports: Vec<String>,
