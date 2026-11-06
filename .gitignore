@@ -43,3 +43,6 @@ Thumbs.db
 /.zcode/
 __pycache__/
 .claude/settings.local.json
+
+# Note locale d'essai de la clé (non publiée)
+/docs/Essai_image_cle.md
