@@ -15,8 +15,13 @@ if [ ! -d "$STORE" ]; then
     exit 0
 fi
 installed=$(dpkg-query -W -f='${Version}' secmet 2>/dev/null | sed 's/~.*//')
-for dir in $(ls -d "$STORE"/*/ 2>/dev/null | sed 's#/$##' | sort -t. -k1,1n -k2,2n -k3,3n -r); do
-    version=$(basename "$dir")
+# Du plus récent au plus ancien. Pas de clés « -k…n » avec un « -r » global :
+# GNU sort n'applique pas l'option globale aux clés qui ont la leur, le tri
+# restait ascendant et la clé redéployait la plus ancienne version (0.3.8
+# devant 0.3.9, constaté le 2026-11-06).
+for version in $(ls "$STORE" 2>/dev/null | sort -rV); do
+    dir="$STORE/$version"
+    [ -d "$dir" ] || continue
     deb=$(ls "$dir"/secmet_*.deb 2>/dev/null | head -1)
     [ -n "$deb" ] || continue
     if ! dpkg --compare-versions "$version" gt "$installed"; then
