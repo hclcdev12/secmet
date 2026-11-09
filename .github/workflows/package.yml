@@ -8,11 +8,19 @@ name: Package
 # la convention GitHub (« ~ » → « . »), signe SHA256SUMS et latest.json avec
 # la clé de version, puis crée la release GitHub dans ce dépôt.
 #
-# Sur un tag ou à la main, le travail « live » construit aussi l'image de la
-# clé USB (conteneur privilégié, 20 à 30 min), son livrable de fabrication
-# secmet-live_<version>_x86_64.tar (image, secmet-make-key.sh, secmet-release)
-# et l'image prête à écrire secmet-key_<version>_x86_64.img.xz (Etcher, Rufus,
-# dd ; docs/Fabriquer_sa_cle.md), signés et publiés avec les paquets.
+# Sur un tag ou à la main, la clé USB est publiée avec les paquets sous deux
+# formes signées : le livrable de fabrication secmet-live_<version>_x86_64.tar
+# (image, secmet-make-key.sh, secmet-release) et l'image prête à écrire
+# secmet-key_<version>_x86_64.img.xz (Etcher, Rufus, dd ;
+# docs/Fabriquer_sa_cle.md). Deux cadences (packaging/live/live-mode.sh) :
+#   - si un fichier du système de la clé a changé depuis la release
+#     précédente, le travail « live » reconstruit l'image (conteneur
+#     privilégié, 14 min) ;
+#   - sinon « publish » reprend l'image de la release précédente (vérifiée
+#     avec la clé de version) et refait seulement sa partition de données,
+#     avec le nouveau .deb dans app/<version>/ signé : la clé le déploie au
+#     démarrage (packaging/live/refresh_live.sh, quelques minutes).
+#   full_live (à la main) impose la reconstruction (base Ubuntu rafraîchie).
 #
 # Secret du dépôt : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex). Les
 # journaux sont publics : aucune étape n'affiche le secret.
@@ -34,11 +42,19 @@ on:
         description: "Publier à nouveau un tag déjà poussé (ex. v0.3.6) ; vide : construction seule"
         required: false
         type: string
+      full_live:
+        description: "Reconstruire le système de la clé USB même s'il n'a pas changé"
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
   SECMET_FORCE_BUILD: "1"
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  # Clé publique de version : ce que la clé USB (secmet-app-update) et
+  # l'application acceptent ; sert à vérifier la release précédente reprise.
+  SECMET_TRUST: bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
 
 permissions:
   contents: write
@@ -182,9 +198,37 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
 
+  live-mode:
+    name: Cadence de l'image de la clé USB
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
+      previous: ${{ steps.mode.outputs.previous }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Système de la clé inchangé depuis la release précédente ?
+        id: mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SECMET_RELEASES_REPO: ${{ github.repository }}
+          # Construction seule (à la main sans tag) : rien à reprendre.
+          SECMET_LIVE_FULL: ${{ (inputs.full_live || (github.event_name == 'workflow_dispatch' && inputs.tag == '')) && '1' || '0' }}
+        run: |
+          line="$(./packaging/live/live-mode.sh)"
+          echo "$line"
+          mode="${line#mode=}"; mode="${mode%% *}"
+          previous="$(sed -n 's/.*previous=\(v[0-9.]*\).*/\1/p' <<<"$line")"
+          { echo "mode=$mode"; echo "previous=$previous"; } >> "$GITHUB_OUTPUT"
+
   live:
     name: Image de la clé USB (conteneur privilégié)
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: live-mode
+    if: needs.live-mode.outputs.mode == 'full'
     runs-on: ubuntu-latest
     steps:
       - name: Place disque (outils inutiles du runner)
@@ -229,8 +273,10 @@ jobs:
 
   publish:
     name: Signature et release GitHub
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''
-    needs: [deb, rpm, appimage, live]
+    # « live » est sauté quand l'image est reprise : on attend chaque travail
+    # explicitement plutôt que de laisser le saut se propager.
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    needs: [deb, rpm, appimage, live-mode, live]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -268,6 +314,27 @@ jobs:
           test "$version" = "$cargo_version" || { echo "tag $tag ≠ Cargo.toml $cargo_version"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Clé USB reprise de la release précédente (système inchangé)
+        if: needs.live-mode.outputs.mode == 'reuse'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SECMET_RELEASE_KEY: ${{ secrets.SECMET_RELEASE_KEY }}
+          SECMET_RELEASE_BIN: ./target/release/secmet-release
+          SECMET_RELEASES_URL: https://github.com/${{ github.repository }}/releases/download
+          PREVIOUS: ${{ needs.live-mode.outputs.previous }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release download "$PREVIOUS" --repo "${{ github.repository }}" --dir previous \
+            -p 'secmet-key_*_x86_64.img.xz' -p 'secmet-live_*_x86_64.tar' -p SHA256SUMS -p SHA256SUMS.sig -p latest.json
+          ls -la previous/
+          keyfile="$(mktemp)"
+          printf '%s\n' "$SECMET_RELEASE_KEY" > "$keyfile"
+          ./packaging/live/refresh_live.sh --previous previous --deb "release/secmet_${VERSION}.ubuntu24.04_amd64.deb" \
+            --key "$keyfile" --trust "$SECMET_TRUST" --version "$VERSION" --out release
+          rm -f "$keyfile"
+          rm -rf previous
+          ls -la release/
+
       - name: Signature (SHA256SUMS, latest.json) et vérification
         env:
           SECMET_RELEASE_KEY: ${{ secrets.SECMET_RELEASE_KEY }}
@@ -289,8 +356,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
-          printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : balenaEtcher, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-            "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.version }}" "$key_id" > notes.md
+          v="${{ steps.version.outputs.version }}"
+          {
+            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : balenaEtcher, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+              "$v" "$v" "$v" "$key_id"
+            if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
+              printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \
+                "${{ needs.live-mode.outputs.previous }}" "$v" "$v"
+            fi
+          } > notes.md
           gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --title "SecMet ${{ steps.version.outputs.version }}" \
             --notes-file notes.md release/*
           gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name'

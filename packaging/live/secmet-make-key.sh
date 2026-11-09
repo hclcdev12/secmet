@@ -157,6 +157,14 @@ for d in config logs lots archive app; do
     mkdir -p "$MNT/data/$d"; chown 1000:1000 "$MNT/data/$d"; chmod 700 "$MNT/data/$d"
 done
 mkdir -p "$MNT/data/vault"; chown root:root "$MNT/data/vault"; chmod 700 "$MNT/data/vault"
+# Magasin livré avec l'image (livrable d'une version dont le système est
+# repris d'une release précédente, bundle_live.sh) : versions signées que
+# secmet-app-update déploie au démarrage.
+if [[ -d "$LIVE_DIR/app" ]]; then
+    cp -r "$LIVE_DIR/app/." "$MNT/data/app/"
+    chown -R 1000:1000 "$MNT/data/app"
+    echo "  magasin app/ : $(ls "$LIVE_DIR/app" | tr '\n' ' ')"
+fi
 KEY="$MNT/data/config/attestation-key.hex"
 if [[ ! -f "$KEY" ]]; then
     RELEASE_BIN="$ROOT_DIR/target/release/secmet-release"

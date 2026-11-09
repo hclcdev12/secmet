@@ -4,7 +4,7 @@
 # clé de version, latest.json. Rien ne quitte la machine sans --publish, qui
 # demande confirmation avant d'envoyer la release sur le dépôt public.
 #
-# usage : packaging/release.sh [--publish] [--skip-checks] [--skip-build] [--skip-live]
+# usage : packaging/release.sh [--publish] [--skip-checks] [--skip-build] [--skip-live] [--full-live]
 #                              [--allow-dirty] [--allow-untagged]
 #                              [--notes <fr.md>] [--notes-en <en.md>] [--notes-de <de.md>]
 #
@@ -17,7 +17,12 @@
 #          de la clé USB (secmet-live_<version>_x86_64.tar) et l'image prête à
 #          écrire (secmet-key_<version>_x86_64.img.xz), sauf --skip-live,
 #          SHA256SUMS, SHA256SUMS.sig, latest.json et les journaux de
-#          construction (logs/). Avec KVM, la clé passe les contrôles QEMU
+#          construction (logs/). Deux cadences pour la clé (Annexe N, §N.7) :
+#          si rien du système de la clé n'a changé depuis la release
+#          précédente (packaging/live/live-mode.sh), son image est téléchargée,
+#          vérifiée et reprise avec le nouveau paquet dans app/<version>/
+#          (refresh_live.sh) ; sinon, ou avec --full-live, construction
+#          complète. Avec KVM, la clé passe les contrôles QEMU
 #          (packaging/live/qemu-check.sh et image-check.sh).
 set -euo pipefail
 
@@ -25,7 +30,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="$ROOT_DIR/packaging"
 cd "$ROOT_DIR"
 
-PUBLISH=0 SKIP_CHECKS=0 SKIP_BUILD=0 SKIP_LIVE=0 ALLOW_DIRTY=0 ALLOW_UNTAGGED=0
+PUBLISH=0 SKIP_CHECKS=0 SKIP_BUILD=0 SKIP_LIVE=0 FULL_LIVE=0 ALLOW_DIRTY=0 ALLOW_UNTAGGED=0
 NOTES_FR="" NOTES_EN="" NOTES_DE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -33,6 +38,7 @@ while [[ $# -gt 0 ]]; do
         --skip-checks) SKIP_CHECKS=1 ;;
         --skip-build) SKIP_BUILD=1 ;;
         --skip-live) SKIP_LIVE=1 ;;
+        --full-live) FULL_LIVE=1 ;;
         --allow-dirty) ALLOW_DIRTY=1 ;;
         --allow-untagged) ALLOW_UNTAGGED=1 ;;
         --notes) NOTES_FR="$2"; shift ;;
@@ -69,6 +75,7 @@ if [[ "$ALLOW_UNTAGGED" -eq 0 ]]; then
     [[ "$head_tag" == "$TAG" ]] || die "HEAD ne porte pas le tag $TAG (git tag -a $TAG), ou --allow-untagged"
 fi
 [[ -f "$KEY" ]] || die "clé de version absente : $KEY (secmet-release keygen \"$KEY\")"
+PUBKEY="$(tr -d '[:space:]' < "${KEY%.hex}.pub")"
 echo "commit : $(git rev-parse --short HEAD)  tag : $TAG  sortie : $OUT_DIR"
 
 ENGINE="${SECMET_ENGINE:-}"
@@ -183,24 +190,50 @@ cp dist/*.rpm /out/
 fi
 
 # --- 2c. Image de la clé USB --------------------------------------------------
-# Conteneur privilégié (20 à 30 min). Le livrable rejoint les paquets et
-# SHA256SUMS ; avec KVM, la clé virtuelle doit déployer la version la plus
-# récente de son magasin au démarrage (packaging/live/qemu-check.sh) et
-# l'image publiable (.img.xz) doit passer son premier démarrage en BIOS
-# (packaging/live/image-check.sh : clé de signature créée, export agrandi).
+# Deux cadences (Annexe N, §N.7). Système inchangé depuis la release
+# précédente : son image et son livrable sont téléchargés, vérifiés avec la
+# clé de version et repris, seule la partition de données est refaite avec
+# le nouveau .deb dans app/<version>/ signé (déployé au démarrage). Sinon,
+# conteneur privilégié (20 à 30 min). Les deux livrables rejoignent les
+# paquets et SHA256SUMS ; avec KVM, la clé virtuelle doit déployer la version
+# la plus récente de son magasin au démarrage (packaging/live/qemu-check.sh,
+# construction complète seulement) et l'image publiable (.img.xz) doit passer
+# son premier démarrage en BIOS (packaging/live/image-check.sh : clé de
+# signature créée, export agrandi, version du magasin déployée).
 if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
-    step "Image de la clé USB (conteneur privilégié)"
-    "$PKG_DIR/live/build_live.sh" > "$LOG_DIR/live.log" 2>&1 || die "image de la clé échouée, voir $LOG_DIR/live.log"
-    "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
-    cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$OUT_DIR/"
+    step "Cadence de l'image de la clé USB"
+    mode_line="$(SECMET_LIVE_FULL="$FULL_LIVE" SECMET_RELEASES_REPO="$REPO" "$PKG_DIR/live/live-mode.sh" "$VERSION" 2>"$LOG_DIR/live-mode.log" \
+        || echo "mode=full reason=live-mode.sh en erreur (voir $LOG_DIR/live-mode.log)")"
+    echo "$mode_line"
     "$PKG_DIR/live/tests/app-update.sh" > "$LOG_DIR/live-script-test.log" 2>&1 || die "test du script de mise à jour échoué, voir $LOG_DIR/live-script-test.log"
-    step "Image publiable de la clé USB (.img.xz)"
-    "$PKG_DIR/live/make_key_image.sh" --dist > "$LOG_DIR/live-dist.log" 2>&1 || die "image publiable échouée, voir $LOG_DIR/live-dist.log"
-    cp -f "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" "$OUT_DIR/"
+    if [[ "$mode_line" == mode=reuse* ]]; then
+        previous="${mode_line#*previous=}"
+        step "Clé USB reprise de la release $previous (système inchangé)"
+        command -v gh >/dev/null 2>&1 || die "gh (GitHub CLI) requis pour reprendre l'image de $previous (ou --full-live)"
+        rm -rf "$OUT_DIR/previous"
+        gh release download "$previous" --repo "$REPO" --dir "$OUT_DIR/previous" \
+            -p 'secmet-key_*_x86_64.img.xz' -p 'secmet-live_*_x86_64.tar' -p SHA256SUMS -p SHA256SUMS.sig -p latest.json \
+            > "$LOG_DIR/live-previous.log" 2>&1 || die "téléchargement de la release $previous échoué, voir $LOG_DIR/live-previous.log"
+        SECMET_RELEASES_URL="$BASE_URL" "$PKG_DIR/live/refresh_live.sh" --previous "$OUT_DIR/previous" \
+            --deb "$OUT_DIR/secmet_${VERSION}~ubuntu24.04_amd64.deb" --key "$KEY" --trust "$PUBKEY" \
+            --version "$VERSION" --out "$ROOT_DIR/dist" > "$LOG_DIR/live-refresh.log" 2>&1 \
+            || die "reprise de l'image échouée, voir $LOG_DIR/live-refresh.log"
+        tail -1 "$LOG_DIR/live-refresh.log"
+        rm -rf "$OUT_DIR/previous"
+    else
+        step "Image de la clé USB (conteneur privilégié)"
+        "$PKG_DIR/live/build_live.sh" > "$LOG_DIR/live.log" 2>&1 || die "image de la clé échouée, voir $LOG_DIR/live.log"
+        "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
+        step "Image publiable de la clé USB (.img.xz)"
+        "$PKG_DIR/live/make_key_image.sh" --dist > "$LOG_DIR/live-dist.log" 2>&1 || die "image publiable échouée, voir $LOG_DIR/live-dist.log"
+    fi
+    cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" "$OUT_DIR/"
     if [[ -r /dev/kvm ]]; then
-        step "Contrôle QEMU de la mise à jour au démarrage de la clé"
-        "$PKG_DIR/live/qemu-check.sh" > "$LOG_DIR/live-check.log" 2>&1 || die "contrôle QEMU échoué, voir $LOG_DIR/live-check.log"
-        tail -1 "$LOG_DIR/live-check.log"
+        if [[ "$mode_line" != mode=reuse* ]]; then
+            step "Contrôle QEMU de la mise à jour au démarrage de la clé"
+            "$PKG_DIR/live/qemu-check.sh" > "$LOG_DIR/live-check.log" 2>&1 || die "contrôle QEMU échoué, voir $LOG_DIR/live-check.log"
+            tail -1 "$LOG_DIR/live-check.log"
+        fi
         step "Contrôle QEMU du premier démarrage de l'image publiable (BIOS)"
         "$PKG_DIR/live/image-check.sh" > "$LOG_DIR/live-dist-check.log" 2>&1 || die "contrôle de l'image publiable échoué, voir $LOG_DIR/live-dist-check.log"
         tail -1 "$LOG_DIR/live-dist-check.log"
@@ -230,7 +263,6 @@ notes_args=()
 [[ -n "$NOTES_DE" ]] && notes_args+=(--notes-de "$(cat "$NOTES_DE")")
 "$RELEASE_BIN" sign "$OUT_DIR" --key "$KEY" --version "$VERSION" --date "$DATE" \
     --sums-url "$BASE_URL/$TAG/SHA256SUMS" "${notes_args[@]}"
-PUBKEY="$(tr -d '[:space:]' < "${KEY%.hex}.pub")"
 "$RELEASE_BIN" verify "$OUT_DIR" --trust "$PUBKEY" >/dev/null
 echo "vérification locale : OK"
 

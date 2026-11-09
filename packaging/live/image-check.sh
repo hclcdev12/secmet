@@ -12,7 +12,9 @@
 # 3. vérification depuis l'image : journal de secmet-first-boot (clé de
 #    signature créée, partition d'export agrandie), attestation-key.hex en
 #    0600 pour l'opérateur sur la partition de données, partition d'export
-#    qui va jusqu'au bout de la clé.
+#    qui va jusqu'au bout de la clé ; si l'image porte un magasin
+#    app/<version>/ (image reprise d'une release précédente,
+#    refresh_live.sh), cette version doit avoir été déployée au démarrage.
 #
 # Prérequis : dist/secmet-key_*.img.xz (make live-dist), qemu-system-x86_64
 # avec KVM, e2fsprogs (e2fsck, debugfs), xz. Durée : 4 minutes.
@@ -61,4 +63,14 @@ read -r exp_start2 exp_after < <(qemu_part "$IMG" SECMET-EXPORT)
 [[ "$exp_after" -gt "$exp_before" ]] || fail "export : $exp_before → $exp_after secteurs"
 tail_gap=$(( disk_sectors - exp_start - exp_after ))
 [[ "$tail_gap" -lt 131072 ]] || fail "l'export s'arrête à $((tail_gap / 2048)) Mio du bout de la clé"
-echo "image publiable : démarrage ${SECMET_QEMU_FIRMWARE}, clé de signature créée (key_id $key_id), export agrandi de $((exp_before / 2048)) à $((exp_after / 2048)) Mio"
+# Magasin app/<version>/ dans l'image (reprise d'une release précédente) :
+# secmet-app-update doit avoir déployé la version la plus récente.
+store=$(debugfs -R "ls -p /app" "$QEMU_DATA" 2>/dev/null | awk -F/ '$6 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ {print $6}' | sort -V | tail -1)
+deployed=""
+if [[ -n "$store" ]]; then
+    grep -h "secmet-app-update\[" "$QEMU_JOURNAL" | sed 's/.*secmet-app-update\[[0-9]*\]: /  /' || true
+    grep -q "secmet-app-update\[.*SecMet $store déployée depuis la partition de données" "$QEMU_JOURNAL" \
+        || fail "SecMet $store (magasin app/ de l'image) non déployée au démarrage (voir $QEMU_JOURNAL)"
+    deployed=", SecMet $store déployée depuis app/"
+fi
+echo "image publiable : démarrage ${SECMET_QEMU_FIRMWARE}, clé de signature créée (key_id $key_id), export agrandi de $((exp_before / 2048)) à $((exp_after / 2048)) Mio$deployed"
