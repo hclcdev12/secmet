@@ -100,7 +100,9 @@ echo "  $(ls "$STORE" | tr '\n' ' ')"
 
 echo "== image : $(basename "$IMGXZ") décompressée"
 IMG="$WORK/key.img"
-xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M conv=sparse status=none
+# fullblock : sans lui, dd traite les lectures partielles du tube comme
+# des blocs (des milliers de petites écritures : 5 min sur GitHub au lieu de 20 s).
+xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 read -r start size < <(qemu_part "$IMG" SECMET-DATA)
 # Options ext4 de la partition d origine (celles du mke2fs d Ubuntu 24.04
 # dans le conteneur de construction), reprises à l identique : le format ne

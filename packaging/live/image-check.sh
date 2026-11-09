@@ -38,7 +38,7 @@ rm -rf "$WORK/qemu" "$WORK/key.img" "$WORK/data.img" "$WORK/journal.log"
 mkdir -p "$WORK"
 echo "== clé de $KEY_SIZE écrite depuis $(basename "$IMGXZ")"
 IMG="$WORK/key.img"
-xz -dc "$IMGXZ" | dd of="$IMG" bs=4M conv=sparse status=none
+xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 truncate -s "$KEY_SIZE" "$IMG"
 read -r exp_start exp_before < <(qemu_part "$IMG" SECMET-EXPORT)
 disk_sectors=$(( $(stat -c %s "$IMG") / 512 ))
