@@ -246,7 +246,7 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make live` | Construit l'image de la clé USB SecMet dans un conteneur privilégié Ubuntu 24.04 → `dist/live/` ([packaging/live/README.md](packaging/live/README.md)) |
 | `make live-bundle` | Livrable de la clé USB `dist/secmet-live_<version>_x86_64.tar` (après `make live`) |
 | `make live-check` | Contrôle QEMU sans écran : la clé virtuelle déploie la version la plus récente de son magasin `app/` |
-| `make live-dist` | Image publiable de la clé `dist/secmet-key_<version>_x86_64.img.xz`, à écrire telle quelle avec balenaEtcher, Rufus ou `dd` (après `make live`) |
+| `make live-dist` | Image publiable de la clé `dist/secmet-key_<version>_x86_64.img.xz`, à écrire telle quelle avec Raspberry Pi Imager, Rufus ou `dd` (après `make live`) |
 | `make live-dist-check` | Contrôle QEMU sans écran, en BIOS : premier démarrage de l'image publiable sur une clé de 16 Go (clé de signature créée, partition d'export agrandie) |
 | `make live-key DEV=/dev/sdX` | Écrit une clé USB SecMet (root ; efface la clé) |
 | `make release` | Chaîne de publication : contrôles, 4 paquets construits et fumés en conteneurs, `SHA256SUMS` et `latest.json` signés avec la clé de version ; rien n'est publié |

@@ -11,7 +11,7 @@ name: Package
 # Sur un tag ou à la main, la clé USB est publiée avec les paquets sous deux
 # formes signées : le livrable de fabrication secmet-live_<version>_x86_64.tar
 # (image, secmet-make-key.sh, secmet-release) et l'image prête à écrire
-# secmet-key_<version>_x86_64.img.xz (Etcher, Rufus, dd ;
+# secmet-key_<version>_x86_64.img.xz (Imager, Rufus, dd ;
 # docs/Fabriquer_sa_cle.md). Deux cadences (packaging/live/live-mode.sh) :
 #   - si un fichier du système de la clé a changé depuis la release
 #     précédente, le travail « live » reconstruit l'image (conteneur
@@ -254,7 +254,7 @@ jobs:
       - name: Script de mise à jour au démarrage (doublures)
         run: ./packaging/live/tests/app-update.sh
 
-      - name: Image publiable de la clé (.img.xz, Etcher / Rufus / dd)
+      - name: Image publiable de la clé (.img.xz, Imager / Rufus / dd)
         env:
           SECMET_ENGINE: docker
         run: |
@@ -358,7 +358,7 @@ jobs:
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
           v="${{ steps.version.outputs.version }}"
           {
-            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : balenaEtcher, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
               "$v" "$v" "$v" "$key_id"
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
               printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \

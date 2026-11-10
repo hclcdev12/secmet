@@ -12,7 +12,7 @@
 #                       et paramètres noyau d'essai possibles) ;
 #   make live-dist    → dist/secmet-key_<version>_x86_64.img.xz : image à
 #                       publier avec la release, à écrire telle quelle sur
-#                       une clé (balenaEtcher, Rufus, dd). Pas de clé de
+#                       une clé (Raspberry Pi Imager, Rufus, dd). Pas de clé de
 #                       signature dedans : chaque clé crée la sienne au
 #                       premier démarrage (secmet-first-boot), qui agrandit
 #                       aussi la partition d'export jusqu'au bout de la clé.
@@ -138,7 +138,7 @@ echo "  core.img : $core_size octets ($core_sectors secteurs)"
 chmod 0644 "$IMG"; sfdisk -l "$IMG" | tail -4; du -h "$IMG"
 
 if [ "$SECMET_KEY_DIST" = 1 ]; then
-    echo "== compression xz (blocs indépendants : décompression parallèle, Etcher et Rufus l ouvrent tels quels)"
+    echo "== compression xz (blocs indépendants : décompression parallèle, Imager et Rufus l ouvrent tels quels)"
     rm -f "$IMG.xz"
     xz -T0 -6 -c "$IMG" > "$IMG.xz" && rm -f "$IMG"
     ls -l "$IMG.xz" | awk "{print \"  \" \$NF \" : \" \$5 \" octets\"}"

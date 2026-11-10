@@ -6,7 +6,7 @@
 #
 # 1. l'image est décompressée dans un fichier épars agrandi à la taille
 #    d'une clé (SECMET_CHECK_KEY_SIZE, 16G) : la table GPT s'arrête bien
-#    avant la fin, comme après Etcher ou Rufus ;
+#    avant la fin, comme après Imager ou Rufus ;
 # 2. démarrage (GRUB i386-pc embarqué sans grub-install, puis
 #    secmet-first-boot), attente de la copie du journal, extinction ;
 # 3. vérification depuis l'image : journal de secmet-first-boot (clé de

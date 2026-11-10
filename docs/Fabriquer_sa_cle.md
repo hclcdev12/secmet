@@ -7,9 +7,11 @@ Chaque version publiée de SecMet contient une **image de clé USB prête à éc
 - Une clé USB de **16 Go ou plus** (12 Go au minimum). USB 3 conseillé : l'écriture et les effacements sont plus rapides. **Tout ce qu'elle contient sera effacé.**
 - Le fichier `secmet-key_<version>_x86_64.img.xz` de la release (environ 850 Mo).
 - Un outil d'écriture d'images :
-  - **balenaEtcher** (Windows, macOS, Linux) : <https://etcher.balena.io> ;
+  - **Raspberry Pi Imager** (Windows, macOS, Linux) : <https://www.raspberrypi.com/software/> ;
   - ou **Rufus** (Windows) : <https://rufus.ie> ;
   - ou `dd` sous Linux.
+
+  balenaEtcher n'est pas conseillé : ses versions récentes échouent sur les images `.img.xz` (« Something went wrong. If it is a compressed image… », problème connu et non corrigé chez Etcher, constaté avec l'image SecMet 0.3.12). Si vous n'avez que lui, décompressez d'abord l'image (7-Zip sous Windows, `xz -dk` sous Linux ou macOS : 11 Go sur le disque) et donnez-lui le `.img`.
 
 ## Vérifier le téléchargement (facultatif, recommandé)
 
@@ -23,7 +25,7 @@ Sous Windows, `certutil -hashfile secmet-key_<version>_x86_64.img.xz SHA256` aff
 
 ## Écrire l'image
 
-**balenaEtcher** : *Flash from file* → choisir le fichier `.img.xz` tel quel (pas besoin de le décompresser) → *Select target* → la clé USB → *Flash*. Etcher écrit puis relit la clé pour vérifier. Compter 11 Go écrits : 3 à 5 minutes sur une clé USB 3, 15 à 20 minutes sur une clé USB 2.
+**Raspberry Pi Imager** : *Choisir le modèle* → n'importe lequel (sans effet sur une image personnalisée) ; *Choisir l'OS* → tout en bas, *Utiliser une image personnalisée* → le fichier `.img.xz` tel quel (pas besoin de le décompresser) ; *Choisir le stockage* → la clé USB ; *Suivant*, puis répondre **Non** à la personnalisation de l'OS si elle est proposée. Imager écrit puis relit la clé pour vérifier. Compter 11 Go écrits : 3 à 5 minutes sur une clé USB 3, 15 à 20 minutes sur une clé USB 2.
 
 **Rufus** : choisir la clé dans *Périphérique*, *SÉLECTION* → le fichier `.img.xz`, laisser les autres réglages, *DÉMARRER*. Si Rufus propose un choix entre « image ISO » et « image DD », prendre **DD**.
 
