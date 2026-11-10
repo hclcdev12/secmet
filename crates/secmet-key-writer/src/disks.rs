@@ -47,6 +47,9 @@ impl Disk {
     }
 
     fn has_system_mount(&self) -> bool {
+        let system_drive = std::env::var("SystemDrive")
+            .unwrap_or_else(|_| "C:".to_string())
+            .to_uppercase();
         self.mounted.iter().any(|m| {
             m == "/"
                 || m == "/home"
@@ -55,6 +58,7 @@ impl Disk {
                 || m.starts_with("/boot")
                 || m == "[SWAP]"
                 || m.starts_with("C:")
+                || m.to_uppercase().starts_with(&system_drive)
         })
     }
 

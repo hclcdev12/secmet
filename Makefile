@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check
+.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -62,6 +62,9 @@ key-writer: ## Compile SecMet Clé USB (outil d'écriture de l'image de la clé,
 
 key-writer-appimage: ## AppImage de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.AppImage (conteneur Ubuntu 24.04)
 	@./packaging/build_key_writer_appimage.sh
+
+key-writer-exe: ## .exe Windows de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.exe (croisé : rustup target add x86_64-pc-windows-gnu, paquet mingw64-gcc)
+	@./packaging/build_key_writer_exe.sh
 
 rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)
 	@./packaging/build_rpm.sh

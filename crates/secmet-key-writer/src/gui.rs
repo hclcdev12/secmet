@@ -145,8 +145,11 @@ fn notify(ctx: &egui::Context, ok: bool, title: &str, body: &str) {
             .stderr(std::process::Stdio::null())
             .spawn();
     }
-    #[cfg(not(target_os = "linux"))]
-    let _ = (ok, title, body);
+    #[cfg(windows)]
+    {
+        platform::chime(ok);
+        let _ = (title, body);
+    }
 }
 
 /// Image choisie.

@@ -134,7 +134,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
     rsync -a --exclude target --exclude 'target-*' --exclude dist --exclude .git \
         --exclude fuzz/target --exclude 'packaging/stage' --exclude 'packaging/appimage_stage' --exclude packaging/rpmbuild \
         --exclude packaging/tools "$ROOT_DIR/" "$SRC_COPY/"
-    rm -f "$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage
+    rm -f "$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage "$OUT_DIR"/*.exe
 
     deb_script="
 set -euo pipefail
@@ -199,6 +199,18 @@ cp dist/*.rpm /out/
     "$extract/squashfs-root/usr/bin/secmet-key-writer" --version | grep -q "secmet-key-writer $VERSION" \
         || die "SecMet Clé USB : mauvaise version"
     rm -rf "$extract"
+
+    # Exécutable Windows : compilation croisée si MinGW est là ; sinon la
+    # release locale n'en a pas (package.yml le construit sur un runner
+    # Windows).
+    if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+        step "SecMet Clé USB (.exe Windows, compilation croisée)"
+        "$PKG_DIR/build_key_writer_exe.sh" > "$LOG_DIR/key-writer-exe.log" 2>&1 \
+            || die "exécutable Windows de SecMet Clé USB échoué, voir $LOG_DIR/key-writer-exe.log"
+        cp -f "$ROOT_DIR/dist/secmet-key-writer_${VERSION}_x86_64.exe" "$OUT_DIR/"
+    else
+        echo "AVERTISSEMENT : x86_64-w64-mingw32-gcc absent, pas de secmet-key-writer_${VERSION}_x86_64.exe dans cette release (dnf install mingw64-gcc)" >&2
+    fi
 fi
 
 # --- 2c. Image de la clé USB --------------------------------------------------
@@ -281,6 +293,7 @@ echo "vérification locale : OK"
 # --- 4. Publication -----------------------------------------------------------
 assets=("$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage
         "$OUT_DIR/SHA256SUMS" "$OUT_DIR/SHA256SUMS.sig" "$OUT_DIR/latest.json")
+for f in "$OUT_DIR"/*.exe; do [[ -f "$f" ]] && assets+=("$f"); done
 step "Résumé"
 ls -la "${assets[@]}"
 if [[ "$PUBLISH" -eq 0 ]]; then

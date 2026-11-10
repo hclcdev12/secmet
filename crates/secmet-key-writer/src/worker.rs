@@ -165,6 +165,11 @@ fn check_cancel(cancel: &AtomicBool) -> Result<(), String> {
 /// Vrai si la cible est un fichier ordinaire (essais sans disque : les
 /// ioctl de bloc sont alors remplacés ou ignorés).
 fn is_regular_file(device: &str) -> bool {
+    // Chemins de périphérique Windows : jamais des fichiers, quoi qu'en
+    // dise `metadata`.
+    if device.starts_with(r"\\.\") || device.starts_with(r"\\?\") {
+        return false;
+    }
     std::fs::metadata(device)
         .map(|m| m.is_file())
         .unwrap_or(false)
@@ -314,13 +319,20 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
     while read < total {
         check_cancel(cancel)?;
         let want = ((total - read) as usize).min(CHUNK);
-        let n = read_full(&mut rd, &mut buf[..want])
+        // Lecture de taille alignée (lecture directe sous Windows ; le
+        // disque fait au moins `round_up(total)`) ; seuls `want` octets
+        // comptent.
+        let ask = round_up(want as u64) as usize;
+        let n = read_full(&mut rd, &mut buf[..ask])
             .map_err(|e| format!("relecture de {device} : {e}"))?;
-        if n == 0 {
-            return Err(format!("relecture interrompue à {}", crate::fmt_size(read)));
+        if n < want {
+            return Err(format!(
+                "relecture interrompue à {}",
+                crate::fmt_size(read + n as u64)
+            ));
         }
-        hasher.update(&buf[..n]);
-        read += n as u64;
+        hasher.update(&buf[..want]);
+        read += want as u64;
         emit(&Event::Progress { done: read });
     }
     let actual = secmet_attest::hex(&hasher.finalize());

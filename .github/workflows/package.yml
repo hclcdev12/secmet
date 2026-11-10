@@ -1,7 +1,8 @@
 name: Package
 
 # Construit les livrables : .deb pour Ubuntu 24.04 et 22.04 (et dérivés :
-# Mint 22 / 21), .rpm Fedora, AppImage (assemblée dans Ubuntu 24.04).
+# Mint 22 / 21), .rpm Fedora, AppImage (assemblée dans Ubuntu 24.04),
+# SecMet Clé USB (AppImage Linux et .exe Windows, runner windows-latest).
 # Chaque paquet est installé et fumé dans son conteneur, à chaque push sur
 # main et sur les pull requests touchant le packaging. Sur un tag vX.Y.Z
 # (ou à la main avec ce tag), le dernier travail renomme les paquets selon
@@ -227,6 +228,46 @@ jobs:
           path: dist/secmet-key-writer_*.AppImage
           if-no-files-found: error
 
+  key-writer-windows:
+    name: SecMet Clé USB (.exe Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: key-writer-windows
+
+      # Un seul exécutable, sans bibliothèque à côté (TLS Schannel, xz en
+      # Rust pur). Sous-système « windows » : pas de console au lancement.
+      - name: Construction
+        shell: bash
+        run: |
+          cargo build --release -p secmet-key-writer
+          version="$(grep -m1 '^version' crates/secmet-key-writer/Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          mkdir -p dist
+          cp target/release/secmet-key-writer.exe "dist/secmet-key-writer_${version}_x86_64.exe"
+          ls -la dist/
+
+      - name: Fumée (--version, --list-disks)
+        shell: bash
+        run: |
+          ./dist/secmet-key-writer_*.exe --version | tee version.txt
+          grep -q "^secmet-key-writer " version.txt
+          ./dist/secmet-key-writer_*.exe --list-disks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: key-writer-windows
+          path: dist/secmet-key-writer_*.exe
+          if-no-files-found: error
+
   live-mode:
     name: Cadence de l'image de la clé USB
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -304,8 +345,8 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
-    needs: [deb, rpm, appimage, key-writer, live-mode, live]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    needs: [deb, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -330,7 +371,7 @@ jobs:
       - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' \) -exec mv {} release/ \;
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
@@ -387,8 +428,8 @@ jobs:
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
           v="${{ steps.version.outputs.version }}"
           {
-            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage : vérifie la signature de l'image puis l'écrit sur la clé ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-              "$v" "$v" "$v" "$v" "$key_id"
+            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage sous Linux, secmet-key-writer_%s_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+              "$v" "$v" "$v" "$v" "$v" "$key_id"
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
               printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \
                 "${{ needs.live-mode.outputs.previous }}" "$v" "$v"
