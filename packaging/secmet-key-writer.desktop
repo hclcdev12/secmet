@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SecMet Clé USB
+Name[en]=SecMet USB Key
+Comment=Écrit l'image de la clé USB SecMet après vérification de sa signature
+Comment[en]=Writes the SecMet USB key image after verifying its signature
+Exec=secmet-key-writer %f
+Icon=secmet-key-writer
+Terminal=false
+Categories=System;Utility;
+MimeType=application/x-xz;

@@ -1,12 +1,11 @@
 # Fabriquer sa clé USB SecMet
 
-Chaque version publiée de SecMet contient une **image de clé USB prête à écrire** : `secmet-key_<version>_x86_64.img.xz`, sur la page [Releases](https://github.com/hclcdev12/secmet/releases). Il suffit de l'écrire sur une clé avec un outil gratuit ; aucun outil SecMet, aucune ligne de commande, pas besoin de Linux. La clé démarre ensuite n'importe quel PC ou portable (UEFI, Secure Boot actif ou non, et anciens BIOS) sur SecMet, avec ses lots, ses certificats et sa clé de signature conservés sur la clé ([Annexe M](Annexes/Annexe_M_cle_live_lots.md)).
+Chaque version publiée de SecMet contient une **image de clé USB prête à écrire** : `secmet-key_<version>_x86_64.img.xz`, sur la page [Releases](https://github.com/hclcdev12/secmet/releases). Il suffit de l'écrire sur une clé avec **SecMet Clé USB**, le petit outil publié avec chaque version, ou avec un outil d'écriture d'images gratuit ; aucune ligne de commande, pas besoin de Linux. La clé démarre ensuite n'importe quel PC ou portable (UEFI, Secure Boot actif ou non, et anciens BIOS) sur SecMet, avec ses lots, ses certificats et sa clé de signature conservés sur la clé ([Annexe M](Annexes/Annexe_M_cle_live_lots.md)).
 
 ## Il vous faut
 
 - Une clé USB de **16 Go ou plus** (12 Go au minimum). USB 3 conseillé : l'écriture et les effacements sont plus rapides. **Tout ce qu'elle contient sera effacé.**
-- Le fichier `secmet-key_<version>_x86_64.img.xz` de la release (environ 850 Mo).
-- Un outil d'écriture d'images :
+- **SecMet Clé USB** (`secmet-key-writer_<version>_x86_64.AppImage` sur la page Releases, Linux ; version Windows à venir), qui télécharge l'image, vérifie sa signature et l'écrit. Sinon, le fichier `secmet-key_<version>_x86_64.img.xz` de la release (environ 850 Mo) et un outil d'écriture d'images :
   - **Raspberry Pi Imager** (Windows, macOS, Linux) : <https://www.raspberrypi.com/software/> ;
   - ou **Rufus** (Windows) : <https://rufus.ie> ;
   - ou `dd` sous Linux.
@@ -24,6 +23,8 @@ secmet-release verify <dossier des fichiers téléchargés> --trust <clé publiq
 Sous Windows, `certutil -hashfile secmet-key_<version>_x86_64.img.xz SHA256` affiche l'empreinte à comparer à la ligne correspondante de `SHA256SUMS`.
 
 ## Écrire l'image
+
+**SecMet Clé USB** (Linux) : rendre l'AppImage exécutable (clic droit → Propriétés → « Autoriser l'exécution », ou `chmod +x`), la lancer, puis suivre les quatre écrans : *Télécharger la dernière version* (ou *Choisir le fichier* si l'image est déjà là) → la signature de la release et l'empreinte de l'image sont vérifiées avec la clé de version de SecMet (rien ne s'écrit si elles ne passent pas) → choisir la clé dans la liste (seuls les disques amovibles de 12 Go ou plus y figurent, jamais les disques internes) → cocher la confirmation et *Effacer et écrire la clé*. Le système demande votre mot de passe pour autoriser l'écriture. L'outil écrit, puis relit toute la clé et compare : « Clé prête ». L'AppImage peut aussi être ouverte directement sur un fichier `.img.xz` (glisser le fichier sur l'icône, ou en argument).
 
 **Raspberry Pi Imager** : *Choisir le modèle* → n'importe lequel (sans effet sur une image personnalisée) ; *Choisir l'OS* → tout en bas, *Utiliser une image personnalisée* → le fichier `.img.xz` tel quel (pas besoin de le décompresser) ; *Choisir le stockage* → la clé USB ; *Suivant*, puis répondre **Non** à la personnalisation de l'OS si elle est proposée. Imager écrit puis relit la clé pour vérifier. Compter 11 Go écrits : 3 à 5 minutes sur une clé USB 3, 15 à 20 minutes sur une clé USB 2.
 

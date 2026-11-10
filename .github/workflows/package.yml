@@ -198,6 +198,35 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
 
+  key-writer:
+    name: SecMet Clé USB (AppImage, conteneur Ubuntu 24.04)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Construction (docker)
+        run: |
+          ./packaging/build_key_writer_appimage.sh
+          ls -la dist/
+
+      - name: Fumée (extraction sans FUSE, glibc requise, --version)
+        run: |
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE"/dist/secmet-key-writer_*.AppImage --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/secmet-key-writer
+          max=$(objdump -T squashfs-root/usr/bin/secmet-key-writer | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+          echo "glibc max requise : $max"
+          test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
+          squashfs-root/usr/bin/secmet-key-writer --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: key-writer
+          path: dist/secmet-key-writer_*.AppImage
+          if-no-files-found: error
+
   live-mode:
     name: Cadence de l'image de la clé USB
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -275,8 +304,8 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
-    needs: [deb, rpm, appimage, live-mode, live]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    needs: [deb, rpm, appimage, key-writer, live-mode, live]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -358,8 +387,8 @@ jobs:
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
           v="${{ steps.version.outputs.version }}"
           {
-            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz : Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-              "$v" "$v" "$v" "$key_id"
+            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage : vérifie la signature de l'image puis l'écrit sur la clé ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+              "$v" "$v" "$v" "$v" "$key_id"
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
               printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \
                 "${{ needs.live-mode.outputs.previous }}" "$v" "$v"

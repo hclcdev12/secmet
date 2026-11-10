@@ -187,6 +187,18 @@ cp dist/*.rpm /out/
         echo "glibc max requise par GTK : $max"
     fi
     rm -rf "$extract"
+
+    step "SecMet Clé USB (AppImage, conteneur Ubuntu 24.04)"
+    "$PKG_DIR/build_key_writer_appimage.sh" > "$LOG_DIR/key-writer.log" 2>&1 \
+        || die "AppImage de SecMet Clé USB échouée, voir $LOG_DIR/key-writer.log"
+    key_writer="$ROOT_DIR/dist/secmet-key-writer_${VERSION}_x86_64.AppImage"
+    [[ -f "$key_writer" ]] || die "AppImage introuvable : $key_writer"
+    cp -f "$key_writer" "$OUT_DIR/"
+    extract="$(mktemp -d)"
+    ( cd "$extract" && "$OUT_DIR/secmet-key-writer_${VERSION}_x86_64.AppImage" --appimage-extract >/dev/null )
+    "$extract/squashfs-root/usr/bin/secmet-key-writer" --version | grep -q "secmet-key-writer $VERSION" \
+        || die "SecMet Clé USB : mauvaise version"
+    rm -rf "$extract"
 fi
 
 # --- 2c. Image de la clé USB --------------------------------------------------

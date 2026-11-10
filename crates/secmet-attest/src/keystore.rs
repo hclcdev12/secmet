@@ -4,6 +4,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -43,6 +44,7 @@ fn random_seed() -> Result<Zeroizing<[u8; 32]>> {
 pub fn load_or_create(path: &Path) -> Result<SigningIdentity> {
     match fs::read_to_string(path) {
         Ok(text) => {
+            #[cfg(unix)]
             if let Ok(meta) = fs::metadata(path) {
                 if meta.permissions().mode() & 0o077 != 0 {
                     return Err(AttestError::Invalid(format!(
@@ -76,6 +78,7 @@ fn create(path: &Path) -> Result<SigningIdentity> {
         .parent()
         .ok_or_else(|| AttestError::Invalid(format!("{}: pas de répertoire", path.display())))?;
     fs::create_dir_all(dir).map_err(|e| AttestError::io(dir.display().to_string(), e))?;
+    #[cfg(unix)]
     fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
         .map_err(|e| AttestError::io(format!("chmod {}", dir.display()), e))?;
     let seed = random_seed()?;
@@ -83,12 +86,11 @@ fn create(path: &Path) -> Result<SigningIdentity> {
     // Création exclusive du fichier final : deux instances lancées avant
     // toute clé ne peuvent pas se remplacer l'une l'autre ; la seconde
     // relit la clé de la première.
-    let mut file = match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-    {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    let mut file = match options.open(path) {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return load_or_create(path),
         Err(e) => return Err(AttestError::io(path.display().to_string(), e)),
@@ -115,6 +117,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
     fn key_is_created_once_restricted_and_reloaded_identically() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("cfg").join("secmet").join(KEY_FILE);

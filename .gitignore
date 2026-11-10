@@ -28,6 +28,7 @@ Thumbs.db
 # Outils d'assemblage AppImage (telecharges par build_appimage.sh)
 /packaging/tools/
 /packaging/appimage_stage/
+/packaging/key_writer_stage/
 /target-appimage/
 
 # Fuzzing (cargo-fuzz) et construction RPM

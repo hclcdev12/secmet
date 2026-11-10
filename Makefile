@@ -57,6 +57,12 @@ deb: deps ## Construit un .deb (reutilise target/release si a jour)
 appimage: ## Construit une AppImage autonome dans Ubuntu 24.04 (podman/docker requis)
 	@./packaging/build_appimage.sh
 
+key-writer: ## Compile SecMet Clé USB (outil d'écriture de l'image de la clé, crates/secmet-key-writer)
+	@cargo build --release -p secmet-key-writer
+
+key-writer-appimage: ## AppImage de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.AppImage (conteneur Ubuntu 24.04)
+	@./packaging/build_key_writer_appimage.sh
+
 rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)
 	@./packaging/build_rpm.sh
 

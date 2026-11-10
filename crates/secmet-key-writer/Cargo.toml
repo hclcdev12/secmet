@@ -1,0 +1,34 @@
+[package]
+name = "secmet-key-writer"
+version = "0.3.13"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.95"
+publish = false
+description = "SecMet Clé USB : écrit l'image de la clé SecMet sur une clé USB après vérification de la signature de la release (Linux, Windows)."
+
+[[bin]]
+name = "secmet-key-writer"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.37"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+xz-native = "1"
+secmet-attest = { path = "../secmet-attest" }
+rfd = { version = "0.18", default-features = false, features = ["xdg-portal"] }
+dirs = "5.0"
+
+# TLS : rustls (ring) sur Linux ; Schannel (native-tls) sur Windows, où
+# ring exigerait un compilateur C.
+[target.'cfg(not(windows))'.dependencies]
+ureq = { version = "2", default-features = false, features = ["tls"] }
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+ureq = { version = "2", default-features = false, features = ["native-tls"] }
+native-tls = "0.2"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl"] }

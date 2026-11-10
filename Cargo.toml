@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/secmet-helper", "crates/secmet-device", "crates/secmet-core", "crates/secmet-attest"]
+members = [".", "crates/secmet-helper", "crates/secmet-device", "crates/secmet-core", "crates/secmet-attest", "crates/secmet-key-writer"]
 default-members = [".", "crates/secmet-helper", "crates/secmet-device", "crates/secmet-core", "crates/secmet-attest"]
 resolver = "2"
 # Crate de fuzz (cargo-fuzz, nightly) : construite à part, voir fuzz/.
