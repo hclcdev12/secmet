@@ -101,6 +101,7 @@ enum Step {
     Confirm,
     Write,
     Done,
+    Failed,
 }
 
 impl Step {
@@ -109,9 +110,43 @@ impl Step {
             Step::Source => 0,
             Step::Verify => 1,
             Step::Disk | Step::Confirm => 2,
-            Step::Write | Step::Done => 3,
+            Step::Write | Step::Done | Step::Failed => 3,
         }
     }
+}
+
+/// Notification système de fin (succès ou échec), pour que le résultat
+/// soit vu même si la fenêtre est derrière une autre.
+fn notify(ctx: &egui::Context, ok: bool, title: &str, body: &str) {
+    ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(
+        egui::UserAttentionType::Critical,
+    ));
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("notify-send")
+            .arg("--app-name=SecMet Clé USB")
+            .arg(format!(
+                "--icon={}",
+                if ok {
+                    "emblem-ok-symbolic"
+                } else {
+                    "dialog-error"
+                }
+            ))
+            .arg(if ok {
+                "--urgency=normal"
+            } else {
+                "--urgency=critical"
+            })
+            .arg(title)
+            .arg(body)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = (ok, title, body);
 }
 
 /// Image choisie.
@@ -169,6 +204,8 @@ struct App {
     write_summary: Option<(String, u64, Duration)>,
     log: Vec<String>,
     show_log: bool,
+    /// Notification à envoyer au prochain rendu : (succès, titre, texte).
+    pending_notice: Option<(bool, String, String)>,
 }
 
 impl App {
@@ -191,6 +228,7 @@ impl App {
             write_summary: None,
             log: Vec::new(),
             show_log: false,
+            pending_notice: None,
         };
         app.fetch_latest();
         app
@@ -454,8 +492,9 @@ impl App {
                     platform::elevation_hint(status.code())
                 };
                 self.log(format!("échec : {msg}"));
+                self.pending_notice = Some((false, "Clé non écrite".to_string(), msg.clone()));
                 self.error = Some(msg);
-                self.step = Step::Confirm;
+                self.step = Step::Failed;
                 self.confirmed = false;
             } else {
                 busy = true;
@@ -539,6 +578,9 @@ impl eframe::App for App {
         if busy {
             ctx.request_repaint_after(Duration::from_millis(150));
         }
+        if let Some((ok, title, body)) = self.pending_notice.take() {
+            notify(&ctx, ok, &title, &body);
+        }
         if self.step == Step::Source {
             let dropped: Vec<PathBuf> = ctx.input(|i| {
                 i.raw
@@ -611,6 +653,7 @@ impl eframe::App for App {
                     Step::Confirm => self.ui_confirm(ui),
                     Step::Write => self.ui_write(ui),
                     Step::Done => self.ui_done(ui),
+                    Step::Failed => self.ui_failed(ui),
                 }
             });
         });
@@ -986,17 +1029,54 @@ impl App {
         }
     }
 
+    fn ui_failed(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Clé non écrite");
+        ui.horizontal_wrapped(|ui| {
+            ui.colored_label(
+                ui.visuals().error_fg_color,
+                egui::RichText::new("✗").size(22.0),
+            );
+            ui.label(
+                egui::RichText::new(self.error.clone().unwrap_or_default())
+                    .strong()
+                    .size(15.0),
+            );
+        });
+        ui.add_space(8.0);
+        ui.label("La clé n'est pas utilisable en l'état : elle est vide ou incomplète. Rien n'a été écrit ailleurs. Le journal (« Détails », en bas) contient le déroulé complet.");
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            if ui.button("Réessayer sur la même clé").clicked() {
+                self.error = None;
+                self.step = Step::Confirm;
+            }
+            if ui.button("Choisir une autre clé").clicked() {
+                self.error = None;
+                self.selected = None;
+                self.step = Step::Disk;
+                self.refresh_disks(true);
+            }
+            if ui.button("Quitter").clicked() {
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        });
+    }
+
     fn ui_done(&mut self, ui: &mut egui::Ui) {
         ui.heading("Clé prête");
-        ui.horizontal(|ui| {
-            ui.colored_label(GREEN, egui::RichText::new("✓").size(22.0));
+        ui.horizontal_wrapped(|ui| {
+            ui.colored_label(GREEN, egui::RichText::new("✓").size(26.0));
             if let Some((sha, written, elapsed)) = &self.write_summary {
-                ui.label(format!(
-                    "{} écrits et relus à l'identique en {}.\nSHA-256 : {}…",
-                    fmt_size(*written),
-                    fmt_duration(*elapsed),
-                    &sha[..16]
-                ));
+                ui.label(
+                    egui::RichText::new(format!(
+                        "Écriture terminée et vérifiée : {} écrits puis relus à l'identique en {}.",
+                        fmt_size(*written),
+                        fmt_duration(*elapsed)
+                    ))
+                    .strong()
+                    .size(15.0),
+                );
+                ui.weak(format!("SHA-256 des données écrites : {sha}"));
             }
         });
         ui.add_space(10.0);
