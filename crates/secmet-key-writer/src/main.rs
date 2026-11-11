@@ -23,6 +23,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod disks;
+mod gpt;
 mod gui;
 mod image;
 mod platform;

@@ -45,7 +45,8 @@ use windows_sys::Win32::UI::Shell::{
     ShellExecuteExW, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    MessageBoxW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONHAND, MB_OK, SW_SHOWNORMAL,
+    MessageBoxW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONHAND, MB_OK, MB_SETFOREGROUND, MB_TOPMOST,
+    SW_SHOWNORMAL,
 };
 
 use crate::disks::Disk;
@@ -274,13 +275,10 @@ pub fn list_disks() -> Result<Vec<Disk>, String> {
         let mounted: Vec<String> = vols
             .iter()
             .filter(|v| v.disks.contains(&n))
-            .flat_map(|v| {
-                if v.paths.is_empty() {
-                    vec!["(sans lettre)".to_string()]
-                } else {
-                    v.paths.clone()
-                }
-            })
+            // Seuls les volumes accessibles (lettre ou dossier) : les
+            // volumes sans lettre (partitions Linux de la clé) ne sont pas
+            // « montés » au sens de l'opérateur.
+            .flat_map(|v| v.paths.clone())
             .collect();
         disks.push(Disk {
             path,
@@ -541,7 +539,9 @@ pub fn message_box(title: &str, text: &str) {
             std::ptr::null_mut(),
             x.as_ptr(),
             t.as_ptr(),
-            MB_OK | MB_ICONERROR,
+            // Au premier plan : sans cela la boîte s'ouvre derrière la
+            // fenêtre de l'Explorateur d'où l'outil a été lancé.
+            MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST,
         )
     };
 }

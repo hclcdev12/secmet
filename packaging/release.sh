@@ -200,17 +200,14 @@ cp dist/*.rpm /out/
         || die "SecMet Clé USB : mauvaise version"
     rm -rf "$extract"
 
-    # Exécutable Windows : compilation croisée si MinGW est là ; sinon la
-    # release locale n'en a pas (package.yml le construit sur un runner
-    # Windows).
-    if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
-        step "SecMet Clé USB (.exe Windows, compilation croisée)"
-        "$PKG_DIR/build_key_writer_exe.sh" > "$LOG_DIR/key-writer-exe.log" 2>&1 \
-            || die "exécutable Windows de SecMet Clé USB échoué, voir $LOG_DIR/key-writer-exe.log"
-        cp -f "$ROOT_DIR/dist/secmet-key-writer_${VERSION}_x86_64.exe" "$OUT_DIR/"
-    else
-        echo "AVERTISSEMENT : x86_64-w64-mingw32-gcc absent, pas de secmet-key-writer_${VERSION}_x86_64.exe dans cette release (dnf install mingw64-gcc)" >&2
-    fi
+    # Exécutable Windows : compilation croisée (MinGW sur la machine, sinon
+    # dans le conteneur Ubuntu 24.04 de l'AppImage, qui l'embarque).
+    step "SecMet Clé USB (.exe Windows, compilation croisée)"
+    "$PKG_DIR/build_key_writer_exe.sh" > "$LOG_DIR/key-writer-exe.log" 2>&1 \
+        || die "exécutable Windows de SecMet Clé USB échoué, voir $LOG_DIR/key-writer-exe.log"
+    cp -f "$ROOT_DIR/dist/secmet-key-writer_${VERSION}_x86_64.exe" "$OUT_DIR/"
+    [[ "$(head -c 2 "$OUT_DIR/secmet-key-writer_${VERSION}_x86_64.exe")" == "MZ" ]] \
+        || die "SecMet Clé USB : le .exe n'est pas un exécutable Windows"
 fi
 
 # --- 2c. Image de la clé USB --------------------------------------------------

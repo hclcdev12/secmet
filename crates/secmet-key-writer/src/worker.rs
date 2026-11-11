@@ -8,7 +8,7 @@
 //! travail entre deux blocs.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,7 +40,7 @@ impl AlignedBuf {
     }
 
     fn slice(&mut self) -> &mut [u8] {
-        let end = self.offset + CHUNK;
+        let end = self.raw.len() - ALIGN + self.offset;
         &mut self.raw[self.offset..end]
     }
 }
@@ -154,6 +154,18 @@ fn read_full(r: &mut impl Read, buf: &mut [u8]) -> std::io::Result<usize> {
     Ok(filled)
 }
 
+/// Écrit la zone de secours de la GPT (entrées puis en-tête, jusqu'au
+/// dernier secteur) depuis un tampon aligné, puis revient au début.
+fn write_tail(dev: &mut File, p: &crate::gpt::Plan) -> std::io::Result<()> {
+    let mut aligned = AlignedBuf::new(p.tail.len());
+    let buf = aligned.slice();
+    buf.copy_from_slice(&p.tail);
+    dev.seek(SeekFrom::Start(p.tail_lba * crate::gpt::SECTOR))?;
+    dev.write_all(buf)?;
+    dev.seek(SeekFrom::Start(0))?;
+    Ok(())
+}
+
 fn check_cancel(cancel: &AtomicBool) -> Result<(), String> {
     if cancel.load(Ordering::Relaxed) {
         Err("écriture annulée : la clé est incomplète, recommencer".to_string())
@@ -255,6 +267,7 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
     let buf = aligned.slice();
     let mut hasher = Sha256::new();
     let mut written = 0u64;
+    let mut gpt_plan: Option<crate::gpt::Plan> = None;
     let outcome = loop {
         if let Err(e) = check_cancel(cancel) {
             break Err(e);
@@ -275,6 +288,22 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
         let padded = round_up(n as u64) as usize;
         buf[..n].copy_from_slice(&chunk);
         buf[n..padded].fill(0);
+        if written == 0 {
+            // GPT complétée au bout du disque (voir `gpt`) : la copie de
+            // secours part avant le premier bloc, puis les secteurs 0 et 1
+            // corrigés partent avec lui.
+            match crate::gpt::plan(&chunk, size) {
+                Ok(Some(p)) => {
+                    if let Err(e) = write_tail(&mut dev, &p) {
+                        break Err(format!("GPT de secours sur {device} : {e}"));
+                    }
+                    buf[..p.head.len()].copy_from_slice(&p.head);
+                    gpt_plan = Some(p);
+                }
+                Ok(None) => {}
+                Err(e) => break Err(format!("GPT de l'image : {e}")),
+            }
+        }
         if let Err(e) = dev.write_all(&buf[..padded]) {
             break Err(format!(
                 "écriture sur {device} après {} : {e}",
@@ -331,6 +360,19 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
                 crate::fmt_size(read + n as u64)
             ));
         }
+        if read == 0 {
+            if let Some(p) = &gpt_plan {
+                // Secteurs 0 et 1 complétés : comparés tels quels, puis
+                // remplacés par ceux de l'image pour l'empreinte.
+                if buf[..p.head.len()] != p.head[..] {
+                    return Err(
+                        "la relecture de la table de partitions ne correspond pas à ce qui a été écrit"
+                            .to_string(),
+                    );
+                }
+                buf[..p.pristine_head.len()].copy_from_slice(&p.pristine_head);
+            }
+        }
         hasher.update(&buf[..want]);
         read += want as u64;
         emit(&Event::Progress { done: read });
@@ -341,6 +383,19 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
             "la relecture ne correspond pas à ce qui a été écrit : clé défectueuse ou débranchée"
                 .to_string(),
         );
+    }
+    if let Some(p) = &gpt_plan {
+        rd.seek(SeekFrom::Start(p.tail_lba * crate::gpt::SECTOR))
+            .map_err(|e| format!("relecture de {device} : {e}"))?;
+        let n = read_full(&mut rd, &mut buf[..p.tail.len()])
+            .map_err(|e| format!("relecture de la GPT de secours sur {device} : {e}"))?;
+        if n < p.tail.len() || buf[..p.tail.len()] != p.tail[..] {
+            return Err(
+                "la relecture de la GPT de secours ne correspond pas à ce qui a été écrit"
+                    .to_string(),
+            );
+        }
+        info(&p.message);
     }
 
     emit(&Event::Phase {

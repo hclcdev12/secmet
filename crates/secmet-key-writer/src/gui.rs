@@ -27,6 +27,10 @@ pub fn run(image: Option<PathBuf>) -> Result<(), String> {
             .with_title(TITLE)
             .with_inner_size([660.0, 540.0])
             .with_min_inner_size([540.0, 440.0]),
+        // Windows : wgpu (Direct3D 12, repli logiciel WARP) ; le pilote
+        // d'affichage de base n'offre qu'OpenGL 1.1 et egui_glow refuse.
+        #[cfg(windows)]
+        renderer: eframe::Renderer::Wgpu,
         ..Default::default()
     };
     eframe::run_native(
@@ -667,7 +671,7 @@ impl App {
     fn ui_error(&self, ui: &mut egui::Ui) {
         if let Some(e) = &self.error {
             ui.add_space(6.0);
-            ui.colored_label(ui.visuals().error_fg_color, format!("✗ {e}"));
+            ui.colored_label(ui.visuals().error_fg_color, format!("✖ {e}"));
             ui.add_space(6.0);
         }
     }
@@ -815,7 +819,7 @@ impl App {
     fn ui_image_summary(&self, ui: &mut egui::Ui) {
         if let (Some(src), Some((v, info))) = (&self.source, &self.verified) {
             ui.horizontal_wrapped(|ui| {
-                ui.colored_label(GREEN, "✓");
+                ui.colored_label(GREEN, "✔");
                 ui.label(format!(
                     "SecMet {} : signature valide (clé de version {}), empreinte conforme, {} à écrire.",
                     src.version.as_deref().unwrap_or("?"),
@@ -846,29 +850,32 @@ impl App {
                 ui.label("Aucune clé USB détectée. Branchez la clé : la liste se met à jour toute seule.");
             });
         } else {
-            egui::Grid::new("disks")
-                .num_columns(4)
-                .striped(true)
-                .spacing([14.0, 8.0])
-                .show(ui, |ui| {
-                    for d in &candidates {
-                        let refusal = d.refusal(needed);
-                        let is_sel = self.selected.as_deref() == Some(d.path.as_str());
-                        ui.add_enabled_ui(refusal.is_none(), |ui| {
-                            if ui.radio(is_sel, "").clicked() {
-                                self.selected = Some(d.path.clone());
-                                self.confirmed = false;
-                            }
-                        });
-                        ui.vertical(|ui| {
-                            ui.label(egui::RichText::new(&d.name).strong());
-                            ui.weak(format!(
-                                "{}  ·  série {}",
-                                d.path,
-                                d.serial.as_deref().unwrap_or("inconnue")
-                            ));
-                        });
-                        ui.label(fmt_size_decimal(d.size));
+            // Une fiche par disque, sur toute la largeur : une grille à
+            // colonnes hachait les libellés longs (chemins Windows).
+            for d in &candidates {
+                let refusal = d.refusal(needed);
+                let is_sel = self.selected.as_deref() == Some(d.path.as_str());
+                ui.horizontal(|ui| {
+                    ui.add_enabled_ui(refusal.is_none(), |ui| {
+                        if ui.radio(is_sel, "").clicked() {
+                            self.selected = Some(d.path.clone());
+                            self.confirmed = false;
+                        }
+                    });
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}  ·  {}",
+                                d.name,
+                                fmt_size_decimal(d.size)
+                            ))
+                            .strong(),
+                        );
+                        ui.weak(format!(
+                            "{}  ·  série {}",
+                            d.path,
+                            d.serial.as_deref().unwrap_or("inconnue")
+                        ));
                         match refusal {
                             Some(r) => {
                                 ui.colored_label(ui.visuals().warn_fg_color, r);
@@ -879,13 +886,12 @@ impl App {
                                     d.mounted.join(", ")
                                 ));
                             }
-                            None => {
-                                ui.label("");
-                            }
+                            None => {}
                         }
-                        ui.end_row();
-                    }
+                    });
                 });
+                ui.add_space(6.0);
+            }
         }
         self.ui_error(ui);
         ui.add_space(10.0);
@@ -988,7 +994,7 @@ impl App {
             for (i, p) in phases.iter().enumerate() {
                 ui.horizontal(|ui| match current {
                     Some(c) if i < c => {
-                        ui.colored_label(GREEN, "✓");
+                        ui.colored_label(GREEN, "✔");
                         ui.label(p.label());
                     }
                     Some(c) if i == c => {
@@ -1037,7 +1043,7 @@ impl App {
         ui.horizontal_wrapped(|ui| {
             ui.colored_label(
                 ui.visuals().error_fg_color,
-                egui::RichText::new("✗").size(22.0),
+                egui::RichText::new("✖").size(22.0),
             );
             ui.label(
                 egui::RichText::new(self.error.clone().unwrap_or_default())
@@ -1068,7 +1074,7 @@ impl App {
     fn ui_done(&mut self, ui: &mut egui::Ui) {
         ui.heading("Clé prête");
         ui.horizontal_wrapped(|ui| {
-            ui.colored_label(GREEN, egui::RichText::new("✓").size(26.0));
+            ui.colored_label(GREEN, egui::RichText::new("✔").size(26.0));
             if let Some((sha, written, elapsed)) = &self.write_summary {
                 ui.label(
                     egui::RichText::new(format!(

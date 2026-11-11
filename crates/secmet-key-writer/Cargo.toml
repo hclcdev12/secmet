@@ -13,7 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
-egui = "0.37"
+# Polices emoji monochromes embarquées (✔ ✖ de l'interface) : sans elles, egui
+# ne dessine qu'un carré, aucune police système n'étant consultée.
+egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
@@ -31,6 +33,12 @@ libc = "0.2"
 [target.'cfg(windows)'.dependencies]
 ureq = { version = "2", default-features = false, features = ["native-tls"] }
 native-tls = "0.2"
+# Rendu par wgpu sur Direct3D 12 plutôt qu'OpenGL : le pilote d'affichage
+# de base de Windows (machines virtuelles, bureau à distance, postes sans
+# pilote graphique) ne fournit qu'OpenGL 1.1, et Direct3D 12 a toujours
+# le repli logiciel WARP. Seul le dorsal dx12 est compilé.
+eframe = { version = "0.37", default-features = false, features = ["wgpu_no_default_features"] }
+wgpu = { version = "30", default-features = false, features = ["dx12", "std", "wgsl"] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem",
     "Win32_System_Console", "Win32_System_Diagnostics_Debug", "Win32_System_IO",

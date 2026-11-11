@@ -63,7 +63,7 @@ key-writer: ## Compile SecMet Clé USB (outil d'écriture de l'image de la clé,
 key-writer-appimage: ## AppImage de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.AppImage (conteneur Ubuntu 24.04)
 	@./packaging/build_key_writer_appimage.sh
 
-key-writer-exe: ## .exe Windows de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.exe (croisé : rustup target add x86_64-pc-windows-gnu, paquet mingw64-gcc)
+key-writer-exe: ## .exe Windows de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.exe (croisé : MinGW sur la machine, sinon conteneur Ubuntu 24.04)
 	@./packaging/build_key_writer_exe.sh
 
 rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)

@@ -7,7 +7,10 @@
 # « version `GLIBC_2.43' not found ». La construction se fait donc dans
 # Ubuntu 24.04, plus ancienne glibc supportée par le banc.
 #
-# Utilisé par packaging/build_appimage.sh (podman ou docker).
+# Utilisé par packaging/build_appimage.sh et build_key_writer_appimage.sh
+# (podman ou docker) ; build_key_writer_exe.sh s'en sert aussi quand MinGW
+# n'est pas installé sur la machine (gcc-mingw-w64 + cible
+# x86_64-pc-windows-gnu).
 FROM docker.io/library/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -20,6 +23,7 @@ RUN apt-get update \
         libgtk-4-dev libglib2.0-dev libglib2.0-bin libgdk-pixbuf2.0-bin \
         desktop-file-utils gtk-update-icon-cache squashfs-tools patchelf \
         librsvg2-common testdisk \
+        gcc-mingw-w64-x86-64 \
  && rm -rf /var/lib/apt/lists/* \
  # Backends d'impression GTK : inutiles à SecMet, et ils tirent libcolord /
  # CUPS de l'hôte au lancement (symboles manquants, avertissements).
@@ -31,6 +35,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 
 RUN curl -fsSL https://sh.rustup.rs \
       | sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path \
+ && rustup target add x86_64-pc-windows-gnu \
  && rustc --version && cargo --version
 
 ENV SECMET_IN_CONTAINER=1
