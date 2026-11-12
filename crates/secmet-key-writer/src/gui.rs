@@ -213,6 +213,9 @@ struct App {
     show_log: bool,
     /// Notification à envoyer au prochain rendu : (succès, titre, texte).
     pending_notice: Option<(bool, String, String)>,
+    /// L'image courante déjà présente dans le dossier de téléchargement a
+    /// été prise automatiquement (une seule fois par lancement).
+    auto_picked: bool,
 }
 
 impl App {
@@ -236,6 +239,7 @@ impl App {
             log: Vec::new(),
             show_log: false,
             pending_notice: None,
+            auto_picked: false,
         };
         app.fetch_latest();
         app
@@ -400,6 +404,19 @@ impl App {
                 }
                 self.latest_result = Some(r);
                 self.latest = None;
+                // Image de la version courante déjà téléchargée (lancement
+                // précédent) : on la prend sans attendre un clic, comme à
+                // la fin d'un téléchargement ; « Autre image » reste là.
+                if !self.auto_picked && self.source.is_none() && self.step == Step::Source {
+                    if let Some(Ok(l)) = &self.latest_result {
+                        let dest = release::download_dir().join(release::image_name(&l.version));
+                        if dest.is_file() {
+                            self.auto_picked = true;
+                            self.log(format!("image déjà téléchargée : {}", dest.display()));
+                            self.choose_local(&dest);
+                        }
+                    }
+                }
             } else {
                 busy = true;
             }
