@@ -70,13 +70,26 @@ step "SecMet $VERSION — état du dépôt"
 if [[ "$ALLOW_DIRTY" -eq 0 && -n "$(git status --porcelain)" ]]; then
     die "arbre de travail modifié ; commitez, ou --allow-dirty"
 fi
+# HEAD porte le tag vX.Y.Z, ou un tag d'essai vX.Y.Z-rcN (tout est construit,
+# rien n'est publié : --publish est refusé).
+RC=0
 if [[ "$ALLOW_UNTAGGED" -eq 0 ]]; then
     head_tag="$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
-    [[ "$head_tag" == "$TAG" ]] || die "HEAD ne porte pas le tag $TAG (git tag -a $TAG), ou --allow-untagged"
+    if [[ "$head_tag" =~ ^v${VERSION//./\\.}-rc[0-9]+$ ]]; then
+        TAG="$head_tag"; RC=1
+        [[ "$PUBLISH" -eq 0 ]] || die "$TAG est un tag d'essai : pas de publication (taguer v$VERSION)"
+    else
+        [[ "$head_tag" == "$TAG" ]] || die "HEAD ne porte pas le tag $TAG (git tag -a $TAG), ou --allow-untagged"
+    fi
+fi
+# Notes : le corps du message du tag annoté (git tag -a), sauf --notes.
+TAG_NOTES=""
+if [[ -z "${NOTES_FR:-}" && "$(git cat-file -t "$TAG" 2>/dev/null || true)" == tag ]]; then
+    TAG_NOTES="$(git tag -l --format='%(contents:body)' "$TAG" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
 fi
 [[ -f "$KEY" ]] || die "clé de version absente : $KEY (secmet-release keygen \"$KEY\")"
 PUBKEY="$(tr -d '[:space:]' < "${KEY%.hex}.pub")"
-echo "commit : $(git rev-parse --short HEAD)  tag : $TAG  sortie : $OUT_DIR"
+echo "commit : $(git rev-parse --short HEAD)  tag : $TAG$([[ "$RC" -eq 1 ]] && echo " (essai)")  sortie : $OUT_DIR"
 
 ENGINE="${SECMET_ENGINE:-}"
 if [[ -z "$ENGINE" ]]; then
@@ -280,6 +293,7 @@ cargo build --release -q -p secmet-attest --bin secmet-release
 RELEASE_BIN="${CARGO_TARGET_DIR:-$ROOT_DIR/target}/release/secmet-release"
 notes_args=()
 [[ -n "$NOTES_FR" ]] && notes_args+=(--notes-fr "$(cat "$NOTES_FR")")
+[[ -z "$NOTES_FR" && -n "$TAG_NOTES" ]] && notes_args+=(--notes-fr "$TAG_NOTES")
 [[ -n "$NOTES_EN" ]] && notes_args+=(--notes-en "$(cat "$NOTES_EN")")
 [[ -n "$NOTES_DE" ]] && notes_args+=(--notes-de "$(cat "$NOTES_DE")")
 "$RELEASE_BIN" sign "$OUT_DIR" --key "$KEY" --version "$VERSION" --date "$DATE" \
@@ -310,8 +324,12 @@ read -r -p "Confirmer ? [oui/N] " answer
 notes_file="${NOTES_FR:-}"
 if [[ -z "$notes_file" ]]; then
     notes_file="$(mktemp)"
-    printf 'SecMet %s\n\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-        "$VERSION" "$(sed -n 's/.*"key_id": "\([0-9a-f]*\)".*/\1/p' "$OUT_DIR/latest.json" | head -1)" > "$notes_file"
+    {
+        printf 'SecMet %s\n\n' "$VERSION"
+        [[ -n "$TAG_NOTES" ]] && printf '%s\n\n' "$TAG_NOTES"
+        printf 'Empreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+            "$(sed -n 's/.*"key_id": "\([0-9a-f]*\)".*/\1/p' "$OUT_DIR/latest.json" | head -1)"
+    } > "$notes_file"
 fi
 gh release create "$TAG" --repo "$REPO" --title "SecMet $VERSION" --notes-file "$notes_file" "${assets[@]}"
 echo "latest.json : https://github.com/$REPO/releases/latest/download/latest.json"

@@ -29,7 +29,9 @@ name: Package
 on:
   push:
     branches: ["main"]
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    # vX.Y.Z publie ; vX.Y.Z-rcN construit tout (paquets, image, .exe)
+    # sans créer la release (répétition générale, Annexe N §N.9).
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"]
   pull_request:
     branches: ["main"]
     paths:
@@ -345,7 +347,7 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && !contains(inputs.tag || github.ref_name, '-rc') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
     needs: [deb, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
     runs-on: ubuntu-latest
     steps:
@@ -375,7 +377,7 @@ jobs:
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
-      - name: Version du tag et des sources
+      - name: Version du tag et des sources, notes du tag annoté
         id: version
         run: |
           tag="$RELEASE_TAG"
@@ -383,6 +385,15 @@ jobs:
           cargo_version="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
           test "$version" = "$cargo_version" || { echo "tag $tag ≠ Cargo.toml $cargo_version"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Le corps du message du tag annoté (git tag -a) devient les notes
+          # de la release et celles de latest.json ; un tag léger n'en a pas.
+          git fetch --no-tags --depth=1 origin "+refs/tags/$tag:refs/tags/$tag"
+          if [ "$(git cat-file -t "$tag")" = tag ]; then
+            git tag -l --format='%(contents:body)' "$tag" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > tag-notes.md
+          else
+            : > tag-notes.md
+          fi
+          echo "notes du tag : $(wc -l < tag-notes.md) ligne(s)"
 
       - name: Clé USB reprise de la release précédente (système inchangé)
         if: needs.live-mode.outputs.mode == 'reuse'
@@ -413,9 +424,11 @@ jobs:
           keyfile="$(mktemp)"
           printf '%s\n' "$SECMET_RELEASE_KEY" > "$keyfile"
           base="https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG"
+          notes_args=()
+          [ -s tag-notes.md ] && notes_args=(--notes-fr "$(cat tag-notes.md)")
           ./target/release/secmet-release sign release --key "$keyfile" \
             --version "${{ steps.version.outputs.version }}" --date "$(date -u +%F)" \
-            --sums-url "$base/SHA256SUMS"
+            --sums-url "$base/SHA256SUMS" "${notes_args[@]}"
           rm -f "$keyfile"
           pubkey="$(python3 -c "import json;print(json.load(open('release/latest.json'))['public_key'])")"
           ./target/release/secmet-release verify release --trust "$pubkey"
@@ -428,8 +441,10 @@ jobs:
           key_id="$(python3 -c "import json;print(json.load(open('release/latest.json'))['key_id'])")"
           v="${{ steps.version.outputs.version }}"
           {
-            printf 'SecMet %s\n\nPaquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage sous Linux, secmet-key-writer_%s_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-              "$v" "$v" "$v" "$v" "$v" "$key_id"
+            printf 'SecMet %s\n\n' "$v"
+            if [ -s tag-notes.md ]; then cat tag-notes.md; printf '\n\n'; fi
+            printf 'Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage sous Linux, secmet-key-writer_%s_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
+              "$v" "$v" "$v" "$v" "$key_id"
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
               printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \
                 "${{ needs.live-mode.outputs.previous }}" "$v" "$v"

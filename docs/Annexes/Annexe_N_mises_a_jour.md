@@ -110,7 +110,7 @@ Le système de la clé est en lecture seule ; SecMet fait partie de l'image. Deu
 
 La publication ne dépend pas de GitHub Actions : elle tourne sur le poste du responsable des versions, dans des conteneurs (podman ou docker). Elle reproduit le workflow `package.yml`.
 
-Script : `packaging/release.sh` (`make release`, `make publish`). Il refuse un arbre de travail modifié ou un `HEAD` sans le tag `vX.Y.Z` (options `--allow-dirty`, `--allow-untagged` pour les essais).
+Script : `packaging/release.sh` (`make release`, `make publish`). Il refuse un arbre de travail modifié ou un `HEAD` sans le tag `vX.Y.Z` ou `vX.Y.Z-rcN` (options `--allow-dirty`, `--allow-untagged` pour les essais) ; sur un tag `-rcN`, `--publish` est refusé.
 
 1. Contrôles : `cargo fmt --check`, `clippy -D warnings`, tests du workspace, `cargo audit`, shellcheck.
 2. Construction en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 42, AppImage (Ubuntu 24.04).
@@ -119,6 +119,13 @@ Script : `packaging/release.sh` (`make release`, `make publish`). Il refuse un a
 5. `--publish` seulement : `gh release create vX.Y.Z` sur le dépôt avec les 7 fichiers, après confirmation explicite (`oui`). Une release déjà existante est refusée.
 
 Sortie : `dist/release/<version>/`, avec les journaux de construction sous `logs/`. Le tag (`git tag -a vX.Y.Z`) et le push du code restent des gestes explicites du responsable des versions.
+
+**Convention de version et de tag (décidée le 2026-11-12).**
+
+- **Un seul numéro `X.Y.Z`** pour tout ce qui sort d'une release : application, helper, image de la clé, SecMet Clé USB (AppImage et `.exe`). C'est celui du `Cargo.toml` de la racine, repris par les six crates et par le nom de chaque fichier publié ; `release.sh` et `package.yml` refusent un tag qui ne lui correspond pas. SecMet Clé USB n'a pas de numéro propre : il est publié à chaque version, qu'il ait changé ou non, et vérifie l'image par sa propre version (`latest.json`), pas par la sienne.
+- **Quand incrémenter.** `Z` : corrections et petites évolutions sans changement de comportement visible. `Y` : nouvel outil, nouveau format de clé, nouveau menu ou parcours de l'application, changement de ce que l'opérateur voit ou fait (`0.4.0` : SecMet Clé USB sous Windows et complétion de la GPT). `X` : pas de critère fixé pour `1.0.0` à ce jour.
+- **Tag** : `vX.Y.Z`, annoté (`git tag -a vX.Y.Z`), posé sur `main`. La première ligne du message est « SecMet X.Y.Z » ; le corps, s'il y en a un, est le résumé des changements pour l'opérateur : il devient les notes de la release GitHub et les notes de `latest.json` (affichées par SecMet dans ses Réglages quand une nouvelle version est annoncée), en tête du texte générique (liste des fichiers, clé de version). Un tag léger ou sans corps donne le texte générique seul ; `release.sh --notes <fr.md>` a priorité.
+- **Répétition générale** : un tag `vX.Y.Z-rcN` (même `Cargo.toml` que la version visée) déclenche `package.yml` en entier, image de la clé et `.exe` compris, mais le travail de publication est sauté ; les fichiers restent des artefacts du run. `release.sh` accepte ce tag et refuse `--publish`. Les tags `-rc` ne comptent pas comme release précédente pour les « deux cadences » (`live-mode.sh` ne lit que les releases publiées). Une fois l'essai concluant, le tag définitif `vX.Y.Z` est posé sur le même commit.
 
 Outil `secmet-release` (crate `secmet-attest`, non livré dans les paquets) :
 
