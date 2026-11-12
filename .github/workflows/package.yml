@@ -443,11 +443,16 @@ jobs:
           {
             printf 'SecMet %s\n\n' "$v"
             if [ -s tag-notes.md ]; then cat tag-notes.md; printf '\n\n'; fi
-            printf 'Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_%s_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_%s_x86_64.AppImage sous Linux, secmet-key-writer_%s_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_%s_x86_64.tar : image, secmet-make-key.sh, secmet-release).\nEmpreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version %s).\n' \
-              "$v" "$v" "$v" "$v" "$key_id"
+            # Texte générique dans un heredoc : il contient des apostrophes.
+            cat <<NOTES
+          Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_${v}_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_${v}_x86_64.AppImage sous Linux, secmet-key-writer_${v}_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_${v}_x86_64.tar : image, secmet-make-key.sh, secmet-release).
+          Empreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version ${key_id}).
+          NOTES
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
-              printf '\nClé USB : système repris tel quel de la release %s (aucun fichier du système de la clé modifié depuis) ; SecMet %s est dans le magasin app/%s de la partition de données et déployée au démarrage.\n' \
-                "${{ needs.live-mode.outputs.previous }}" "$v" "$v"
+              cat <<NOTES
+
+          Clé USB : système repris tel quel de la release ${{ needs.live-mode.outputs.previous }} (aucun fichier du système de la clé modifié depuis) ; SecMet ${v} est dans le magasin app/${v} de la partition de données et déployée au démarrage.
+          NOTES
             fi
           } > notes.md
           gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --title "SecMet ${{ steps.version.outputs.version }}" \
