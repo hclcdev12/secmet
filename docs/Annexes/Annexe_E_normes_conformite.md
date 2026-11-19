@@ -1,27 +1,27 @@
 # Annexe E — Normes et conformité
 
-> Annexe du Cahier des charges SecMet (document interne) — v0.3.1
+> Documentation SecMet — v0.4.0
 
 ## 1. Informations générales
 
 | Élément | Description |
 |---------|-------------|
 | **Produit** | SecMet — Application d'effacement sécurisé de disques en atelier |
-| **Version du produit** | 0.3.1 |
-| **Version du présent document** | 2.0 |
-| **Date** | 9 octobre 2026 |
-| **Document source** | `normes.txt` (synthèse interne, non publiée) — synthèse des normes et pratiques d'effacement sécurisé |
-| **Documents associés** | Cahier des charges (document interne, non publié), [Annexe F — Spécification technique](Annexe_F_specification_technique.md) |
+| **Version du produit** | 0.4.0 |
+| **Version du présent document** | 2.1 |
+| **Date** | 19 novembre 2026 |
+| **Références** | Publications publiques : NIST SP 800-88 Rev. 2, IEEE 2883-2022, ISO/IEC 21964, RGPD (voir §10) |
+| **Documents associés** | [Annexe F — Spécification technique](Annexe_F_specification_technique.md) |
 
 ### Objet du document
 
-Ce document précise **quelles exigences et pratiques** issues du cadre normatif décrit dans `normes.txt` sont **prises en charge**, **partiellement couvertes** ou **hors périmètre** par SecMet v0.3.1.
+Ce document précise **quelles exigences et pratiques** issues des référentiels publics cités au §10 sont **prises en charge**, **partiellement couvertes** ou **hors périmètre** par SecMet v0.4.0.
 
-Il ne constitue **pas** une attestation de certification officielle (NIST, ANSSI, ISO, etc.). Il sert de référence contractuelle et technique pour situer le produit dans l'écosystème normatif de la sanitization des supports.
+Il ne constitue **pas** une attestation de certification officielle (NIST, ANSSI, ISO, etc.) : le NIST ne certifie aucun produit d'effacement, et SecMet ne détient aucune certification (ni CSPN, ni Critères communs, ni ADISA). Il sert de référence contractuelle et technique pour situer le produit dans l'écosystème normatif de la sanitization des supports.
 
 ---
 
-## 2. Synthèse du cadre normatif (référence `normes.txt`)
+## 2. Synthèse du cadre normatif
 
 | Niveau | Objectif typique | Exemples de méthodes citées |
 |--------|------------------|----------------------------|
@@ -29,7 +29,7 @@ Il ne constitue **pas** une attestation de certification officielle (NIST, ANSSI
 | **Purge** | Effacement irréversible avant réemploi ou rebus | Crypto-erase, block erase, commandes constructeur ATA/SCSI/NVMe |
 | **Destruction** | Fin de vie sans réemploi | Destruction physique du support |
 
-Références normatives récurrentes : **NIST SP 800-88 Rev. 1** (déc. 2014, guide de référence ; la lecture Rev. 2 / IEEE 2883 est plus conservatrice sur certaines méthodes), **IEEE 2883-2022**, commandes **ATA / SCSI / NVMe** natives, **ISO/IEC 21964** (destruction), **RGPD**, **FIPS 199 / NIST SP 800-53** (organisationnel). Le consensus écarte les schémas à passes multiples (DoD 5220.22-M) au profit de méthodes **adaptées au média**, **vérifiables** et **traçables**.
+Références normatives récurrentes : **NIST SP 800-88 Rev. 2** (version finale du 26 septembre 2025, référence en vigueur ; elle remplace la Rev. 1 de décembre 2014 et renvoie aux techniques d'IEEE 2883 au lieu de reprendre les tableaux par média de la Rev. 1), **IEEE 2883-2022**, commandes **ATA / SCSI / NVMe** natives, **ISO/IEC 21964** (destruction), **RGPD**, **FIPS 199 / NIST SP 800-53** (organisationnel). Le consensus écarte les schémas à passes multiples (DoD 5220.22-M) au profit de méthodes **adaptées au média**, **vérifiables** et **traçables**.
 
 ---
 
@@ -50,13 +50,15 @@ SecMet est un outil d'**atelier** pour un poste Linux dédié. Il vise à :
 | Destruction physique | **Non** (recommandée sur le certificat quand le SMART le justifie) |
 | Cloud, fog, stockage distant | **Non** |
 | Contrôles organisationnels | **Hors périmètre logiciel** (responsabilité du client) |
-| Certification ou labellisation officielle | **Non** |
+| Certification ou labellisation officielle | **Non** (ni CSPN, ni Critères communs, ni ADISA ; le NIST ne certifie aucun produit) |
 
 ---
 
 ## 4. Correspondance normes ↔ fonctionnalités SecMet
 
 ### 4.1 NIST SP 800-88
+
+La référence en vigueur est la **Rev. 2** (26 septembre 2025), qui remplace la Rev. 1 (2014). Les exigences ci-dessous (Clear / Purge / Destruction, méthode adaptée au média, vérification, documentation) sont communes aux deux révisions.
 
 | Exigence / pratique | Prise en charge | Détail |
 |--------------------------------|------------------------|--------|
@@ -68,7 +70,16 @@ SecMet est un outil d'**atelier** pour un poste Linux dédié. Il vise à :
 | Vérification de l'effacement | **Oui (échantillonnée)** | Canaris posés avant commande firmware, relecture de 1 000 blocs, motifs attendus après écriture hôte, signatures résiduelles en tête et queue |
 | Choix du niveau selon la classification des données | **Non automatisé** | Le moteur vise toujours le meilleur niveau disponible ; la dégradation Purge → Clear est annoncée, le client décide de la suite |
 
-**Alignement par type de média (politique Rev. 1 par défaut) :**
+**Politiques de classement.** Le niveau (Purge ou Clear) attribué à chaque méthode dépend d'une politique définie dans le moteur (`crates/secmet-core/src/taxonomy.rs`) ; son identifiant est signé dans chaque attestation (`erasure.policy`) et imprimé sur le certificat :
+
+| Identifiant | Lecture | Statut en 0.4.0 |
+|-------------|---------|-----------------|
+| `nist-800-88r1` | Tableaux par média de la Rev. 1 (annexe A) : Format NVM (crypto et user data) et SECURITY ERASE enhanced sur SSD classés Purge | **Politique par défaut**, la seule utilisée par l'interface |
+| `nist-800-88r2` | Lecture conservatrice (Rev. 2 / IEEE 2883) : Format NVM user data et SECURITY ERASE sur SSD retombent en Clear | Disponible dans le moteur et acceptée par le protocole du helper, **non sélectionnable dans l'interface** |
+
+Le passage de `nist-800-88r2` en politique par défaut est prévu. D'ici là, un certificat portant `nist-800-88r1` indique que le classement suit les tableaux de la Rev. 1 . Les deux politiques ne diffèrent que par le classement de Format NVM user data et de SECURITY ERASE sur SSD.
+
+**Alignement par type de média (politique par défaut `nist-800-88r1`) :**
 
 | Média | Méthodes dans l'ordre du plan | Niveau |
 |-------|-------------------------------|--------|
@@ -78,7 +89,7 @@ SecMet est un outil d'**atelier** pour un poste Linux dédié. Il vise à :
 | Tout média, repli | Écriture hôte (motif pseudo-aléatoire recomputable par LBA puis zéros) | **Clear** |
 | Disque derrière un pont USB | Écriture hôte uniquement (aucune commande firmware à travers le pont) | **Clear** |
 
-> La politique `nist-800-88-rev2` (disponible dans le moteur) classe Format NVM user-data et SECURITY ERASE sur SSD en Clear, lecture plus conservatrice alignée sur IEEE 2883.
+> Avec la politique `nist-800-88r2`, Format NVM user data et SECURITY ERASE (enhanced comme normal) sur SSD sont classés **Clear** ; Format NVM crypto, les commandes SANITIZE et SECURITY ERASE sur HDD restent **Purge**.
 
 ---
 
@@ -128,7 +139,7 @@ Les commandes sont émises par `secmet-helper` sur un nœud ouvert en exclusif, 
 
 | Obligation / droit | Contribution de SecMet | Limite |
 |--------------------|------------------------|--------|
-| Droit à l'effacement (art. 17) | **Oui** — effacement irréversible, catégorie NIST documentée | Supports traités en atelier uniquement |
+| Droit à l'effacement (art. 17) | **Contribue** — moyen technique d'effacement documenté (catégorie NIST obtenue, attestation signée) | L'obligation incombe au responsable de traitement ; supports traités en atelier uniquement |
 | Preuve de l'effacement | **Oui** — attestation signée Ed25519, vérifiable hors ligne, certificat nominatif | Valeur probante liée à l'archivage et à la distribution de la clé publique du banc |
 | Accountability (art. 5.2) | **Partielle** — traces techniques, opérateur, banc | Gouvernance globale organisationnelle |
 | Autres supports (cloud, sauvegardes) | **Non** | Hors périmètre |
@@ -146,7 +157,7 @@ Les commandes sont émises par `secmet-helper` sur un nœud ouvert en exclusif, 
 
 ### 4.7 Références historiques (DoD 5220.22-M)
 
-| Pratique | Statut dans `normes.txt` | Statut dans SecMet |
+| Pratique | Statut dans les références actuelles | Statut dans SecMet |
 |----------|--------------------------|-------------------|
 | DoD 5220.22-M (3 ou 7 passes) | Dépréciée | **Non visée** |
 | Overwrite multi-passes HDD | Plus jugée nécessaire | **Défaut 1 passe + zéros** ; 3 passes proposées par continuité, sans revendication DoD ; aucune passe multiple n'élève le niveau au-delà de Clear |
@@ -219,7 +230,7 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 
 | Référence | Niveau de couverture | Formulation recommandée |
 |-----------|---------------------|-------------------------|
-| NIST SP 800-88 Rev. 1 | **Alignement** | Purge firmware quand le disque le supporte, Clear sinon, catégorie réellement obtenue sur le certificat |
+| NIST SP 800-88 Rev. 2 (remplace la Rev. 1) | **Alignement** | « Aligné sur NIST SP 800-88 » : Purge firmware quand le disque le supporte, Clear sinon, catégorie réellement obtenue sur le certificat ; classement par défaut selon les tableaux de la Rev. 1 (`nist-800-88r1`), voir §4.1 |
 | IEEE 2883-2022 | **Alignement partiel** | Méthodes natives, vérification échantillonnée, traçabilité signée |
 | ATA / NVMe | **Couverture opérationnelle** | Implémentation native complète pour les cas d'usage atelier |
 | ISO/IEC 21964 | **Non couvert** | Destruction physique hors périmètre, recommandée si nécessaire |
@@ -228,7 +239,7 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 
 ### Formulation de périmètre (proposition)
 
-> SecMet v0.3.1 est un outil d'atelier permettant la sanitization de disques HDD et SSD connectés localement à un banc Linux, par commandes firmware natives (NIST Purge) ou écriture hôte (NIST Clear), chaque étape étant vérifiée par relecture d'échantillons et documentée par une attestation signée vérifiable hors ligne. Il s'aligne sur NIST SP 800-88 Rev. 1 et sur l'esprit d'IEEE 2883-2022. Il ne remplace pas une procédure de destruction physique, ne couvre pas le stockage distant ou cloud, et ne constitue pas une certification officielle au sens des référentiels cités.
+> SecMet v0.4.0 est un outil d'atelier permettant la sanitization de disques HDD et SSD connectés localement à un banc Linux, par commandes firmware natives (NIST Purge) ou écriture hôte (NIST Clear), chaque étape étant vérifiée par relecture d'échantillons et documentée par une attestation signée vérifiable hors ligne. Il est aligné sur NIST SP 800-88 (Rev. 2 en vigueur ; classement par défaut encore selon les tableaux de la Rev. 1) et sur l'esprit d'IEEE 2883-2022. Il ne remplace pas une procédure de destruction physique, ne couvre pas le stockage distant ou cloud, et ne constitue pas une certification officielle au sens des référentiels cités : aucun organisme ne certifie la conformité à NIST SP 800-88, et SecMet n'a aucune certification.
 
 ---
 
@@ -236,13 +247,14 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 
 | Document | Rôle |
 |----------|------|
-| `normes.txt` (synthèse interne, non publiée) | Synthèse du cadre normatif |
-| Cahier des charges (document interne, non publié) | Exigences et critères de recette |
 | [Annexe F — Spécification technique](Annexe_F_specification_technique.md) | Architecture et implémentation |
 | [Annexe G — Guide utilisateur](Annexe_G_guide_utilisateur.md) | Guide opérateur |
 | [Annexe H — Déploiement du banc](Annexe_H_deploiement_banc.md) | Déploiement |
-| NIST SP 800-88 Rev. 1 | <https://doi.org/10.6028/nist.sp.800-88r1> |
+| NIST SP 800-88 Rev. 2 (26 septembre 2025, en vigueur) | <https://csrc.nist.gov/pubs/sp/800/88/r2/final> |
+| NIST SP 800-88 Rev. 1 (2014, remplacée ; base de la politique `nist-800-88r1`) | <https://doi.org/10.6028/nist.sp.800-88r1> |
+| IEEE 2883-2022 (*Standard for Sanitizing Storage*) | Norme IEEE, diffusion payante |
+| ISO/IEC 21964 (destruction des supports de données) | Norme ISO, diffusion payante |
 
 ---
 
-*Document établi pour SecMet v0.3.1 — à valider par le maître d'ouvrage pour usage contractuel ou audit interne.*
+*Document établi pour SecMet v0.4.0 — à valider par le maître d'ouvrage pour usage contractuel ou audit interne.*

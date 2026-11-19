@@ -1,6 +1,6 @@
 # Annexe G — Guide utilisateur
 
-> Annexe du Cahier des charges SecMet (document interne) — v0.3.1
+> Documentation SecMet — v0.4.0
 
 Ce guide est pensé pour un **atelier** : branchement de disques, effacement, vérification et archivage d'un certificat. SecMet fonctionne **localement sur le banc** : aucun serveur central ni service cloud n'est requis pour traiter les disques ni générer le certificat.
 
@@ -17,7 +17,7 @@ Le certificat indique la **méthode réellement obtenue** et sa catégorie **NIS
 
 ## 2) Prérequis et démarrage
 
-- Linux (Debian/Ubuntu/Mint) et droits administrateur : un mot de passe est demandé **au lancement**.
+- Linux (Debian/Ubuntu/Mint ou Fedora) et droits administrateur : un mot de passe est demandé **au lancement**. Ou bien une **clé USB SecMet** démarrée sur la machine à traiter : rien à installer (voir §9).
 - Disques **internes** (SATA, NVMe) ou **USB**.
 
 ### Premier lancement et droits administrateur
@@ -40,8 +40,11 @@ Si vous aviez l'ancien paquet `shred-graphique`, au **premier lancement** de Sec
 | Bandeau d'avertissement | Rappel permanent de l'irréversibilité |
 | Avis sur l'hôte | Visible seulement si la racine du système n'a pas pu être rattachée à un disque local (média live, ZFS) : le disque système n'est alors protégé que par le verrou exclusif du noyau, vérifiez la sélection |
 | Ligne de sélection | **Tout sélectionner**, total de la capacité cochée |
-| Cartes disques | Case à cocher, nom, bouton **i** (identité, SMART, capacités), badge d'état (INACTIF, EN COURS, TERMINÉ, ARRÊTÉ, ÉCHEC, INDISPONIBLE, BLOQUÉ), sous-titre (type, capacité, modèle, série, FROZEN, VERROUILLÉ, motif d'indisponibilité), barre de progression, bouton Stop |
+| Cartes disques | Case à cocher, nom, bouton **i** (identité, SMART, capacités), badge d'état (INACTIF, ANALYSE…, EN ATTENTE, EN COURS, ARRÊT…, ARRÊTÉ, TERMINÉ, ÉCHEC, À DÉTRUIRE, INDISPONIBLE, LOCKED), sous-titre (type, capacité, modèle, série, FROZEN, LOCKED, motif d'indisponibilité), barre de progression, bouton Stop, bouton **Marquer à détruire** (disque verrouillé ou en lecture seule) |
+| Bandeau de lot | En mode lot : lot en cours (identifiant, opérateur, nombre de machines ou de disques) et bouton **Clôturer** |
 | Barre d'actions | **Rafraîchir**, **TestDisk**, **Générer le PDF**, **Relancer les échoués**, **Déverrouiller**, **Dé-frozen**, **Lancer la suppression sécurisée** |
+
+**ANALYSE…** : identification du disque en cours ; **EN ATTENTE** : disque retenu pour l'effacement, en attente de son tour ; **ARRÊT…** : arrêt demandé, en cours ; **LOCKED** (libellé non traduit) : disque verrouillé par un mot de passe ATA.
 
 Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis identification firmware disque par disque (modèle, série, SMART, capacités, verdict du moteur).
 
@@ -49,7 +52,7 @@ Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis ide
 
 1. Brancher les disques (interne ou USB). Cliquer **Rafraîchir** si un disque vient d'être branché.
 2. Cocher un ou plusieurs disques. Un disque monté, membre d'un volume, support du système ou dont l'inspection a échoué reste INDISPONIBLE avec son motif.
-3. Si un disque SATA est **FROZEN** : bouton **Dé-frozen** (voir §6). Si un disque est **VERROUILLÉ** par un mot de passe ATA : bouton **Déverrouiller** (voir §7).
+3. Si un disque SATA est **FROZEN** : bouton **Dé-frozen** (voir §6). Si un disque est verrouillé par un mot de passe ATA (**LOCKED**) : bouton **Déverrouiller** (voir §7).
 4. Cliquer **Lancer la suppression sécurisée** : le dialogue de confirmation récapitule, par disque, la méthode, la catégorie NIST et les replis ; pour un HDD en écriture hôte, choisir le nombre de passes. Confirmer.
 5. Suivre la progression : étape du plan, phase (canaris, firmware, relecture), pourcentage, débit et ETA pour l'écriture hôte, pourcentage du disque pour un sanitize, temps restant estimé pour un SECURITY ERASE (durée annoncée par le disque).
 6. **Stop** interrompt une écriture hôte entre deux blocs ou un sanitize entre deux sondages. Pendant un Format NVM ou un SECURITY ERASE UNIT, le bouton est grisé : la commande ne peut pas être interrompue (débrancher le disque la fait échouer et laisse un mot de passe que SecMet lèvera au scan suivant).
@@ -65,6 +68,8 @@ Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis ide
 | `~/.secmet_logs/sessions/<SEC-…>/journal.log` | Synthèse de session : horodatage, méthode, verdict par disque |
 | `~/.secmet_logs/sessions/<SEC-…>/<disque>.log` | Rapport détaillé des étapes (issue, critère d'échec, validation, seed) et journal TestDisk |
 | `~/.secmet_logs/session_report_<date>.json` | Rapport structuré de session (base du certificat) |
+
+En mode lot, les journaux et certificats d'un lot vont dans `lots/<LOT-ID>/` (puis `archive/` à la clôture) ; sur la clé USB SecMet, tout est sur la partition `SECMET-DATA` (§9).
 
 Les journaux et certificats sont écrits en lecture seule pour les autres utilisateurs (0700/0600). Les journaux restent en **français** quelle que soit la langue de l'interface ; les certificats sont rédigés dans la langue de l'interface (voir ci-dessous).
 
@@ -91,9 +96,9 @@ secmet-verify --qr "SM1:…"                  # texte lu dans le QR
 secmet-verify --trust fc5b6a969d0b1077 …    # clé ou key_id de confiance
 ```
 
-Le programme contrôle la signature et n'accepte que les **clés de confiance** : `--trust`, variable `SECMET_TRUSTED_KEYS`, `/etc/secmet/trusted-keys`, `~/.config/secmet/trusted-keys`, ou `~/.config/secmet/attestation-key.pub` (clé du poste). Une signature valide avec une clé inconnue est signalée « clé non vérifiée » et le programme rend le code 1 (`--allow-untrusted` pour simplement afficher). Distribuez la clé publique du banc (`~/.config/secmet/attestation-key.pub`) aux vérificateurs.
+Le programme contrôle la signature et n'accepte que les **clés de confiance** : `--trust`, variable `SECMET_TRUSTED_KEYS`, `/etc/secmet/trusted-keys`, sur la clé USB `SECMET_DATA_DIR/config/attestation-key.pub` et `SECMET_DATA_DIR/config/trusted-keys`, puis `~/.config/secmet/attestation-key.pub` (clé du poste) et `~/.config/secmet/trusted-keys`. Une signature valide avec une clé inconnue est signalée « clé non vérifiée » et le programme rend le code 1 (`--allow-untrusted` pour simplement afficher). Distribuez la clé publique du banc (`~/.config/secmet/attestation-key.pub`) aux vérificateurs.
 
-Pour un **lot** clôturé sur clé USB (§9), `secmet-verify --manifest L-…-manifest.json --trust <clé>` vérifie le manifeste signé et contrôle que toutes les attestations listées sont présentes et intactes dans le dossier, et qu'aucune n'a été ajoutée.
+Pour un **lot** clôturé (§8, §9), `secmet-verify --manifest L-…-manifest.json --trust <clé>` vérifie le manifeste signé et contrôle que toutes les attestations listées sont présentes et intactes dans le dossier, et qu'aucune n'a été ajoutée.
 
 ## 6) Dé-frozen SATA
 
@@ -123,24 +128,45 @@ Icône **engrenage** dans la barre de titre :
 - **Langue de l'interface** : français (natif), anglais, allemand ; appliquée immédiatement (fenêtre reconstruite), verrouillée pendant une opération. Les certificats PDF générés ensuite sont rédigés dans la même langue ; les journaux restent en français.
 - **Logo des certificats PDF** : image PNG, JPEG, GIF, BMP, WebP ou TIFF, convertie en JPEG sur fond blanc (`~/.config/secmet/pdf-logo.jpg`) et placée en haut à gauche de chaque page à la place du logo SecMet ; **Logo SecMet** rétablit le défaut.
 - **Opérateur** : nom pré-rempli dans le dialogue **Générer le PDF** (modifiable à chaque génération) ; vide, il est saisi à chaque fois.
-- **Lots** (poste installé) : **Mode lot** regroupe les effacements en lots, comme sur la clé USB : au lancement, SecMet propose d'ouvrir ou de continuer un lot ; les disques effacés au fil des sessions (brancher, effacer, débrancher, recommencer) y sont enregistrés avec leur certificat ; **Clôturer** produit le certificat groupé et le manifeste signé dans l'archive du lot (`~/.secmet_logs/archive`), copiés aussi sur une clé `SECMET-EXP` si une est branchée. Un disque qui repasse dans le même lot est signalé (Remplacer / Ajouter quand même). Cocher la case ouvre le dialogue de lot immédiatement.
+- **Lots** (poste installé) : **Mode lot** regroupe les effacements en lots, comme sur la clé USB : au lancement, SecMet propose d'ouvrir ou de continuer un lot ; les disques effacés au fil des sessions (brancher, effacer, débrancher, recommencer) y sont enregistrés avec leur certificat ; **Clôturer** produit le certificat groupé et le manifeste signé dans l'archive du lot (`~/.secmet_logs/archive`) ; sur un poste installé, rien n'est copié sur une clé SecMet branchée. Un lot sans aucun disque effacé ne se clôture pas : **Abandonner le lot** l'archive tel quel, sans certificat groupé ni manifeste. Un disque qui repasse dans le même lot est signalé (Remplacer / Ajouter quand même). Cocher la case ouvre le dialogue de lot immédiatement.
 - **Dossier des certificats** : bouton **Ouvrir le dossier des certificats**, qui ouvre dans le gestionnaire de fichiers le lot en cours (clé USB), sinon les lots clôturés (`archive/`) ou les certificats du poste. Le dialogue **Lot clôturé** propose de même **Ouvrir le dossier** vers la copie remise au client. Les fichiers restent modifiables par cet accès ; toute suppression ou altération d'une attestation se détecte au manifeste signé.
-- **Mises à jour** : version installée, date de la dernière vérification et, si le canal de publication annonce une version plus récente, son numéro, sa date et ses notes, avec un bouton **Ouvrir la page de téléchargement**. **Vérifier maintenant** interroge le canal immédiatement. La case **Vérifier automatiquement les mises à jour** (cochée par défaut) autorise une requête HTTPS par jour, sans donnée personnelle ; décochée, SecMet ne contacte jamais le réseau. Sans réseau, rien ne change et aucune erreur ne bloque. Un **point jaune** sur l'engrenage signale qu'une version plus récente est connue. Seules les annonces signées par la clé de version SecMet sont prises en compte.
+- **Mises à jour** : version installée, date de la dernière vérification et, si le canal de publication annonce une version plus récente, son numéro, sa date et ses notes, avec un bouton **Ouvrir la page de téléchargement**. **Installer la mise à jour** apparaît en plus quand le poste a le gestionnaire de paquets attendu (`apt` pour le `.deb`, `dnf` pour le `.rpm`, y compris sur la clé USB) et qu'**aucune opération n'est en cours** : SecMet télécharge le paquet, vérifie la signature de la release et l'empreinte du paquet (rien n'est installé sans empreinte vérifiée), puis l'installe après le mot de passe administrateur ; **Relancer SecMet** démarre ensuite la nouvelle version. SecMet ne vérifie pas qu'un lot est ouvert : un lot peut contenir des certificats de deux versions (chaque certificat indique la sienne) ; pour l'éviter, installer la mise à jour entre deux lots. Sans gestionnaire de paquets reconnu, seule la page de téléchargement est proposée (AppImage à remplacer à la main, [Annexe N](Annexe_N_mises_a_jour.md)). **Vérifier maintenant** interroge le canal immédiatement. La case **Vérifier automatiquement les mises à jour** (cochée par défaut) autorise une requête HTTPS par jour, sans donnée personnelle ; décochée, SecMet ne contacte jamais le réseau. Sans réseau, rien ne change et aucune erreur ne bloque. Un **point jaune** sur l'engrenage signale qu'une version plus récente est connue. Seules les annonces signées par la clé de version SecMet sont prises en compte.
+- **Sur la clé USB SecMet** seulement : **Recopier les lots clôturés sur la partition d'export** (rattrapage d'une copie manquée) et **Nettoyer la clé…** (voir §9).
 
-Les réglages (langue, logo, opérateur, passes HDD, mises à jour) sont conservés dans `~/.config/secmet/settings.json`.
+Les réglages (langue, logo, opérateur, passes HDD, mode lot, mises à jour) sont conservés dans `~/.config/secmet/settings.json` (sur la clé : `config/settings.json` de la partition `SECMET-DATA`).
 
-## 9) Lots sur clé USB SecMet
+## 9) Clé USB SecMet et lots
 
-Sur une **clé USB SecMet** (données sur la partition `SECMET-DATA`), les machines traitées successivement sont regroupées en **lots** :
+### Démarrer sur la clé
+
+La clé USB SecMet s'écrit à partir de l'image publiée avec chaque version, avec l'outil **SecMet Clé USB** (Windows ou Linux) : voir [Fabriquer sa clé](../Fabriquer_sa_cle.md). Ensuite :
+
+1. Brancher la clé sur la machine à traiter, démarrer dessus (menu de démarrage du BIOS/UEFI). La session s'ouvre seule et SecMet se lance.
+2. **Mot de passe** : l'invite d'administration demande le mot de passe du compte `secmet`. Sur une clé écrite depuis l'image publiée, c'est **`secmet`**, le même sur toutes les clés : il n'empêche pas un tiers qui a la clé en main de lancer un effacement. Le changer dans la session (`passwd`) ne dure que jusqu'à l'extinction ; pour un mot de passe propre à l'atelier, faire fabriquer la clé avec un mot de passe choisi ([Fabriquer sa clé](../Fabriquer_sa_cle.md)). Gardez la clé en lieu sûr.
+3. La clé a deux partitions de travail : `SECMET-DATA` (lots, certificats, clé de signature propre à cette clé, réglages) et `SECMET-EXP` (livrables remis au client, lisible sur tout PC). Si Windows propose de **formater** une partition de la clé, **refuser** toujours.
+4. Au premier démarrage, la clé crée sa clé de signature : sa clé publique est à remettre une fois aux vérificateurs (§5).
+
+Sur la clé, les machines traitées successivement sont regroupées en **lots** :
 
 1. **Au démarrage**, SecMet propose d'**ouvrir un lot** (opérateur pré-rempli, référence client facultative) ou de continuer **sans lot**. Si un lot est déjà ouvert sur la clé, il propose **Continuer**, **Clôturer** ou (après clôture) **Nouveau lot**, et signale les machines **interrompues** par une coupure.
 2. Un **bandeau** rappelle le lot en cours (identifiant, opérateur, nombre de machines) avec un bouton **Clôturer** ; il remplace l'avis « disque système non identifié », attendu sur une clé live.
 3. **Au lancement d'un effacement**, si la machine figure déjà dans le lot (même numéro de série, ou mêmes disques), SecMet demande **Remplacer**, **Ajouter quand même** ou **Annuler**. L'entrée est écrite sur la clé avant le premier bloc effacé.
 4. **En fin d'effacement**, les certificats de la machine (une page par disque, au nom de l'opérateur du lot) sont **générés automatiquement** dans le lot ; le message « Machine enregistrée au lot … » le confirme. Le bouton **Générer le PDF** n'a alors plus d'objet : il rappelle que les certificats sont déjà au lot et propose **Ouvrir le dossier** (les régénérer écraserait les fichiers enregistrés, et la clôture le refuserait). On peut alors éteindre la machine et passer à la suivante.
 5. **Horloge** : si la date du poste est antérieure à une référence connue (pile du BIOS épuisée), SecMet le signale au démarrage ; **Garder l'horloge du poste** laisse la date telle quelle, **Utiliser cette date** applique la date saisie à SecMet seulement. Dans les deux cas, et dès que l'horloge n'est pas synchronisée par le réseau, le certificat porte une réserve sur la date.
-6. **Clôturer** produit le **certificat groupé** (avec « Machines traitées : N » et la série de chaque machine sous son disque), le **manifeste signé** (liste des certificats et empreintes, vérifiable), copie le tout sur la partition d'export `SECMET-EXP` si elle est présente, puis archive le lot. Plus aucune machine ne peut y être ajoutée.
+6. **Clôturer** produit le **certificat groupé** (avec « Machines traitées : N » et la série de chaque machine sous son disque), le **manifeste signé** (liste des certificats et empreintes, vérifiable), copie le tout sur la partition d'export `SECMET-EXP` si elle est présente, puis archive le lot. Plus aucune machine ne peut y être ajoutée. Si la copie échoue (partition absente ou pleine), la clôture aboutit quand même et le compte rendu propose **Réessayer la copie sur la partition d'export** ; plus tard, les Réglages proposent **Recopier les lots clôturés sur la partition d'export**.
+7. **Abandonner le lot** : tant qu'aucun disque n'a été effacé dans le lot, le bouton **Clôturer** propose d'abandonner le lot ; il est archivé avec son journal, sans certificat groupé ni manifeste, et rien n'est copié sur l'export. Dès qu'un certificat est enregistré, seule la clôture reste possible.
+
+**Sans lot** sur la clé, le certificat produit par **Générer le PDF** est copié aussitôt sur `SECMET-EXP`, dans un dossier au nom de la session.
 
 Les lots vivent sous `lots/` puis `archive/` sur la clé ; le journal `journal.ndjson` de chaque lot est chaîné : une ligne supprimée ou modifiée se détecte.
+
+### Nettoyer la clé
+
+Réglages > **Nettoyer la clé…** libère de la place : trois groupes à cocher (lots archivés, livrables de la partition d'export, certificats hors lot avec leurs journaux), avec le nombre de fichiers et la taille, puis confirmation. Le nettoyage est refusé tant qu'un lot est ouvert, et le groupe « lots archivés » tant qu'un lot clôturé n'a pas sa copie sur l'export (l'archive serait alors la seule copie signée). Les réglages, la clé de signature et les mises à jour téléchargées ne sont jamais touchés.
+
+### Mises à jour sur la clé
+
+**Installer la mise à jour** (Réglages, §8) fonctionne aussi sur la clé : la version installée est conservée sur `SECMET-DATA` et réinstallée à chaque démarrage, rien à réécrire. Le système de la clé lui-même (noyau, bureau) se met à jour en réécrivant la clé : voir [Fabriquer sa clé](../Fabriquer_sa_cle.md) pour garder lots et clé de signature.
 
 ## 10) Validation TestDisk (optionnelle)
 
@@ -166,10 +192,12 @@ Styles centralisés dans [`resources/secmet.css`](../../resources/secmet.css) (t
 
 - **Refus « pkexec sans bit setuid » au démarrage** : pas de repli sudo ; `make fix-pkexec` ou contacter l'administrateur.
 - **Disque INDISPONIBLE** : lire le motif dans le sous-titre (monté, swap, membre d'un volume, disque système, lecture seule). Démonter ou détacher, puis **Rafraîchir**.
-- **Disque BLOQUÉ** : verrouillé (Déverrouiller), compteur de tentatives expiré (cycle d'alimentation), sanitize en cours ou en échec (attendre ou CLEAR via le helper au prochain scan).
+- **Disque INDISPONIBLE pour blocage** (motif dans le sous-titre) : verrouillé, badge LOCKED (Déverrouiller), compteur de tentatives expiré (cycle d'alimentation), sanitize en cours ou en échec (attendre ou CLEAR via le helper au prochain scan).
 - **FROZEN** : Dé-frozen puis Rafraîchir.
 - **Stop grisé** : commande firmware bloquante en cours (Format NVM, SECURITY ERASE UNIT) ; attendre la fin estimée.
 - **Vérification KO** : le firmware a acquitté sans effacer ou des signatures subsistent ; le plan passe au repli suivant automatiquement ; sinon **Relancer les échoués**.
 - **Badge À DÉTRUIRE** : le moteur a conclu qu'aucune voie logicielle ne reste (le dialogue d'échec donne la raison), ou l'opérateur a utilisé **Marquer à détruire** sur un disque verrouillé ou en lecture seule. Ne pas relancer : remettre le disque à la filière de destruction physique ; à la clôture du lot, le PDF contient un **bordereau de destruction** avec les numéros de série concernés.
 - **PDF s'ouvre dans un éditeur** : installer un lecteur PDF (`evince`, `okular`, `atril`) et utiliser **Ouvrir le PDF** ; les `.json` sont les attestations signées, pas le certificat visuel.
 - **`secmet-verify` répond « clé non vérifiée »** : ajouter la clé publique du banc avec `--trust` ou dans `/etc/secmet/trusted-keys`.
+- **Pas de bouton « Installer la mise à jour »** : une opération est en cours (attendre la fin), aucune version plus récente n'est annoncée, ou le poste n'a ni `apt` ni `dnf` (utiliser la page de téléchargement).
+- **Diagnostic sur la clé** : le journal système de chaque démarrage est recopié dans `logs/system/` de la partition `SECMET-DATA` ; le joindre à une demande d'assistance.

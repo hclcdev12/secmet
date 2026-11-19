@@ -1,18 +1,17 @@
 # Annexe F — Spécification technique
 
-> Annexe du Cahier des charges SecMet (document interne) — v0.3.1
+> Documentation SecMet — v0.4.0
 >
-> **Note** — Ce document décrit l'architecture et le fonctionnement technique du logiciel.  
-> Le **cahier des charges** (accord client / développeur sur le produit à livrer) est dans Cahier des charges (document interne, non publié).
+> **Note** — Ce document décrit l'architecture et le fonctionnement technique du logiciel. Les besoins sont décrits dans les [annexes A](Annexe_A_besoins_fonctionnels.md) et [B](Annexe_B_besoins_non_fonctionnels.md), la clé USB et les lots dans l'[annexe M](Annexe_M_cle_live_lots.md), les mises à jour et la publication dans l'[annexe N](Annexe_N_mises_a_jour.md).
 
 | Champ | Valeur |
 |-------|--------|
 | **Produit** | SecMet |
-| **Version logicielle** | 0.3.1 |
+| **Version logicielle** | 0.4.0 |
 | **Identifiant application** | `com.secmet` |
 | **Paquet Debian** | `secmet` |
-| **Statut du document** | Spécification technique (v2) |
-| **Date** | 9 octobre 2026 |
+| **Statut du document** | Spécification technique (v3) |
+| **Date** | 19 novembre 2026 |
 | **Licence** | GPL-3.0-or-later (nom et logo : marque, voir Annexe J) |
 
 ---
@@ -27,17 +26,20 @@ Lors du reconditionnement, du recyclage ou de la mise au rebut de matériel info
 
 ### 1.2 Objectifs du produit
 
-1. **Effacement irréversible** selon NIST SP 800-88 : commandes firmware (Purge) d'abord, écriture hôte (Clear) en dernier, chaque étape validée par relecture.
+1. **Effacement irréversible** aligné sur NIST SP 800-88 : commandes firmware (Purge) d'abord, écriture hôte (Clear) en dernier, chaque étape validée par relecture.
 2. **Traçabilité** : journaux détaillés, attestation JSON signée par disque, certificat PDF vérifiable hors ligne.
 3. **Simplicité d'usage** : flux entièrement graphique, une seule action par session.
 4. **Visibilité sur les disques** : identité firmware, capacités, SMART, protections, verdict du moteur, progression.
 5. **Autonomie du banc** : aucun outil externe, aucun serveur.
 6. **Sécurité opérationnelle** : protection du disque système, confirmations explicites, helper privilégié à surface minimale.
+7. **Mobilité** : clé USB SecMet démarrable, lots persistants d'une machine à l'autre, certificats signés par une clé propre à chaque clé USB.
 
 ### 1.3 Historique
 
 - v0.1/v0.2 (`shred-graphique` puis SecMet) : orchestration d'outils externes (`shred`, `hdparm`, `nvme-cli`, `smartctl`, `blkid`), certificat HTML rendu par Chromium.
 - **v0.3.0** : accès matériel natifs (crate `secmet-device`), moteur de décision NIST (`secmet-core`), daemon privilégié à protocole (`secmet-helper`), attestation signée et PDF natif (`secmet-attest`), AppImage, réglages, interface traduite.
+- **v0.3.1 à v0.3.13** : vérification des mises à jour (`latest.json` signé) puis installation depuis l'application ; sort du support et « Marquer à détruire » ; lots persistants avec journal chaîné et manifeste signé ; clé USB SecMet (image `secmet-key_<version>_x86_64.img.xz` et livrable `secmet-live_<version>_x86_64.tar` publiés à chaque release), horloge du poste, nettoyage de la clé ; outil SecMet Clé USB pour Linux.
+- **v0.4.0** (12 novembre 2026) : SecMet Clé USB pour Windows (`.exe`), complétion de la GPT pendant l'écriture de la clé, convention de version unique (annexe N).
 
 Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_logs/`.
 
@@ -46,19 +48,21 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 | Profil | Rôle |
 |--------|------|
 | **Opérateur atelier** | Branche les disques, sélectionne les cibles, lance l'effacement, génère le certificat |
-| **Administrateur système** | Installe le `.deb`, le `.rpm` ou l'AppImage, vérifie PolicyKit, choisit la topologie du banc |
+| **Administrateur système** | Installe le `.deb`, le `.rpm` ou l'AppImage, ou écrit la clé SecMet avec SecMet Clé USB ; vérifie PolicyKit, choisit la topologie du banc |
 | **Intégrateur / auditeur** | Vérifie les attestations signées (`secmet-verify`), consulte les journaux |
 
 ### 1.5 Documents connexes
 
 | Document | Rôle |
 |----------|------|
-| Cahier des charges (document interne, non publié) | Accord sur le produit à livrer |
 | [README.md](../../README.md) | Installation et référence technique |
 | [Annexe G — Guide utilisateur](Annexe_G_guide_utilisateur.md) | Procédure atelier |
-| [Annexe H — Déploiement du banc](Annexe_H_deploiement_banc.md) | Déploiement (dédié, live USB, PXE, AppImage) |
+| [Annexe H — Déploiement du banc](Annexe_H_deploiement_banc.md) | Déploiement (dédié, clé SecMet, live, PXE, AppImage) |
 | [Annexe E — Normes](Annexe_E_normes_conformite.md) | Positionnement normatif |
 | [Annexe J — Licences](Annexe_J_licences_tierces.md) | Conformité distribution |
+| [Annexe M — Clé live et lots](Annexe_M_cle_live_lots.md) | Clé USB SecMet, lots persistants, horloge |
+| [Annexe N — Mises à jour](Annexe_N_mises_a_jour.md) | Canal signé, installation, chaîne de publication |
+| [Fabriquer sa clé](../Fabriquer_sa_cle.md) | Écriture de la clé avec SecMet Clé USB |
 
 ---
 
@@ -68,15 +72,20 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 
 - Inventaire des disques par sysfs (transport SATA/SAS/USB/NVMe/virtio, taille, partitions, `rotational`), protections (racine, montages, swap, LVM/RAID/dm tracés par `slaves/`).
 - Identification firmware : IDENTIFY DEVICE (ATA, via SG_IO), Identify Controller / Namespace (NVMe), journal sanitize, SMART (attributs ATA avec seuils, page Health NVMe).
-- Plan d'effacement par disque (moteur NIST SP 800-88 Rev. 1, politique Rev. 2 disponible) : Purge firmware, replis explicites, dégradation annoncée, écriture hôte en dernier.
+- Plan d'effacement par disque (moteur aligné sur NIST SP 800-88 ; politique par défaut `nist-800-88r1`, politique `nist-800-88r2` disponible dans le moteur, voir [Annexe E §4.1](Annexe_E_normes_conformite.md#41-nist-sp-800-88)) : Purge firmware, replis explicites, dégradation annoncée, écriture hôte en dernier.
 - Exécution par le helper : canaris avant commande firmware, sanitize sondé, Format NVM et SECURITY ERASE UNIT bloquants avec progression temporelle, écriture hôte `O_EXCL | O_DIRECT` avec débit et ETA, relecture d'échantillons, recherche de signatures résiduelles.
 - Sélection multiple, effacements en parallèle, Stop, relance des échoués.
 - Dé-frozen SATA (veille système), déverrouillage ATA avec mot de passe connu, levée automatique des mots de passe posés par SecMet.
 - Certificat PDF natif (une page par disque ou lot) rédigé dans la langue de l'interface (fr, en, de), attestation JSON canonique signée Ed25519, QR code, vérificateur `secmet-verify` avec clés de confiance.
 - Validation TestDisk optionnelle (lecture seule).
-- Réglages : langue (fr, en, de), logo des certificats, nom de l'opérateur par défaut, passes HDD.
+- Sort du support à l'issue de chaque opération (réemploi, destruction recommandée ou requise, à relancer), « Marquer à détruire » pour un disque non effaçable, bordereau de destruction dans le PDF de lot.
+- Lots persistants (`src/lot.rs`, `src/ui/lot_ui.rs`) : ouverture, reprise, doublons, clôture avec PDF groupé et manifeste signé (`secmet-attest::manifest`, `secmet-verify --manifest`), abandon d'un lot sans disque effacé ; toujours actifs sur la clé, activables par réglage sur un poste installé ([Annexe M](Annexe_M_cle_live_lots.md)).
+- Clé USB SecMet : image publiée à chaque release, partitions `SECMET-DATA` (données, clé de signature propre à la clé) et `SECMET-EXP` (livrables), mise à jour de SecMet au démarrage depuis le magasin `app/`, contrôle de l'horloge du poste (`src/clock.rs`), nettoyage de la clé (`src/key_cleanup.rs`).
+- Mises à jour : vérification de `latest.json` signé, puis **Installer la mise à jour** (téléchargement, vérification de `SHA256SUMS` signé et de l'empreinte, installation du `.deb` ou du `.rpm` sous `pkexec`, `src/update_install.rs`) et **Relancer SecMet** ([Annexe N](Annexe_N_mises_a_jour.md)).
+- SecMet Clé USB (`crates/secmet-key-writer`) : écriture de l'image de la clé sous Linux et Windows, après vérification de la signature de la release puis de l'empreinte de l'image.
+- Réglages : langue (fr, en, de), logo des certificats, nom de l'opérateur par défaut, passes HDD, mode lot, vérification automatique des mises à jour ; sur la clé, recopie des lots clôturés sur l'export et nettoyage.
 - Journalisation sous `~/.secmet_logs/` (0700/0600), migration depuis `shred-graphique`.
-- Distribution : paquets `.deb` (Ubuntu 24.04 et 22.04) et `.rpm` (Fedora), AppImage (composant système installé au premier lancement).
+- Distribution : paquets `.deb` (Ubuntu 24.04 et 22.04) et `.rpm` (construit pour Fedora 42), AppImage (composant système installé au premier lancement), image de la clé SecMet (`.img.xz`), livrable de fabrication de la clé (`.tar`), SecMet Clé USB (AppImage Linux et `.exe` Windows) ; `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version.
 
 ### 2.2 Hors périmètre
 
@@ -87,14 +96,15 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 | Contournement d'un verrou ATA Security sans mot de passe | Jamais tenté : mot de passe du propriétaire ou destruction physique |
 | Annulation d'un Format NVM ou d'un SECURITY ERASE UNIT lancé | Commandes bloquantes dans le pilote |
 | Gestion centralisée multi-postes, effacement distant | Application locale |
-| Images live USB ou infrastructure PXE clé en main | Le client provisionne son banc ([Annexe H](Annexe_H_deploiement_banc.md)) |
+| Infrastructure PXE clé en main | Le client provisionne son banc réseau ([Annexe H](Annexe_H_deploiement_banc.md)) ; la clé USB SecMet, elle, est livrée prête à écrire |
 
 ### 2.3 Topologies de banc
 
 | Topologie | Rôle du réseau | Cas d'usage | Livrable |
 |-----------|----------------|-------------|----------|
 | **Machine dédiée** | Optionnel | Atelier fixe, référence | `.deb` |
-| **Live USB** | Non requis | Effacement sur place (laptop) | AppImage sur la clé |
+| **Clé SecMet** | Non requis | Effacement sur place (laptops), lots d'une machine à l'autre | Image de clé SecMet (`secmet-key_<version>_x86_64.img.xz`), écrite avec SecMet Clé USB |
+| **Live générique** | Non requis | Live maison du client | AppImage ou `.deb` sur le live |
 | **PXE** | Boot initial | Parc homogène | AppImage ou `.deb` dans l'image |
 
 ---
@@ -132,6 +142,12 @@ flowchart TB
 | **UC-10** | Valider par TestDisk | Au moins un succès | Verdict dans le dialogue, journal archivé |
 | **UC-11** | Régler langue, logo et opérateur | Aucune opération en cours | Fenêtre reconstruite ; PDF suivants rédigés dans la langue choisie, avec le logo choisi ; nom de l'opérateur pré-rempli |
 | **UC-12** | Installer le composant (AppImage) | Composant absent ou différent | Helper, policy et TestDisk installés par pkexec |
+| **UC-13** | Travailler en lot | Mode lot actif (toujours sur la clé) | Lot ouvert, repris ou nouveau ; une entrée par machine (clé) ou par session de disques (poste) ; certificats rangés dans `lots/<id>/certificates/` |
+| **UC-14** | Clôturer ou abandonner un lot | Lot ouvert, aucune opération en cours | Clôture : PDF groupé, manifeste signé, archive, copie sur `SECMET-EXP` depuis la clé ; abandon (aucun disque effacé) : archive sans certificat groupé ni manifeste |
+| **UC-15** | Marquer un disque à détruire | Disque non effaçable (verrou ATA sans mot de passe, média en lecture seule) | Certificat « destruction physique requise » avec la raison, aucun contournement |
+| **UC-16** | Installer une mise à jour | Version plus récente annoncée, `apt` ou `dnf` présent, aucune opération en cours | Paquet vérifié puis installé sous pkexec ; **Relancer SecMet** |
+| **UC-17** | Écrire une clé SecMet | SecMet Clé USB, image de la release, clé USB amovible de 12 Go ou plus | Signature et empreinte vérifiées, clé écrite, GPT complétée |
+| **UC-18** | Corriger l'horloge (clé) | Horloge non synchronisée et antérieure aux références | Date saisie appliquée à l'application seulement ; réserve sur les certificats |
 
 ---
 
@@ -183,6 +199,18 @@ flowchart TB
 | **EF-25** | Logo SecMet dans l'interface et par défaut sur le PDF ; icône dédiée au lanceur | Visible dans les deux livrables |
 | **EF-26** | Nom de l'opérateur par défaut enregistré dans les réglages | Pré-rempli dans le dialogue « Générer le PDF », modifiable à chaque génération |
 | **EF-27** | Vérifier le canal de publication (`latest.json` signé par une clé de version intégrée) au démarrage et toutes les 24 h, hors ligne non bloquant, désactivable | Point jaune sur Réglages et section Mises à jour si une version plus récente est annoncée ; annonce non signée ou clé inconnue ignorée |
+| **EF-28** | Installer une mise à jour depuis les Réglages : télécharger `SHA256SUMS` et sa signature, vérifier la signature, télécharger le paquet du poste, comparer son empreinte, installer sous `pkexec` ; bouton visible seulement si `apt-get`/`dpkg` ou `dnf`/`rpm` est présent et qu'aucune opération n'est en cours | Rien n'est exécuté sans empreinte vérifiée ; **Relancer SecMet** après succès ; sur la clé, paquet rangé dans `SECMET-DATA/app/<version>/` |
+
+### 4.5 Lots, clé USB et sort du support
+
+| ID | Exigence | Critère de validation |
+|----|----------|----------------------|
+| **EF-29** | Lot persistant : `lot.json`, journal `journal.ndjson` chaîné par empreintes SHA-256, écritures forcées sur le support, reprise d'une entrée interrompue, contrôle de doublon | Modifier ou supprimer une ligne du journal casse la chaîne ; une entrée restée « en cours » est signalée au démarrage suivant |
+| **EF-30** | Clôture : PDF groupé régénéré depuis les attestations signées, manifeste signé `<LOT-ID>-manifest.json`, archivage en lecture seule, copie sur `SECMET-EXP` depuis la clé seulement | `secmet-verify --manifest` détecte une attestation manquante, modifiée ou en trop |
+| **EF-31** | Abandon d'un lot sans aucun certificat enregistré | Événement `lot_abandoned`, lot archivé sans manifeste, rien copié sur l'export |
+| **EF-32** | Sort du support signé dans l'attestation (`disposition`, `disposition_reasons`) et imprimé ; « Marquer à détruire » pour un disque verrouillé sans mot de passe ou en lecture seule | Badge **À DÉTRUIRE**, bordereau de destruction dans le PDF de lot |
+| **EF-33** | Mode clé (`SECMET_DATA_DIR`) : données, clé de signature et coffre ATA sur `SECMET-DATA` ; contrôle de l'horloge ; nettoyage de la clé en trois groupes, refusé tant qu'un lot est ouvert ou qu'un lot clôturé n'a pas sa copie sur l'export | `config/`, `app/`, `vault/` et `logs/system` jamais touchés par le nettoyage |
+| **EF-34** | SecMet Clé USB : vérifier la signature de la release puis l'empreinte de l'image avant toute écriture ; ne proposer que des disques amovibles de 12 Go ou plus, sans partition système montée ; compléter la GPT (copie de secours au bout de la clé) pendant l'écriture | Image non signée ou modifiée refusée ; clé démarrable avec sa table GPT complète |
 
 ---
 
@@ -199,7 +227,7 @@ flowchart TB
 | **ENF-07** | Performance | Écriture hôte par blocs de 4 Mio alignés, débit affiché ; release LTO |
 | **ENF-08** | Robustesse | Délais sur chaque commande firmware (30 s IDENTIFY, durée annoncée pour SECURITY ERASE), fil GTK jamais bloqué par une invite Polkit |
 | **ENF-09** | Robustesse | Décodage borné des réponses (sense, journaux NVMe, TestDisk), listes et chaînes du PDF tronquées |
-| **ENF-10** | Maintenabilité | Cinq crates, 249 tests unitaires, clippy strict, `cargo fmt`, intégration continue GitHub Actions (tests, audit, fuzzing de neuf décodeurs, paquets) |
+| **ENF-10** | Maintenabilité | Six crates (dont `secmet-key-writer`, construite à part), environ 310 tests unitaires, clippy strict, `cargo fmt`, intégration continue GitHub Actions (tests, audit, fuzzing de neuf décodeurs, paquets) |
 | **ENF-11** | Accessibilité | Interface et certificats en français, anglais, allemand ; avertissements explicites |
 | **ENF-12** | Autonomie | Aucun outil externe hors TestDisk (optionnel, embarqué) |
 
@@ -211,8 +239,8 @@ flowchart TB
 
 | Couche | Technologie |
 |--------|-------------|
-| Langage | Rust 2021 (rust-version 1.80) |
-| Interface graphique | GTK 4 (`gtk4` 0.9, `glib` 0.20) |
+| Langage | Rust 2021 (rust-version 1.80 ; 1.95 pour `secmet-key-writer`) |
+| Interface graphique | GTK 4 (`gtk4` 0.9, `glib` 0.20) ; SecMet Clé USB : `egui`/`eframe` 0.37 (OpenGL sous Linux, `wgpu` sur Direct3D 12 sous Windows) |
 | Accès matériel | `libc` (ioctl `SG_IO`, `NVME_IOCTL_ADMIN_CMD`), sysfs |
 | Cryptographie | `chacha20` (canaris), `sha2`, `ed25519-dalek`, `zeroize` |
 | Certificat | Rendu PDF 1.4 maison, `qrcode`, Base45 maison, `flate2` (zlib) |
@@ -220,8 +248,8 @@ flowchart TB
 | Images (logo) | `image` 0.25 |
 | Réseau (mises à jour) | `ureq` 2 + `rustls` (HTTPS, racines embarquées) |
 | Privilèges | PolicyKit + `pkexec` |
-| Packaging | Debian `.deb`, Fedora `.rpm`, AppImage (linuxdeploy dans un conteneur Ubuntu 24.04) |
-| Intégration continue | GitHub Actions : `ci.yml` (fmt, clippy, tests, `cargo audit`, shellcheck), `fuzz.yml` (cargo-fuzz), `package.yml` (paquets installés et testés en conteneur) |
+| Packaging | Debian `.deb`, Fedora `.rpm`, AppImage (linuxdeploy dans un conteneur Ubuntu 24.04) ; image de la clé (debootstrap Ubuntu 24.04, `packaging/live/`) ; `.exe` Windows de SecMet Clé USB (compilation croisée MinGW) |
+| Intégration continue | GitHub Actions : `ci.yml` (fmt, clippy, tests, `cargo audit`, shellcheck), `fuzz.yml` (cargo-fuzz), `package.yml` (paquets installés et testés en conteneur ; sur un tag `vX.Y.Z`, construction des onze fichiers de la release, signature avec la clé de version et publication ; tag `vX.Y.Z-rcN` : construction sans publication) |
 
 ### 6.2 Diagramme des composants
 
@@ -233,12 +261,21 @@ flowchart TB
         cert[src/certificate]
         settings[settings.rs_i18n_pdf_logo]
         sysinst[system_install.rs]
+        lot[lot.rs_lot_ui.rs]
+        upd[update.rs_update_install.rs]
+        keymode[clock.rs_key_cleanup.rs_paths.rs]
     end
     subgraph attest [secmet_attest]
         model[model.rs]
         sign[sign.rs]
         pdf[pdf.rs_lang.rs_qr.rs]
+        manifest[manifest.rs_release.rs]
         verify[secmet_verify]
+        release[secmet_release]
+    end
+    subgraph writer [secmet_key_writer]
+        kgui[gui.rs]
+        kworker[worker.rs_gpt.rs_image.rs]
     end
     subgraph helper [secmet_helper_serve]
         server[server.rs_sessions]
@@ -261,7 +298,13 @@ flowchart TB
 
     ui --> client
     ui --> cert
+    ui --> lot
+    ui --> upd
     cert --> attest
+    lot --> attest
+    upd --> attest
+    kgui --> kworker
+    writer --> attest
     client -->|NDJSON| server
     server --> runner
     runner --> engine
@@ -281,7 +324,9 @@ flowchart TB
 |---------|------|-------------|
 | `secmet` | Application graphique | `/usr/bin/secmet` |
 | `secmet-helper` | Daemon privilégié (`serve`) | `/usr/bin/secmet-helper` |
-| `secmet-verify` | Vérification d'attestations | `/usr/bin/secmet-verify` |
+| `secmet-verify` | Vérification d'attestations et de manifestes de lot | `/usr/bin/secmet-verify` |
+| `secmet-release` | Clé de version, signature et vérification d'une release (`keygen`, `sign`, `verify`) ; utilisé au démarrage de la clé pour vérifier le magasin `app/` | `/usr/bin/secmet-release` (`.deb` et `.rpm`) |
+| `secmet-key-writer` | SecMet Clé USB, écriture de l'image de la clé | Livrable séparé : `secmet-key-writer_<version>_x86_64.AppImage`, `secmet-key-writer_<version>_x86_64.exe` |
 | `testdisk` embarqué | Validation optionnelle | `/usr/lib/secmet/bin/testdisk`, bibliothèques sous `/usr/lib/secmet/lib/` |
 | Policy | PolicyKit | `/usr/share/polkit-1/actions/secmet.policy` |
 
@@ -316,13 +361,17 @@ Entrée : capacités de la cible (média, transport, ATA/NVMe, santé, protectio
 
 Ordre des candidats : NVMe Sanitize (block, crypto), Format NVM (crypto, user data), Sanitize overwrite ; ATA SANITIZE (crypto scramble, block erase, overwrite HDD), SECURITY ERASE (enhanced, normal) ; écriture hôte. Chaque étape porte ses critères d'échec et sa spécification de relecture.
 
-| Méthode | Niveau (Rev. 1) |
-|---------|-----------------|
-| NVMe / ATA SANITIZE | Purge |
-| Format NVM crypto / user data | Purge |
-| SECURITY ERASE enhanced (SSD), normal ou enhanced (HDD) | Purge |
-| SECURITY ERASE normal (SSD) | Clear |
-| Écriture hôte | Clear, jamais Purge |
+| Méthode | `nist-800-88r1` (défaut) | `nist-800-88r2` |
+|---------|-----------------|-----------------|
+| NVMe / ATA SANITIZE | Purge | Purge |
+| Format NVM crypto | Purge | Purge |
+| Format NVM user data | Purge | Clear |
+| SECURITY ERASE enhanced (SSD) | Purge | Clear |
+| SECURITY ERASE normal ou enhanced (HDD) | Purge | Purge |
+| SECURITY ERASE normal (SSD) | Clear | Clear |
+| Écriture hôte | Clear, jamais Purge | Clear, jamais Purge |
+
+La politique par défaut est `nist-800-88r1` (`impl Default for Policy`, `taxonomy.rs`) ; l'interface envoie toujours la politique par défaut (`PolicyId::default()`), `nist-800-88r2` n'est accessible que par le protocole du helper. Le passage par défaut à `nist-800-88r2` est prévu (§10.5).
 
 ### 6.6 Flux d'effacement
 
@@ -360,18 +409,19 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
 | Bandeaux | Avertissement d'irréversibilité ; avis « disque système non identifié » si nécessaire |
 | Sélection | « Tout sélectionner », total |
 | Cartes | Case, nom, bouton i, badge d'état, sous-titre, progression, Stop, vérification, Détails |
-| Actions | Rafraîchir, TestDisk, Générer le PDF, Relancer les échoués, Déverrouiller, Dé-frozen, Lancer la suppression sécurisée |
+| Bandeau de lot | Lot en cours (identifiant, opérateur, nombre d'entrées), bouton Clôturer (ou Abandonner le lot) |
+| Actions | Rafraîchir, TestDisk, Générer le PDF, Relancer les échoués, Déverrouiller, Marquer à détruire, Dé-frozen, Lancer la suppression sécurisée |
 
 ### 7.3 États d'une carte
 
-`inactif` → `en cours` → `terminé` / `arrêté` / `échec` ; `indisponible` (protection), `bloqué` (verrou, sanitize). La vérification affiche OK / KO / non effectuée.
+Badges affichés : `INACTIF`, `ANALYSE…` (identification en cours), `EN ATTENTE`, `EN COURS`, `ARRÊT…`, `ARRÊTÉ`, `TERMINÉ`, `ÉCHEC`, `À DÉTRUIRE` (échec terminal ou disque marqué à détruire), `INDISPONIBLE` (protection), `LOCKED` (verrou ATA Security ; libellé non traduit). Un disque gelé n'a pas de badge propre : son sous-titre porte « FROZEN » (et « LOCKED » pour un verrou ATA). La vérification affiche OK / KO / non effectuée.
 
 ### 7.4 Identité visuelle
 
 | Support | Asset |
 |---------|-------|
 | Application | `content/SecMet_logo.svg` (variante blanche) |
-| Certificat | `resources/secmet_logo.jpg` (défaut) ou logo personnalisé |
+| Certificat | `crates/secmet-attest/resources/secmet_logo.jpg` (défaut) ou logo personnalisé |
 | Lanceur | `content/SecMet_icon.svg` |
 
 ---
@@ -390,8 +440,10 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
     ├── <SEC-…>.pdf                 # une page par disque
     ├── <SEC-…>-<disque>.json       # attestation signée
     ├── <SEC-…>-lot.pdf / -lot.json # format groupé
+├── lots/<LOT-ID>/                  # mode lot : lot ouvert (lot.json, journal.ndjson, certificates/, sessions/)
+└── archive/<LOT-ID>/               # lots clôturés ou abandonnés
 ~/.config/secmet/                   # ou SECMET_DATA_DIR/config (clé live) ; ~/.secmet_logs devient SECMET_DATA_DIR/logs
-├── settings.json                   # hdd_passes, language, pdf_logo, operator_name, check_updates, update_url
+├── settings.json                   # hdd_passes, language, pdf_logo, operator_name, check_updates, update_url, lots_enabled
 ├── update-state.json               # dernière vérification des mises à jour, dernier latest.json valide
 ├── pdf-logo.jpg
 ├── attestation-key.hex (0600)      # graine Ed25519
@@ -400,6 +452,8 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
 /var/lib/secmet/ata-security/       # coffre des mots de passe SecMet (root) ; SECMET-DATA/vault/ sur le système de la clé (annexe M)
 ```
 
+En mode clé (`SECMET_DATA_DIR`), la même arborescence vit sur `SECMET-DATA`, avec en plus `app/` (versions téléchargées), `vault/` et `logs/system/` (journaux de démarrage) : voir l'[Annexe M, §M.3](Annexe_M_cle_live_lots.md#m3-structure-de-la-clé).
+
 ### 8.2 Attestation signée
 
 ```json
@@ -407,7 +461,7 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
   "alg": "Ed25519", "key_id": "…", "public_key": "…",
   "payload": {
     "version": 1, "certificate_id": "SEC-…-sdc", "session_id": "SEC-…",
-    "issued_at": "…", "operator": "…", "software": "secmet 0.3.1",
+    "issued_at": "…", "operator": "…", "software": "secmet 0.4.0",
     "disk": {"name","model","serial","firmware","media","transport","capacity","size_bytes"},
     "erasure": {"method_code","method_label","nist_level","policy","outcome","started_at","finished_at","duration_seconds","caveats","disposition","disposition_reasons"},
     "validation": {"kind","seed","samples","anomalies","evidence_sha256","residual_signatures","verify_status"},
@@ -432,6 +486,9 @@ Les textes libres (`method_label`, `caveats`, `verify_status`, mentions « non d
 | `JobReport`, `StepReport`, `ValidationSummary` | `secmet-helper::runner` | Résultat d'exécution |
 | `Disk`, `SessionReport`, `DiskOperationRecord`, `JobOutcomeRecord` | `secmet` | Modèle de l'interface et de la session |
 | `Attestation`, `SignedAttestation` | `secmet-attest::model`, `sign` | Certificat |
+| `Lot`, `LotState`, `MachineEntry`, `JournalLine` | `secmet::lot` | Lot persistant et journal chaîné |
+| `LotManifest`, `ManifestEntry` | `secmet-attest::manifest` | Manifeste de lot signé |
+| `LatestRelease`, `SumsSignature` | `secmet-attest::release` | Canal de publication signé |
 
 ---
 
@@ -460,12 +517,19 @@ Les textes libres (`method_label`, `caveats`, `verify_status`, mentions « non d
 ### 10.1 Construction
 
 ```bash
-make build      # target/release/{secmet,secmet-helper,secmet-verify}
-make deb        # dist/secmet_0.3.1_amd64.deb
-make rpm        # dist/secmet-0.3.1-1.<distribution>.x86_64.rpm (Fedora)
-make appimage   # dist/SecMet_0.3.1_x86_64.AppImage (conteneur Ubuntu 24.04)
-make release    # dist/release/0.3.1/ : paquets fumés en conteneurs, SHA256SUMS(.sig), latest.json signés (Annexe N)
+make build               # target/release/{secmet,secmet-helper,secmet-verify,secmet-release}
+make deb                 # dist/secmet_<version>_amd64.deb (construction locale)
+make rpm                 # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
+make appimage            # dist/SecMet_<version>_x86_64.AppImage (conteneur Ubuntu 24.04)
+make live                # image de la clé USB SecMet (conteneur privilégié) → dist/live/
+make live-dist           # dist/secmet-key_<version>_x86_64.img.xz
+make live-bundle         # dist/secmet-live_<version>_x86_64.tar
+make key-writer-appimage # dist/secmet-key-writer_<version>_x86_64.AppImage
+make key-writer-exe      # dist/secmet-key-writer_<version>_x86_64.exe (compilation croisée)
+make release             # dist/release/<version>/ : paquets fumés en conteneurs, SHA256SUMS(.sig), latest.json signés (Annexe N)
 ```
+
+Les fichiers publiés portent le nom de la distribution visée (`secmet_<version>.ubuntu24.04_amd64.deb`, `secmet_<version>.ubuntu22.04_amd64.deb`, `secmet-<version>-1.fc42.x86_64.rpm`). Une release publie onze fichiers (paquets, AppImage, image et livrable de la clé, SecMet Clé USB pour Linux et Windows, `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) ; voir l'[Annexe N](Annexe_N_mises_a_jour.md).
 
 ### 10.2 Dépendances du paquet `.deb`
 
@@ -479,7 +543,7 @@ make release    # dist/release/0.3.1/ : paquets fumés en conteneurs, SHA256SUMS
 
 | Chemin | Contenu |
 |--------|---------|
-| `/usr/bin/secmet`, `/usr/bin/secmet-helper`, `/usr/bin/secmet-verify` | Binaires |
+| `/usr/bin/secmet`, `/usr/bin/secmet-helper`, `/usr/bin/secmet-verify`, `/usr/bin/secmet-release` | Binaires |
 | `/usr/share/applications/secmet.desktop`, `/usr/share/icons/hicolor/scalable/apps/secmet.svg` | Lanceur |
 | `/usr/share/polkit-1/actions/secmet.policy` | PolicyKit |
 | `/usr/lib/secmet/bin/testdisk`, `/usr/lib/secmet/lib/` | TestDisk embarqué |
@@ -498,12 +562,14 @@ cargo clippy --workspace --all-targets -- -D warnings ; cargo fmt --all
 - Codes stables pour tous les messages du helper (traduction intégrale des détails d'erreur).
 - Épinglage et empreinte des outils linuxdeploy téléchargés par la construction de l'AppImage.
 - Supervision centralisée (hors périmètre actuel).
-- Clé USB SecMet et lots persistants sur plusieurs machines : spécifiés dans l'[Annexe M](Annexe_M_cle_live_lots.md).
-- Mises à jour signées et chaîne de publication `make release` : spécifiées dans l'[Annexe N](Annexe_N_mises_a_jour.md).
+- Politique `nist-800-88r2` par défaut, dans le code, l'interface et les certificats (prévu).
+- Évolutions de la clé USB (chiffrement de la clé de signature par une phrase de passe, etc.) : voir l'[Annexe M](Annexe_M_cle_live_lots.md).
+
+La clé USB SecMet, les lots persistants, les mises à jour signées avec installation depuis l'application et SecMet Clé USB sont réalisés (§2.1).
 
 ---
 
-## Annexe A — Correspondance exigences / modules
+## F.A — Correspondance exigences / modules
 
 | Exigence | Modules |
 |----------|---------|
@@ -511,10 +577,14 @@ cargo clippy --workspace --all-targets -- -D warnings ; cargo fmt --all
 | EF-06 à EF-14 | `secmet-core::engine`, `canary` ; `secmet-helper::server`, `runner`, `disk_target`, `vault`, `recovery` ; `src/ui/erase.rs` |
 | EF-15 à EF-21 | `src/certificate/`, `src/trace_log.rs`, `secmet-attest` (dont `lang`) |
 | EF-22 à EF-26 | `src/migrate.rs`, `src/i18n/`, `src/settings.rs`, `src/pdf_logo.rs`, `src/logo.rs`, `src/ui/settings_ui.rs`, `src/ui/pdf_ui.rs` |
-| EF-27 | `src/update.rs`, `src/ui/update_ui.rs`, `secmet-attest::release` |
+| EF-27, EF-28 | `src/update.rs`, `src/update_install.rs`, `src/ui/update_ui.rs`, `src/ui/settings_ui.rs`, `secmet-attest::release` |
+| EF-29 à EF-31 | `src/lot.rs`, `src/ui/lot_ui.rs`, `secmet-attest::manifest` |
+| EF-32 | `secmet-core::disposition`, `src/ui/erase.rs` |
+| EF-33 | `src/paths.rs`, `src/clock.rs`, `src/ui/clock_ui.rs`, `src/key_cleanup.rs`, `secmet-helper::vault` |
+| EF-34 | `crates/secmet-key-writer` (`gui`, `worker`, `gpt`, `image`, `release`) |
 | ENF-01 à ENF-03 | `src/pkexec_gate.rs`, `secmet-helper::polkit`, `session`, `isolation`, `secmet.policy` |
 
-## Annexe B — Glossaire technique
+## F.B — Glossaire technique
 
 | Terme | Définition |
 |-------|------------|
@@ -524,7 +594,9 @@ cargo clippy --workspace --all-targets -- -D warnings ; cargo fmt --all
 | **SATL** | Couche de traduction SCSI/ATA (libata, pont USB, HBA SAS) ; conditionne le CDB ATA PASS-THROUGH utilisé |
 | **Frozen** | SECURITY FREEZE LOCK posé par le BIOS : commandes Security et parfois Sanitize refusées |
 | **Attestation** | Charge utile du certificat, JSON canonique signé Ed25519 |
+| **Lot** | Ensemble des machines (clé) ou des sessions de disques (poste) traitées sous un même identifiant, clôturé par un manifeste signé |
+| **Clé de version** | Clé Ed25519 qui signe `SHA256SUMS` et `latest.json` d'une release ; distincte des clés d'attestation |
 
 ---
 
-*Document rédigé à partir de l'état du dépôt SecMet v0.3.1 (octobre 2026).*
+*Document rédigé à partir de l'état du dépôt SecMet v0.4.0 (novembre 2026).*

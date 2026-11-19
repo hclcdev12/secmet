@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><b>Effacement sécurisé de disques sous Linux, conforme NIST SP 800-88, avec certificat signé.</b></p>
+<p align="center"><b>Effacement sécurisé de disques sous Linux, aligné sur NIST SP 800-88 (Purge / Clear), avec certificat signé.</b></p>
 
 <p align="center">
   <a href="https://github.com/hclcdev12/secmet/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/hclcdev12/secmet?label=version"></a>
@@ -48,20 +48,21 @@ SecMet est une application **Rust** (GTK4) pour l'effacement sécurisé de disqu
 
 **Atelier**
 
-- **Lots** sur la clé USB SecMet : les machines traitées successivement sont regroupées, certificats générés automatiquement, journal chaîné, clôture avec certificat groupé et manifeste signé, copie sur la partition d'export.
-- **Réglages** : langue de l'interface et des certificats (français, anglais, allemand), logo des certificats PDF, nom de l'opérateur pré-rempli, **mises à jour** vérifiées quotidiennement avec signature contrôlée (désactivable).
+- **Lots** sur la clé USB SecMet : les machines traitées successivement sont regroupées, certificats générés automatiquement, journal chaîné, clôture avec certificat groupé et manifeste signé, copie sur la partition d'export. Sur un poste installé, le **Mode lot** des Réglages regroupe de même les disques effacés au fil des sessions.
+- **Réglages** : langue de l'interface et des certificats (français, anglais, allemand), logo des certificats PDF, nom de l'opérateur pré-rempli, **mises à jour** vérifiées quotidiennement avec signature contrôlée (désactivable) et installables depuis les Réglages.
 
 **Distribution**
 
 - Paquets **`.deb`** (Ubuntu 24.04 et 22.04) et **`.rpm`** (Fedora), TestDisk embarqué si absent du système.
 - **AppImage** autonome (GTK4 et TestDisk embarqués), composant système installé au premier lancement.
 - **Image de clé USB** amorçable, avec mise à jour de l'application depuis la clé elle-même.
+- **SecMet Clé USB** (Linux et Windows) : télécharge l'image de la clé, vérifie la signature de la release puis l'empreinte, et l'écrit sur une clé USB.
 
 ## Installation
 
 ### Paquets publiés
 
-Les versions publiées sont sur la page [Releases](https://github.com/hclcdev12/secmet/releases) : paquets `.deb` (Ubuntu 24.04 / Mint 22 / Debian 13 ; Ubuntu 22.04 / Mint 21 / Debian 12), `.rpm` (Fedora 42), AppImage, image de la clé USB prête à écrire (`secmet-key_<version>_x86_64.img.xz`) et l'outil qui l'écrit après vérification de sa signature (SecMet Clé USB, `secmet-key-writer_<version>_x86_64.AppImage` pour Linux et `secmet-key-writer_<version>_x86_64.exe` pour Windows, voir [Fabriquer sa clé](docs/Fabriquer_sa_cle.md)), avec `SHA256SUMS` signé et `latest.json`. Une seule installation à la main ; ensuite SecMet se met à jour depuis ses Réglages (téléchargement, vérification de la signature, installation).
+Les versions publiées sont sur la page [Releases](https://github.com/hclcdev12/secmet/releases) : paquets `.deb` (Ubuntu 24.04 / Mint 22 / Debian 13 ; Ubuntu 22.04 / Mint 21 / Debian 12), `.rpm` (Fedora 42), AppImage, image de la clé USB prête à écrire (`secmet-key_<version>_x86_64.img.xz`) et l'outil qui l'écrit après vérification de sa signature (SecMet Clé USB, `secmet-key-writer_<version>_x86_64.AppImage` pour Linux et `secmet-key-writer_<version>_x86_64.exe` pour Windows, voir [Fabriquer sa clé](docs/Fabriquer_sa_cle.md)), avec `SHA256SUMS` signé et `latest.json`. Une seule installation à la main ; ensuite SecMet se met à jour depuis ses Réglages (téléchargement, vérification de la signature, installation) sur un poste muni d'`apt` (paquet `.deb`) ou de `dnf` (paquet `.rpm`). Ailleurs, l'AppImage se remplace à la main.
 
 ```bash
 # Ubuntu 24.04, Linux Mint 22, Debian 13 (remplacer <version>)
@@ -97,7 +98,7 @@ Mécanisme détaillé des mises à jour : [Annexe N](docs/Annexes/Annexe_N_mises
 
 ## Utilisation
 
-Le mot de passe demandé au démarrage est celui de votre compte : il protège les opérations sur les disques. Les disques effacés le sont définitivement : ne tester qu'avec des disques dédiés.
+Le mot de passe demandé au démarrage est celui de votre compte : il protège les opérations sur les disques. Sur la clé USB SecMet publiée, c'est celui du compte `secmet`, **`secmet` par défaut** (voir [Lots et clé USB](#lots-et-clé-usb)). Les disques effacés le sont définitivement : ne tester qu'avec des disques dédiés.
 
 ### Premiers pas
 
@@ -123,7 +124,8 @@ Icône engrenage dans la barre de titre.
 - **Langue** de l'interface : français natif, anglais, allemand, appliquée immédiatement. Les certificats PDF générés ensuite sont rédigés dans la même langue ; les journaux restent en français.
 - **Logo des certificats** : image PNG, JPEG, GIF, BMP, WebP ou TIFF, convertie en JPEG sur fond blanc dans `~/.config/secmet/pdf-logo.jpg` et placée en haut à gauche de chaque page jusqu'au retour au logo par défaut.
 - **Opérateur** : nom pré-rempli dans le dialogue **Générer le PDF**.
-- **Mises à jour** : version installée, dernière vérification, nouvelle version et ses notes si le canal en annonce une (`latest.json` signé par la clé de version intégrée, sinon ignoré), bouton **Vérifier maintenant** et lien vers la page de téléchargement. La vérification automatique (une requête HTTPS par jour, sans donnée personnelle) se désactive par une case. Un **point jaune** sur l'engrenage signale une version plus récente.
+- **Lots** (poste installé) : case **Mode lot**, qui regroupe les effacements en lots comme sur la clé ; les livrables d'un lot clôturé restent dans `~/.secmet_logs/archive/`.
+- **Mises à jour** : version installée, dernière vérification, nouvelle version et ses notes si le canal en annonce une (`latest.json` signé par la clé de version intégrée, sinon ignoré), bouton **Vérifier maintenant** et lien vers la page de téléchargement. Quand une version plus récente est annoncée, que le poste dispose d'`apt` ou de `dnf` et qu'aucune opération n'est en cours, le bouton **Installer la mise à jour** télécharge le paquet, vérifie `SHA256SUMS` signé, l'installe via `pkexec`, puis propose **Relancer SecMet** ; sur la clé USB, le paquet est en plus déposé dans le magasin `app/<version>/` de la partition de données, que la clé déploie à chaque démarrage. L'installation ne vérifie pas qu'un lot est ouvert : un lot peut donc réunir des certificats de deux versions, chaque attestation indiquant la sienne. La vérification automatique (une requête HTTPS par jour, sans donnée personnelle) se désactive par une case. Un **point jaune** sur l'engrenage signale une version plus récente.
 
 Les réglages sont persistants dans `~/.config/secmet/settings.json` (`check_updates`, `update_url` pour un miroir interne) ; `SECMET_UPDATE_URL` remplace l'adresse pour les essais.
 
@@ -131,11 +133,13 @@ Les réglages sont persistants dans `~/.config/secmet/settings.json` (`check_upd
 
 `SECMET_DATA_DIR=/chemin/absolu` place réglages, logo, clé d'attestation et état des mises à jour dans `/chemin/config/`, et journaux, rapports et certificats dans `/chemin/logs/`, au lieu de `~/.config/secmet/` et `~/.secmet_logs/`. C'est le mécanisme de la clé USB SecMet : les données suivent la clé d'un poste à l'autre, clé de signature comprise.
 
-Dans ce mode, SecMet travaille par **lots** : un lot regroupe les machines traitées successivement (dialogue au démarrage, bandeau, certificats générés automatiquement en fin d'effacement, journal chaîné). Sa clôture produit le certificat groupé, un manifeste signé et une copie sur la partition d'export `SECMET-EXP` ; un lot sans disque effacé peut être abandonné. Les Réglages de la clé ajoutent la recopie des lots clôturés sur la partition d'export et le nettoyage de la clé. Tout est décrit dans l'[Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md). Pour fabriquer une clé sans outillage ni Linux : [Fabriquer sa clé](docs/Fabriquer_sa_cle.md) (image `.img.xz` de chaque release, écrite avec SecMet Clé USB, Raspberry Pi Imager ou Rufus).
+Dans ce mode, SecMet travaille par **lots** : un lot regroupe les machines traitées successivement (dialogue au démarrage, bandeau, certificats générés automatiquement en fin d'effacement, journal chaîné). Sa clôture produit le certificat groupé, un manifeste signé et une copie sur la partition d'export `SECMET-EXP` ; un lot sans disque effacé peut être abandonné (**Abandonner le lot**). Les Réglages de la clé ajoutent la recopie des lots clôturés sur la partition d'export et le nettoyage de la clé. Tout est décrit dans l'[Annexe M](docs/Annexes/Annexe_M_cle_live_lots.md). Pour fabriquer une clé sans outillage ni Linux : [Fabriquer sa clé](docs/Fabriquer_sa_cle.md) (image `.img.xz` de chaque release, écrite avec SecMet Clé USB, Raspberry Pi Imager ou Rufus).
+
+Sur la clé publiée, le bureau s'ouvre sans écran de connexion ; seul le démarrage de SecMet (opérations sur les disques) demande un mot de passe, celui du compte `secmet`, **`secmet` par défaut**. Ce mot de passe est le même sur toutes les clés écrites depuis l'image publiée : pour un usage chez un client, construisez votre propre image avec un autre mot de passe (`SECMET_OPERATOR_PASSWORD='…' make live`, voir [packaging/live/README.md](packaging/live/README.md)). Un changement fait avec `passwd` pendant une session est perdu à l'extinction, le système de la clé étant en lecture seule.
 
 ### Vérifier un certificat
 
-`secmet-verify <certificat.json>` (ou `--qr "<texte scanné>"`) contrôle la signature Ed25519 et n'accepte que les clés de confiance : `--trust <clé publique ou key_id>`, variable `SECMET_TRUSTED_KEYS`, `/etc/secmet/trusted-keys`, `~/.config/secmet/attestation-key.pub`. La clé publique du banc est dans `~/.config/secmet/attestation-key.pub` ; distribuez-la aux vérificateurs. `--allow-untrusted` affiche le résultat pour une clé inconnue sans l'accepter comme preuve.
+`secmet-verify <certificat.json>` (ou `--qr "<texte scanné>"`) contrôle la signature Ed25519 et n'accepte que les clés de confiance : `--trust <clé publique ou key_id>`, variable `SECMET_TRUSTED_KEYS`, `/etc/secmet/trusted-keys`, `attestation-key.pub` et `trusted-keys` de `SECMET_DATA_DIR/config/` (clé USB) et de `~/.config/secmet/`. La clé publique du banc est dans `~/.config/secmet/attestation-key.pub` (sur la clé USB : `config/attestation-key.pub` de la partition de données) ; distribuez-la aux vérificateurs. `--allow-untrusted` affiche le résultat pour une clé inconnue sans l'accepter comme preuve.
 
 `secmet-verify --manifest <lot>-manifest.json` vérifie le **manifeste signé d'un lot** et le confronte aux attestations `.json` du même dossier : certificat manquant, modifié ou en trop → code 1.
 
@@ -172,7 +176,9 @@ Le moteur `secmet-core` décide d'un **plan** par disque à partir des capacité
 
 Le certificat indique la **méthode réellement obtenue** et sa **catégorie NIST SP 800-88** (Purge, Clear, ou non classé en cas d'échec), avec le seed, le nombre de blocs relus et les anomalies. Chaque session génère un journal lisible et un rapport JSON dans `~/.secmet_logs/`, et chaque disque un rapport détaillé des étapes.
 
-### Correspondance NIST SP 800-88 Rev. 1
+### Correspondance NIST SP 800-88
+
+Politique appliquée par défaut : `nist-800-88r1`, correspondance de la Rev. 1 ; son identifiant figure sur chaque attestation.
 
 | Méthode | Niveau NIST | Couverture |
 |---|---|---|
@@ -180,7 +186,7 @@ Le certificat indique la **méthode réellement obtenue** et sa **catégorie NIS
 | Écriture hôte (1 ou 3 passes + zéros), Security Erase normal sur SSD | **Clear** | Espace adressable uniquement |
 | TRIM seul | — | Jamais retenu comme méthode |
 
-Référence : NIST SP 800-88 Rev. 1, *Guidelines for Media Sanitization* (déc. 2014) — <https://doi.org/10.6028/nist.sp.800-88r1>. Une politique conservatrice (lecture Rev. 2 / IEEE 2883, Format user-data erase et Security Erase SSD en Clear) est disponible dans le moteur.
+Références : NIST SP 800-88 Rev. 2, *Guidelines for Media Sanitization* (26 septembre 2025), qui remplace la Rev. 1 — <https://csrc.nist.gov/pubs/sp/800/88/r2/final> ; NIST SP 800-88 Rev. 1 (déc. 2014), dont le tableau ci-dessus reprend les correspondances par média — <https://doi.org/10.6028/nist.sp.800-88r1>. La Rev. 2 renvoie aux techniques d'IEEE 2883 sans reprendre les tableaux par média de la Rev. 1. Le moteur contient une seconde politique, `nist-800-88r2`, plus conservatrice (Format NVM user-data erase et Security Erase sur SSD classés Clear) ; elle est acceptée par le helper mais pas encore proposée dans l'interface. Son passage en politique par défaut est prévu. SecMet n'est certifié par aucun organisme (le NIST ne certifie pas de produits) : ses méthodes sont alignées sur la norme, sans certification.
 
 ### Limitations
 
@@ -245,13 +251,16 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make appimage` | Construit l'AppImage dans un conteneur Ubuntu 24.04 |
 | `make live` | Construit l'image de la clé USB SecMet dans un conteneur privilégié Ubuntu 24.04 → `dist/live/` ([packaging/live/README.md](packaging/live/README.md)) |
 | `make live-bundle` | Livrable de la clé USB `dist/secmet-live_<version>_x86_64.tar` (après `make live`) |
+| `make live-image` | Clé SecMet virtuelle `dist/live/secmet-key.img` pour QEMU (conteneur privilégié, après `make live`) |
+| `make live-test` | Démarre la clé virtuelle dans QEMU (UEFI OVMF), avec écran |
+| `make test-live-scripts` | Test du script de mise à jour au démarrage de la clé, avec doublures (sans QEMU) |
 | `make live-check` | Contrôle QEMU sans écran : la clé virtuelle déploie la version la plus récente de son magasin `app/` |
 | `make live-dist` | Image publiable de la clé `dist/secmet-key_<version>_x86_64.img.xz`, à écrire telle quelle avec Raspberry Pi Imager, Rufus ou `dd` (après `make live`) |
-| `make key-writer` | SecMet Clé USB (`crates/secmet-key-writer`, egui) : outil graphique qui télécharge l'image de la clé, vérifie la signature de la release avec la clé de version, puis l'écrit sur une clé USB et la relit (Linux et Windows) ; `make key-writer-appimage` l'assemble en `dist/secmet-key-writer_<version>_x86_64.AppImage` (conteneur Ubuntu 24.04), `make key-writer-exe` en `dist/secmet-key-writer_<version>_x86_64.exe` (compilation croisée MinGW, sur la machine ou dans le même conteneur ; en CI, runner Windows) ; après la relecture, l'outil complète la GPT (copie de secours au bout de la clé), sans quoi Windows la « répare » en cassant le MBR protecteur |
+| `make key-writer` | SecMet Clé USB (`crates/secmet-key-writer`, egui) : outil graphique qui télécharge l'image de la clé, vérifie la signature de la release avec la clé de version, puis l'empreinte de l'image, l'écrit sur une clé USB et la relit (Linux et Windows) ; une image de la version courante déjà présente dans le dossier des téléchargements est prise d'office au lancement (« Autre image » ramène au choix) ; `make key-writer-appimage` l'assemble en `dist/secmet-key-writer_<version>_x86_64.AppImage` (conteneur Ubuntu 24.04), `make key-writer-exe` en `dist/secmet-key-writer_<version>_x86_64.exe` (compilation croisée MinGW, sur la machine ou dans le même conteneur ; en CI, runner Windows) ; pendant l'écriture, dès le premier bloc, l'outil complète la GPT (copie de secours au bout de la clé, MBR protecteur étendu), sans quoi Windows la « répare » en cassant le MBR protecteur |
 | `make live-dist-check` | Contrôle QEMU sans écran, en BIOS : premier démarrage de l'image publiable sur une clé de 16 Go (clé de signature créée, partition d'export agrandie) |
 | `make live-key DEV=/dev/sdX` | Écrit une clé USB SecMet (root ; efface la clé) |
-| `make release` | Chaîne de publication : contrôles, 4 paquets construits et fumés en conteneurs, `SHA256SUMS` et `latest.json` signés avec la clé de version ; rien n'est publié |
-| `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation |
+| `make release` | Chaîne de publication : contrôles, les 11 livrables d'une release (4 paquets construits et fumés en conteneurs, SecMet Clé USB en AppImage et `.exe`, image de la clé `.img.xz` et livrable `.tar`, `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) signés avec la clé de version du poste ; rien n'est publié |
+| `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation ; n'envoie pas encore l'image de la clé (`.img.xz`) ni le livrable `.tar` |
 | `make fuzz-check` | Compile les cibles de fuzz (`fuzz/`) sans instrumentation |
 | `make clean` | Nettoie `target/` (via rustup, pas besoin de `cargo` dans le PATH) |
 | `make fix-pkexec` | Restaure le bit setuid de `pkexec` (PolicyKit) |
@@ -268,22 +277,22 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 
 | Workflow | Déclencheur | Contenu |
 |----------|-------------|---------|
-| `ci.yml` | push / PR sur `main` et `I/O_SecMet` | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, shellcheck des scripts, compilation des cibles de fuzz |
+| `ci.yml` | push / PR sur `main`, manuel | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, shellcheck des scripts, compilation des cibles de fuzz |
 | `fuzz.yml` | push / PR touchant `crates/` ou `fuzz/` (60 s par cible), hebdomadaire (30 min), manuel (durée au choix) | cargo-fuzz (nightly, libFuzzer) sur neuf décodeurs purs : sense ATA, IDENTIFY, SMART, NVMe, trames IPC, QR et JSON d'attestation, mountinfo, canaris ; entrées fautives publiées en artefact |
-| `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `<version>~ubuntu22.04`, publiée sous `secmet_<version>.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; sur un tag ou à la main, image de la clé USB et son livrable `.tar` (reconstruits seulement si le système de la clé a changé depuis la release précédente, sinon repris avec le nouveau `.deb` dans leur magasin `app/`) ; sur un tag, signature et release GitHub |
+| `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `<version>~<distribution>`, publiée sous `secmet_<version>.ubuntu24.04_amd64.deb` et `secmet_<version>.ubuntu22.04_amd64.deb`), `.rpm` Fedora 42, AppImage ; chaque paquet installé et fumé dans son conteneur ; sur un tag ou à la main, image de la clé USB et son livrable `.tar` (reconstruits seulement si le système de la clé a changé depuis la release précédente, sinon repris avec le nouveau `.deb` dans leur magasin `app/`) ; sur un tag, signature et release GitHub |
 
 Les cibles de fuzz vivent dans `fuzz/` (crate hors workspace) : `cargo +nightly fuzz run ata_sense` en local après `cargo install cargo-fuzz`.
 
 ### Publication d'une version
 
-Le push d'un tag annoté `vX.Y.Z` suffit (un tag `vX.Y.Z-rcN` construit tout sans publier, pour une répétition générale ; le corps du message du tag devient les notes de la release et de `latest.json`) : `package.yml` construit les quatre paquets, SecMet Clé USB (AppImage Linux, `.exe` Windows) et l'image de la clé USB, sous deux formes (image prête à écrire `secmet-key_<version>_x86_64.img.xz` et livrable de fabrication `secmet-live_<version>_x86_64.tar` : image, `secmet-make-key.sh`, `secmet-release`), signe le tout avec la **clé de version** (secret du dépôt, distincte des clés d'attestation des certificats) et crée la release. La clé USB a **deux cadences** : si aucun fichier de son système n'a changé depuis la release précédente (`packaging/live/live-mode.sh`), l'image précédente est téléchargée, vérifiée et reprise, seule sa partition de données est refaite avec le nouveau `.deb` signé dans `app/<version>/`, que la clé déploie au démarrage (`packaging/live/refresh_live.sh`, quelques minutes au lieu d'un quart d'heure) ; sinon, ou à la main avec `full_live`, l'image est reconstruite. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis, `--full-live` pour forcer la reconstruction), où la clé passe en plus les contrôles QEMU `make live-check` et `make live-dist-check`. Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
+Le push d'un tag annoté `vX.Y.Z` suffit (un tag `vX.Y.Z-rcN` construit tout sans publier, pour une répétition générale ; le corps du message du tag devient les notes de la release et de `latest.json`) : `package.yml` construit les quatre paquets, SecMet Clé USB (AppImage Linux, `.exe` Windows) et l'image de la clé USB, sous deux formes (image prête à écrire `secmet-key_<version>_x86_64.img.xz` et livrable de fabrication `secmet-live_<version>_x86_64.tar` : image, `secmet-make-key.sh`, `secmet-release`), signe le tout avec la **clé de version** (distincte des clés d'attestation des certificats), lue dans le secret `SECMET_RELEASE_KEY` du dépôt : la signature se fait donc dans la CI GitHub. Il crée ensuite la release (11 fichiers). La clé USB a **deux cadences** : si aucun fichier de son système n'a changé depuis la release précédente (`packaging/live/live-mode.sh`), l'image précédente est téléchargée, vérifiée et reprise, seule sa partition de données est refaite avec le nouveau `.deb` signé dans `app/<version>/`, que la clé déploie au démarrage (`packaging/live/refresh_live.sh`, quelques minutes au lieu d'un quart d'heure) ; sinon, ou à la main avec `full_live`, l'image est reconstruite. La même chaîne tourne hors ligne sur le poste du responsable des versions (`packaging/release.sh`, podman ou docker requis, `--full-live` pour forcer la reconstruction), qui signe alors avec la clé de version du poste ; la clé USB y passe en plus les contrôles QEMU `make live-check` et `make live-dist-check`. Écart connu : `make publish` n'envoie pas l'image `.img.xz` ni le livrable `.tar`, pourtant signés dans `SHA256SUMS` ; une release complète passe par `package.yml` (ou par un `gh release upload` de ces deux fichiers). Détail dans l'[Annexe N](docs/Annexes/Annexe_N_mises_a_jour.md).
 
 ```bash
 secmet-release keygen ~/.config/secmet/release-key.hex   # une fois ; sauvegarder la clé hors ligne
-git tag -a v0.3.2 -m "SecMet 0.3.2" && git push origin main v0.3.2
-make release      # dist/release/0.3.2/ : paquets, SHA256SUMS, SHA256SUMS.sig, latest.json
+git tag -a vX.Y.Z -m "<notes de la version>" && git push origin main vX.Y.Z
+make release      # dist/release/X.Y.Z/ : les 11 livrables, dont SHA256SUMS, SHA256SUMS.sig, latest.json
 make publish      # release GitHub sur https://github.com/hclcdev12/secmet (confirmation)
-secmet-release verify dist/release/0.3.2 --trust <clé publique ou key_id>
+secmet-release verify dist/release/X.Y.Z --trust <clé publique ou key_id>
 ```
 
 `SECMET_RELEASE_KEY`, `SECMET_RELEASES_REPO` et `SECMET_RELEASES_URL` remplacent les valeurs par défaut. L'application lit `https://github.com/<dépôt>/releases/latest/download/latest.json` et n'accepte que les fichiers signés par une clé listée dans `src/update.rs` (`RELEASE_PUBLIC_KEYS`).
@@ -317,6 +326,8 @@ crates/
   secmet-helper/       # Daemon privilégié : sessions, ouverture O_EXCL anti-TOCTOU, exécution des plans
   secmet-attest/       # Certificats : attestation signée Ed25519, QR Base45, PDF natif, secmet-verify ;
                        # versions publiées signées (module release, binaire secmet-release)
+  secmet-key-writer/   # SecMet Clé USB (egui, Linux et Windows) : vérification et écriture de l'image de la clé
+                       # (hors default-members : make key-writer)
 
 scripts/
   deps.sh              # Installation des dépendances (apt)
@@ -347,8 +358,8 @@ Autres dossiers : `fuzz/` (cibles cargo-fuzz, hors workspace), `docs/` (annexes,
 
 [GNU GPL v3 ou ultérieure](LICENSE) — Copyright (c) 2026 SecMet Contributors
 
-Le code est libre : toute version redistribuée, modifiée ou intégrée doit rester sous GPL avec ses sources. Le nom **SecMet** et le lion du logo sont des marques : ils identifient le logiciel officiel et ne sont pas couverts par la GPL (voir [content/LICENSE](content/LICENSE)) ; une version modifiée doit être renommée.
+Le code est libre : toute version redistribuée, modifiée ou intégrée doit rester sous GPL avec ses sources. Le nom **SecMet** et le lion du logo sont réservés (marque non déposée à ce jour) : ils identifient le logiciel officiel et ne sont pas couverts par la GPL (voir [content/LICENSE](content/LICENSE)) ; une version modifiée doit être renommée.
 
-SecMet s'appuie sur des composants open source (GTK 4, crates Rust, TestDisk embarqué). Détail des licences tierces et conformité distribution : [Annexe J](docs/Annexes/Annexe_J_licences_tierces.md). Annexes : [docs/Annexes/README.md](docs/Annexes/README.md).
+SecMet s'appuie sur des composants open source : GTK 4, crates Rust (toutes sous licences permissives, sauf une en MPL-2.0), TestDisk embarqué, et pour la clé USB un système Ubuntu 24.04 complet ; SecMet Clé USB utilise egui et wgpu. Détail des licences tierces et conformité distribution : [Annexe J](docs/Annexes/Annexe_J_licences_tierces.md). Annexes : [docs/Annexes/README.md](docs/Annexes/README.md).
 
 Le module d'infos disque SMART s'inspire conceptuellement de [QDiskInfo](https://github.com/edisionnano/QDiskInfo) (GPL-3.0) ; la logique et l'UI sont une réécriture indépendante en Rust/GTK4, sans inclusion de sources QDiskInfo.

@@ -11,6 +11,7 @@ Notes courtes pour travailler sur le dépôt (v0.4.0).
 | `secmet-core` | `crates/secmet-core` | Moteur de décision NIST SP 800-88 (plan par disque), canaris ChaCha20 ; crate pure, sans GTK ni ioctl |
 | `secmet-helper` | `crates/secmet-helper` | Daemon privilégié `secmet-helper serve` : sessions, ouverture `O_EXCL | O_DIRECT`, exécution des plans, TestDisk, coffre ATA |
 | `secmet-attest` | `crates/secmet-attest` | Attestation JSON canonique signée Ed25519, QR Base45, PDF natif, binaire `secmet-verify` ; versions signées (`release`, `secmet-release`) ; manifeste de lot signé (`manifest`) |
+| `secmet-key-writer` | `crates/secmet-key-writer` | SecMet Clé USB (egui, Linux et Windows) : vérification de la release signée puis de l'empreinte, écriture de l'image de la clé avec complétion de la GPT pendant l'écriture, relecture ; hors `default-members` (`make key-writer`, `cargo build -p secmet-key-writer`), rust-version 1.95 |
 
 ```bash
 source scripts/env.sh
@@ -18,7 +19,7 @@ cargo test --workspace                      # nécessite libgtk-4-dev pour le pa
 cargo test -p secmet-helper                 # helper seul (sans GTK)
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
-cargo build --release --workspace           # target/release/{secmet,secmet-helper,secmet-verify}
+cargo build --release --workspace           # target/release/{secmet,secmet-helper,secmet-verify,secmet-release}
 ```
 
 Règles de la base de code : `panic = "abort"` en release, clippy avec `unwrap_used` / `expect_used` / `undocumented_unsafe_blocks` en erreur (tout `unsafe` vit dans `secmet-device::sys` et `aligned`), `cargo fmt` obligatoire. Un test ne doit jamais lancer de programme externe ni ouvrir de fenêtre.
@@ -41,11 +42,12 @@ Règles de la base de code : `panic = "abort"` en release, clippy avec `unwrap_u
 | `src/certificate/` | Session, enregistrements, construction de l'attestation, export PDF/JSON |
 | `src/i18n/` | Tables `(fr, en, de)` ; tests de complétude et de marqueurs `{nom}` ; les journaux restent en français ; les certificats suivent la langue de l'interface (libellés fixes : `secmet-attest::lang`, textes libres : `src/i18n/certificate.rs`) |
 | `src/settings.rs`, `src/pdf_logo.rs` | `~/.config/secmet/settings.json`, logo personnalisé `pdf-logo.jpg` |
-| `src/ui/lot_ui.rs` | Lots côté interface : dialogue au démarrage, bandeau, contrôle de doublon (`check_before_erase`), `register_start` / `register_end` (certificats automatiques dans le lot), clôture (`close_lot_work` : PDF groupé, manifeste, export `SECMET-EXP`, archivage) ; actif seulement si `paths::dedicated_data_dir()` |
+| `src/ui/lot_ui.rs` | Lots côté interface : dialogue au démarrage, bandeau, contrôle de doublon (`check_before_erase`), `register_start` / `register_end` (certificats automatiques dans le lot), clôture (`close_lot_work` : PDF groupé, manifeste, export `SECMET-EXP`, archivage) ; actif si `paths::dedicated_data_dir()` (clé, lots de machines) ou si `settings.lots_enabled` (poste installé, « Mode lot » des Réglages, lots de disques, sans export sur une clé branchée) |
 | `src/clock.rs`, `src/ui/clock_ui.rs` | Seule source d'heure (`clock::now()` / `stamp()`), décalage manuel, contrôle au démarrage en mode clé (NTP, références : exécutable, lots), réserve sur les certificats (`caveat_key`) |
 | `src/lot.rs` | Lot persistant (annexe M) : `lots/<LOT-ID>/{lot.json,journal.ndjson,certificates,sessions}`, journal chaîné SHA-256, écritures tmp+fsync+rename, reprise, doublons, clôture et archivage ; pur, testé avec `tempfile` |
 | `src/paths.rs` | Chemins : helper, policy, et **dossier de données** (`layout()` : `~/.config/secmet` + `~/.secmet_logs`, ou `SECMET_DATA_DIR/{config,logs}` pour la clé live) ; aucun autre module ne calcule un chemin de données |
 | `src/update.rs`, `src/ui/update_ui.rs` | Mises à jour : `latest.json` signé (clé publique de version `RELEASE_PUBLIC_KEYS`), état `update-state.json`, fil de vérification, point jaune sur Réglages ; `SECMET_UPDATE_URL` pour un serveur d'essai |
+| `src/update_install.rs` | Bouton **Installer la mise à jour** (`settings_ui.rs`) : `package_kind()` (apt/dpkg → `.deb` choisi selon la glibc, dnf/rpm → `.rpm`, sinon lien seul), téléchargement, contrôle de `SHA256SUMS` signé, installation sous `pkexec` ; sur la clé, dépôt en plus dans `app/<version>/` (deux versions gardées). Bouton visible seulement sans opération en cours ; **aucun contrôle du lot ouvert** |
 | `src/system_install.rs` | AppImage : détection du composant, installeur embarqué (`packaging/install-helper.sh` via `include_str!`) |
 
 ## Données sur le poste
@@ -68,22 +70,23 @@ make deb        # dist/secmet_<version>_amd64.deb (TestDisk embarqué sous /usr/
 make rpm        # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
 make appimage   # dist/SecMet_<version>_x86_64.AppImage, assemblée dans un conteneur Ubuntu 24.04
 make live       # dist/live/ : image de la clé USB SecMet (conteneur privilégié) ; make live-key DEV=/dev/sdX l'écrit
-make release    # dist/release/<version>/ : les 4 paquets fumés en conteneurs + SHA256SUMS(.sig) + latest.json signés
-make publish    # idem, puis release GitHub sur ce dépôt (confirmation demandée) ; le push d'un tag vX.Y.Z suffit (package.yml)
+make release    # dist/release/<version>/ : les 11 livrables (4 paquets fumés en conteneurs, SecMet Clé USB AppImage et .exe, .img.xz et .tar de la clé, SHA256SUMS(.sig), latest.json signés)
+make publish    # idem, puis release GitHub (confirmation) ; n'envoie pas encore .img.xz ni .tar (release.sh, liste assets) ; le push d'un tag vX.Y.Z suffit (package.yml)
 ```
 
 L'AppImage **doit** être assemblée dans le conteneur (`packaging/appimage.Containerfile`) : les bibliothèques GTK embarquées sont liées à la glibc de la machine de construction, et le banc est en glibc 2.39. Voir [Annexe H](Annexes/Annexe_H_deploiement_banc.md).
 
-La CI GitHub Actions (`ci.yml`, `fuzz.yml`, `package.yml`) rejoue fmt, clippy, tests, `cargo audit`, shellcheck, fuzzing et construction des paquets ; détail dans le [README](../README.md#intégration-continue-github-actions).
+La CI GitHub Actions (`ci.yml`, `fuzz.yml`, `package.yml`) rejoue fmt, clippy, tests, `cargo audit`, shellcheck, fuzzing et construction des paquets ; détail dans le [README](../README.md#intégration-continue).
 
 ## Certificats d'exemple
 
 - `docs/exemple_pdf.pdf` (un disque) et `docs/exemple_lot.pdf` (lot) illustrent le rendu. Pour générer un lot de démonstration signé avec une clé fixe, dans une langue donnée : `cargo run -p secmet-attest --example sample_certificate -- <dossier> [fr|en|de]`.
 
-## Mise en production (spécifiée, non implémentée)
+## Mise en production (réalisée, v0.4.0)
 
-- [Annexe M](Annexes/Annexe_M_cle_live_lots.md) : clé USB SecMet, partition de données `SECMET-DATA`, lots persistants sur plusieurs laptops, manifeste de lot signé.
-- [Annexe N](Annexes/Annexe_N_mises_a_jour.md) : mises à jour signées (clé de version hors ligne), releases GitHub du dépôt du code `hclcdev12/secmet` (depuis 0.3.5 ; `secmet-releases` y renvoie par `moved_to`), publiées par `package.yml` sur tag ou par `make release` en local. **Réalisé** : `packaging/release.sh`, module `secmet-attest::release`, binaire `secmet-release` (`keygen`, `sign`, `verify`), vérification dans l'application (`src/update.rs`, point jaune, section Mises à jour). **Décision** : pas de bouton Installer (l'application annonce, l'installation reste manuelle). **À faire** : versions sur la clé live (annexe M).
+- [Annexe M](Annexes/Annexe_M_cle_live_lots.md) : clé USB SecMet (image `secmet-key_<version>_x86_64.img.xz` publiée), partition de données `SECMET-DATA`, lots persistants sur plusieurs laptops, manifeste de lot signé, horloge, nettoyage de la clé. Mot de passe du compte `secmet` : `secmet` par défaut (`build_rootfs.sh`, `SECMET_OPERATOR_PASSWORD`), demandé par l'invite du helper.
+- [Annexe N](Annexes/Annexe_N_mises_a_jour.md) : mises à jour signées, releases GitHub du dépôt du code `hclcdev12/secmet` (depuis 0.3.5 ; `secmet-releases` y renvoie par `moved_to`), 11 fichiers par release. **Réalisé** : `packaging/release.sh`, module `secmet-attest::release`, binaire `secmet-release` (`keygen`, `sign`, `verify`), vérification dans l'application (`src/update.rs`, point jaune), bouton **Installer la mise à jour** puis **Relancer SecMet** (`src/update_install.rs`), magasin `app/<version>/` déployé au démarrage de la clé (`secmet-app-update`), SecMet Clé USB (Linux et Windows). Signature : en CI par `package.yml` avec le secret `SECMET_RELEASE_KEY`, ou en local par `release.sh` avec la clé du poste. Convention de version : un seul numéro X.Y.Z, tag annoté dont le corps devient les notes, `vX.Y.Z-rcN` construit sans publier.
+- **Écarts connus** : politique NIST par défaut `nist-800-88r1` (`taxonomy.rs`, `impl Default for Policy`), `nist-800-88r2` non proposée dans l'interface ; aucune vérification du lot ouvert avant l'installation d'une mise à jour ; `make publish` n'envoie pas `.img.xz` ni `.tar` ; mot de passe `secmet` identique sur toutes les clés publiées.
 
 ## Banc de test
 

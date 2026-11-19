@@ -1,14 +1,15 @@
 # Licences des assets graphiques — SecMet
 
-## SecMet_icon.svg, SecMet_logo.svg (et `crates/secmet-attest/resources/secmet_logo.jpg`)
+## SecMet_icon.svg, SecMet_logo.svg, SecMet_logo_dark.svg (et `crates/secmet-attest/resources/secmet_logo.jpg`, ainsi que `packaging/live/overlay/usr/share/backgrounds/secmet.png` et `packaging/live/overlay/usr/share/plymouth/themes/secmet/watermark.png` sur la clé USB)
 
-Copyright (c) 2026 SecMet Contributors — **tous droits réservés** (marque).
+Copyright (c) 2026 SecMet Contributors — **tous droits réservés** (nom et logo réservés ; marque non déposée à ce jour).
 
 Le nom « SecMet » et le lion du logo identifient le logiciel officiel. Ils ne sont **pas** couverts par la licence GPL du code :
 
 - ils peuvent être reproduits tels quels pour distribuer, décrire ou désigner le logiciel SecMet **non modifié** (paquets, captures d'écran, documentation, certificats produits par le logiciel) ;
 - une version modifiée du logiciel, ou un produit dérivé, doit être **renommée** et distribuée **sans** ce nom ni ce logo ;
-- toute autre utilisation (produit, service, support commercial) nécessite l'accord écrit des auteurs.
+- citer le nom pour désigner le logiciel (par exemple « support pour SecMet », « compatible SecMet ») reste libre, à condition de ne pas laisser croire à un partenariat ou à une version officielle ;
+- toute autre utilisation du nom ou du logo (nom de produit ou de service, logo sur une offre commerciale) nécessite l'accord écrit des auteurs.
 
 ## device-hdd.svg
 

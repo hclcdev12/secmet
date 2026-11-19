@@ -1,10 +1,96 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: secmet
+Upstream-Contact: https://github.com/hclcdev12/secmet/issues
 Source: https://github.com/hclcdev12/secmet
+Comment: Runtime dependencies (not shipped in this package):
+ GTK 4 (libgtk-4-1), GLib, Pango, GdkPixbuf: LGPL-2.1+; Cairo: LGPL-2.1
+ or MPL-1.1; PolicyKit: LGPL-2.0+; glibc: LGPL-2.1+. They are linked
+ dynamically and provided by the distribution.
+ .
+ Programs run as separate processes and not shipped: pkexec, apt-get or
+ dnf (update install), systemctl, which, timeout, sh, xdg-open and the
+ desktop PDF viewer.
+ .
+ Credits / inspiration (not shipped, no source code included):
+ QDiskInfo - GPL-3.0 - https://github.com/edisionnano/QDiskInfo
+ SMART disk-info UI/logic reimplemented independently in Rust+GTK4.
+ .
+ Full list of third-party components and licences:
+ /usr/share/doc/secmet/THIRD_PARTY_LICENSES.md (Annexe J of the sources,
+ docs/Annexes/Annexe_J_licences_tierces.md).
 
 Files: *
 Copyright: 2026 SecMet Contributors
-License: GPL-3.0+
+License: GPL-3+
+
+Files: usr/bin/secmet usr/bin/secmet-helper usr/bin/secmet-verify usr/bin/secmet-release
+Copyright: 2026 SecMet Contributors
+ the authors of the Rust crates statically linked into these binaries
+ (exact names and versions in Cargo.lock of the sources)
+License: GPL-3+ and Expat and Apache-2.0 and ISC and BSD-3-clause and Unicode-3.0 and CDLA-Permissive-2.0 and MPL-2.0
+Comment: The SecMet code is GPL-3+. The binaries also contain 134 Rust crates
+ (version 0.4.0). Where a crate offers a choice, the MIT (Expat) branch is used.
+ Licences of the linked crates: Expat (gtk4, glib, cairo-rs, serde,
+ chrono, regex, sha2, image, ureq, ...); Apache-2.0 and ISC (ring);
+ ISC (rustls-webpki, untrusted); BSD-3-clause (ed25519-dalek,
+ curve25519-dalek, subtle); Unicode-3.0 (icu_* via url/idna);
+ CDLA-Permissive-2.0 (webpki-roots, Mozilla root certificates);
+ MPL-2.0 (option-ext, via dirs; source: https://crates.io/crates/option-ext).
+ Sources of all crates: https://crates.io (versions pinned in Cargo.lock).
+ List per target: see THIRD_PARTY_LICENSES.md, section 2.
+
+Files: content/SecMet_icon.svg content/SecMet_logo.svg content/SecMet_logo_dark.svg crates/secmet-attest/resources/secmet_logo.jpg
+Copyright: 2026 SecMet Contributors
+License: SecMet-trademark
+
+Files: content/device-hdd.svg
+Copyright: 2019-2024 The Bootstrap Authors
+License: Expat
+Comment: Bootstrap Icons, https://github.com/twbs/icons
+ See also /usr/share/doc/secmet/content-LICENSE.
+
+Files: usr/lib/secmet/bin/testdisk
+Copyright: Christophe Grenier <grenier@cgsecurity.org>
+License: GPL-2+
+Comment: Bundled unmodified, only when present on the build machine
+ (Ubuntu package testdisk for the .deb, Fedora package for the .rpm).
+ Run by secmet-helper as a separate process. Source and compliance notes:
+ /usr/share/doc/secmet/bundled-tools-compliance.txt.
+ Upstream: https://www.cgsecurity.org/wiki/TestDisk
+
+Files: usr/lib/secmet/lib/*
+Copyright: the authors of each library
+License: other-distribution
+ Private copies, unmodified, of the shared libraries that testdisk links
+ on the build machine. Each library keeps the licence of the
+ distribution package it was copied from (see the paragraphs below for
+ the libraries of the Ubuntu 24.04 build, and the copyright file of the
+ same package in the build distribution for any other library).
+
+Files: usr/lib/secmet/lib/libncursesw.so.* usr/lib/secmet/lib/libtinfo.so.*
+Copyright: 2018-2025 Thomas E. Dickey
+ 1998-2017 Free Software Foundation, Inc.
+License: X11
+
+Files: usr/lib/secmet/lib/libuuid.so.*
+Copyright: 1996, 1997, 1998, 1999, 2007 Theodore Ts'o and util-linux contributors
+License: BSD-3-clause
+
+Files: usr/lib/secmet/lib/libcom_err.so.*
+Copyright: 1987, 1988 Student Information Processing Board of the Massachusetts Institute of Technology
+License: com_err
+
+Files: usr/lib/secmet/lib/libext2fs.so.*
+Copyright: Theodore Ts'o and e2fsprogs contributors
+License: LGPL-2
+
+Files: usr/lib/secmet/lib/libntfs-3g.so.*
+Copyright: Tuxera Inc., Jean-Pierre Andre and the ntfs-3g contributors
+License: GPL-2+
+Comment: Debian's copyright file lists some parts of ntfs-3g under
+ LGPL-2+; GPL-2+ is assumed for the whole library.
+
+License: GPL-3+
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation, either version 3 of the License, or
@@ -19,37 +105,254 @@ License: GPL-3.0+
  License version 3 can be found in "/usr/share/common-licenses/GPL-3";
  it is also shipped as /usr/share/doc/secmet/LICENSE.
 
-Files: content/SecMet_icon.svg content/SecMet_logo.svg crates/secmet-attest/resources/secmet_logo.jpg
-Copyright: 2026 SecMet Contributors
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU General Public
+ License version 2 can be found in "/usr/share/common-licenses/GPL-2";
+ it is also shipped as /usr/share/doc/secmet/gpl-2.0.txt.
+
+License: LGPL-2
+ This library is free software; you can redistribute it and/or modify it
+ under the terms of the GNU Library General Public License version 2 as
+ published by the Free Software Foundation.
+ .
+ On Debian systems, the complete text of the GNU Library General Public
+ License version 2 can be found in "/usr/share/common-licenses/LGPL-2".
+ Elsewhere: https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html
+
 License: SecMet-trademark
  The name "SecMet" and the SecMet logo identify the official software and
- are not covered by the GPL. They may be reproduced as-is to distribute or
+ are not covered by the GPL (they are reserved; not a registered
+ trademark at this time). They may be reproduced as-is to distribute or
  describe the unmodified software; a modified version must be renamed and
- shipped without them. See content-LICENSE in /usr/share/doc/secmet/.
+ shipped without them. See /usr/share/doc/secmet/content-LICENSE.
 
-Files: content/device-hdd.svg
-Copyright: 2019-2024 The Bootstrap Authors
-License: MIT
- See content/LICENSE in the source tree.
-
-Files: usr/lib/secmet/bin/testdisk usr/lib/secmet/lib/*
-Copyright: Christophe Grenier <grenier@cgsecurity.org> and library authors
-License: GPL-2.0+
- Bundled only when present on the build machine. See
- /usr/share/doc/secmet/gpl-2.0.txt and bundled-tools-compliance.txt.
- Source: https://www.cgsecurity.org/wiki/TestDisk
-
-Files: debian/*
-License: GPL-2.0+
- This packaging metadata is licensed under the GPL, as is conventional for
- Debian packaging, like the application itself.
-
-Comment: Runtime dependencies (not shipped in this package)
- GTK 4 (libgtk-4-1) — LGPL-2.1+
- PolicyKit — LGPL-2.0+
- testdisk (recommended, optional) — GPL-2.0+ (invoked as a separate process)
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, sublicense, and/or sell copies of the Software, and to
+ permit persons to whom the Software is furnished to do so, subject to
+ the following conditions:
  .
- Credits / inspiration (not shipped, no source code included):
- QDiskInfo — GPL-3.0 — https://github.com/edisionnano/QDiskInfo
- SMART disk-info UI/logic reimplemented independently in Rust+GTK4.
- See Annexes/Annexe_J_licences_tierces.md (or THIRD_PARTY_LICENSES.md in the package) for the full list.
+ The above copyright notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License"); you may
+ not use this file except in compliance with the License. You may obtain
+ a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ .
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ .
+ On Debian systems, the complete text of the Apache License, Version 2.0
+ can be found in "/usr/share/common-licenses/Apache-2.0".
+
+License: ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+License: BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+ .
+ 1. Redistributions of source code must retain the above copyright
+ notice, this list of conditions and the following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above copyright
+ notice, this list of conditions and the following disclaimer in the
+ documentation and/or other materials provided with the distribution.
+ .
+ 3. Neither the name of the copyright holder nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: Unicode-3.0
+ UNICODE LICENSE V3
+ .
+ COPYRIGHT AND PERMISSION NOTICE
+ .
+ Copyright (c) 1991-2023 Unicode, Inc.
+ .
+ NOTICE TO USER: Carefully read the following legal agreement. BY
+ DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+ SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+ TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+ DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+ .
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of data files and any associated documentation (the "Data Files") or
+ software and any associated documentation (the "Software") to deal in the
+ Data Files or Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, and/or sell
+ copies of the Data Files or Software, and to permit persons to whom the
+ Data Files or Software are furnished to do so, provided that either (a)
+ this copyright and permission notice appear with all copies of the Data
+ Files or Software, or (b) this copyright and permission notice appear in
+ associated Documentation.
+ .
+ THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+ KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+ THIRD PARTY RIGHTS.
+ .
+ IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+ BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+ OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+ WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+ FILES OR SOFTWARE.
+ .
+ Except as contained in this notice, the name of a copyright holder shall
+ not be used in advertising or otherwise to promote the sale, use or other
+ dealings in these Data Files or Software without prior written
+ authorization of the copyright holder.
+
+License: CDLA-Permissive-2.0
+ Community Data License Agreement - Permissive - Version 2.0
+ .
+ This is the Community Data License Agreement - Permissive, Version
+ 2.0 (the "agreement"). Data Provider(s) and Data Recipient(s) agree
+ as follows:
+ .
+ 1. Provision of the Data
+ .
+ 1.1. A Data Recipient may use, modify, and share the Data made
+ available by Data Provider(s) under this agreement if that Data
+ Recipient follows the terms of this agreement.
+ .
+ 1.2. This agreement does not impose any restriction on a Data
+ Recipient's use, modification, or sharing of any portions of the
+ Data that are in the public domain or that may be used, modified,
+ or shared under any other legal exception or limitation.
+ .
+ 2. Conditions for Sharing Data
+ .
+ 2.1. A Data Recipient may share Data, with or without modifications, so
+ long as the Data Recipient makes available the text of this agreement
+ with the shared Data.
+ .
+ 3. No Restrictions on Results
+ .
+ 3.1. This agreement does not impose any restriction or obligations
+ with respect to the use, modification, or sharing of Results.
+ .
+ 4. No Warranty; Limitation of Liability
+ .
+ 4.1. All Data Recipients receive the Data subject to the following
+ terms:
+ .
+ THE DATA IS PROVIDED ON AN "AS IS" BASIS, WITHOUT REPRESENTATIONS,
+ WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED
+ INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE,
+ NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+ .
+ NO DATA PROVIDER SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING
+ WITHOUT LIMITATION LOST PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF
+ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE DATA OR RESULTS,
+ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ .
+ 5. Definitions
+ .
+ 5.1. "Data" means the material received by a Data Recipient under
+ this agreement.
+ .
+ 5.2. "Data Provider" means any person who is the source of Data
+ provided under this agreement and in reliance on a Data Recipient's
+ agreement to its terms.
+ .
+ 5.3. "Data Recipient" means any person who receives Data directly
+ or indirectly from a Data Provider and agrees to the terms of this
+ agreement.
+ .
+ 5.4. "Results" means any outcome obtained by computational analysis
+ of Data, including for example machine learning models and models'
+ insights.
+
+License: MPL-2.0
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ .
+ On Debian systems, the complete text of the Mozilla Public License,
+ Version 2.0 can be found in "/usr/share/common-licenses/MPL-2.0".
+ The source of the MPL-2.0 crate used (option-ext) is available at
+ https://crates.io/crates/option-ext and https://github.com/soc/option-ext.
+
+License: X11
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the
+ "Software"), to deal in the Software without restriction, including
+ without limitation the rights to use, copy, modify, merge, publish,
+ distribute, distribute with modifications, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+ THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ .
+ Except as contained in this notice, the name(s) of the above copyright
+ holders shall not be used in advertising or otherwise to promote the
+ sale, use or other dealings in this Software without prior written
+ authorization.
+
+License: com_err
+ Permission to use, copy, modify, and distribute this software and its
+ documentation for any purpose is hereby granted, provided that the above
+ copyright notice appear in all copies and that both that copyright
+ notice and this permission notice appear in supporting documentation,
+ and that the names of M.I.T. and the M.I.T. S.I.P.B. not be used in
+ advertising or publicity pertaining to distribution of the software
+ without specific, written prior permission. M.I.T. and the M.I.T.
+ S.I.P.B. make no representations about the suitability of this software
+ for any purpose. It is provided "as is" without express or implied
+ warranty.

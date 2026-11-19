@@ -1,6 +1,6 @@
 # Annexe L — Validation post-effacement TestDisk
 
-> Annexe du Cahier des charges SecMet (document interne) — v0.3.1
+> Documentation SecMet — v0.4.0
 
 ## L.1 Objet
 
@@ -30,10 +30,10 @@ Le helper lance TestDisk en mode scripté, en lecture seule :
 testdisk /log /logname /run/secmet/testdisk-<id>/testdisk.log /cmd /dev/<disque> analyze,search
 ```
 
-- **Binaire** : `/usr/lib/secmet/bin/testdisk` (embarqué dans le `.deb` et l'AppImage, avec ses bibliothèques privées sous `/usr/lib/secmet/lib`) s'il existe, sinon le `testdisk` du système.
+- **Binaire** : `/usr/lib/secmet/bin/testdisk` (embarqué dans le `.deb`, le `.rpm` et l'AppImage, donc aussi sur la clé USB SecMet, avec ses bibliothèques privées sous `/usr/lib/secmet/lib`) s'il existe, sinon le `testdisk` du système.
 - **Lecture seule** : aucune écriture sur le périphérique ; une analyse compte comme un job pour le helper (aucun effacement ni commande firmware concurrente sur ce disque, arrêt du daemon différé).
 - **Répertoire de travail** : `/run/secmet/testdisk-<id>/` (créé par le helper, 0700 root) pour que TestDisk 7.1, qui ignore souvent `/logname`, écrive `./testdisk.log` au bon endroit.
-- **Sortie** : journal, stdout et stderr renvoyés au client, bornés à 256 Kio chacun ; le dossier temporaire est supprimé. Une copie est archivée dans `~/.secmet_logs/sessions/<SEC-…>/`.
+- **Sortie** : journal, stdout et stderr renvoyés au client, bornés à 256 Kio chacun ; le dossier temporaire est supprimé. Une copie est archivée dans le dossier de la session (`~/.secmet_logs/sessions/<SEC-…>/`, ou `lots/<LOT-ID>/sessions/` en mode lot, sur `SECMET-DATA` pour la clé USB).
 
 ## L.4 Source d'analyse
 
@@ -56,7 +56,7 @@ Le résumé est affiché dans la langue de l'interface et consigné en français
 
 ## L.6 Dépendance
 
-- `testdisk` est **recommandé** (`Recommends`) par le `.deb` et de toute façon **embarqué** sous `/usr/lib/secmet/bin/` (licence GPL-2.0+, conformité dans `bundled-tools-compliance.txt`). L'AppImage l'embarque de même et l'installe avec le composant système.
+- `testdisk` est **recommandé** (`Recommends`) par le `.deb` et le `.rpm`, et de toute façon **embarqué** sous `/usr/lib/secmet/bin/` (licence GPL-2.0+, conformité dans `bundled-tools-compliance.txt`). L'AppImage l'embarque de même et l'installe avec le composant système.
 - L'usage de la validation reste **optionnel** pour l'opérateur.
 
 ## L.7 Limites
@@ -66,7 +66,7 @@ Le résumé est affiché dans la langue de l'interface et consigné en français
 - Un verdict « Succès » ne remplace pas une analyse forensique tierce.
 - Voir aussi [Annexe E — Normes et conformité](Annexe_E_normes_conformite.md).
 
-## L.8 Correspondance CDC
+## L.8 Correspondance avec les autres annexes
 
 | Élément | Référence |
 |---------|-----------|
