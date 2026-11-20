@@ -75,7 +75,7 @@ sudo dnf install ./secmet-<version>-1.fc44.x86_64.rpm
 
 Le `.rpm` `fc42` (Fedora 42, plus maintenue) est encore publié en 0.4.1 pour que les SecMet 0.4.0 installés sous Fedora, qui cherchent ce nom, puissent se mettre à jour depuis leurs Réglages ; il disparaîtra ensuite.
 
-Dépendances des paquets : `libgtk-4-1` et `policykit-1` (résolues par `apt` ou `dnf`, d'où la préférence sur `dpkg -i` seul ; après un `dpkg -i`, `sudo apt-get install -f` complète). Recommandés : `testdisk` (de toute façon embarqué sous `/usr/lib/secmet/bin/` et utilisé si le binaire système est absent) et un lecteur PDF (`evince`, `okular` ou `atril`). L'inventaire SMART, firmware et banc (DMI) est lu nativement par le helper : aucun outil externe.
+Dépendances des paquets : `libgtk-4-1` et `pkexec | policykit-1` pour le `.deb` (le paquet `pkexec` existe dans Ubuntu 22.04 et 24.04, Debian 12 et 13 ; `policykit-1` n'existe plus dans Debian 13 et reste accepté pour les distributions qui n'ont que lui), `gtk4` et `polkit` (qui fournit `pkexec`) pour le `.rpm` (résolues par `apt` ou `dnf`, d'où la préférence sur `dpkg -i` seul ; après un `dpkg -i`, `sudo apt-get install -f` complète). Recommandés : `testdisk` (de toute façon embarqué sous `/usr/lib/secmet/bin/` et utilisé si le binaire système est absent) et un lecteur PDF (`evince`, `okular` ou `atril`). L'inventaire SMART, firmware et banc (DMI) est lu nativement par le helper : aucun outil externe.
 
 ### AppImage
 
@@ -223,7 +223,7 @@ Après installation ou mise à jour de la policy Polkit : `make dev` puis `make 
 | Linux (Debian/Ubuntu pour `make deps`) | Plateforme cible |
 | Rust (stable, via rustup) | Compilation |
 | GTK 4 | Interface graphique |
-| `policykit-1` / `pkexec` | Droits administrateur |
+| `pkexec` (PolicyKit) | Droits administrateur |
 | `testdisk` | Validation post-effacement (embarqué dans les paquets s'il est présent sur la machine de build) |
 | podman ou docker | Paquets, AppImage et image live construits en conteneurs |
 

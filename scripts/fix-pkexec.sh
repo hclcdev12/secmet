@@ -6,7 +6,7 @@ say() { printf "%s\n" "$*"; }
 fail() { say "ERROR: $*"; exit 1; }
 
 if ! command -v pkexec >/dev/null 2>&1; then
-    fail "pkexec introuvable. Installez: sudo apt install policykit-1"
+    fail "pkexec introuvable. Installez: sudo apt install pkexec"
 fi
 
 PKEXEC_BIN="$(command -v pkexec)"
@@ -21,8 +21,8 @@ say "pkexec sans setuid: $PKEXEC_BIN"
 ls -l "$PKEXEC_BIN"
 
 if command -v apt-get >/dev/null 2>&1; then
-    say "Reinstallation de policykit-1..."
-    sudo apt install --reinstall -y policykit-1
+    say "Reinstallation de pkexec..."
+    sudo apt install --reinstall -y pkexec
 fi
 
 if [[ "$(id -u)" -ne 0 ]]; then

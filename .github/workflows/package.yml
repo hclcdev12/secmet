@@ -92,7 +92,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential pkg-config curl ca-certificates git \
-            libgtk-4-dev libglib2.0-dev policykit-1 testdisk \
+            libgtk-4-dev libglib2.0-dev pkexec testdisk \
             dpkg-dev fakeroot
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -124,6 +124,7 @@ jobs:
           secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
+          command -v pkexec
           ./packaging/check-installed-docs.sh /usr/share/doc/secmet
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -159,6 +160,36 @@ jobs:
           name: tools
           path: tools/*
           if-no-files-found: error
+
+  # Installation seule du .deb sur Debian (C8) : apt-get résout les
+  # dépendances (pkexec | policykit-1 : policykit-1 n'existe plus dans
+  # Debian 13), puis fumée commune packaging/tests/install-deb.sh.
+  deb-install:
+    name: .deb ${{ matrix.distro }} sur ${{ matrix.image }}
+    needs: deb
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu24.04
+            image: debian:13
+          - distro: ubuntu22.04
+            image: debian:12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: deb-${{ matrix.distro }}
+          path: deb
+
+      - name: Installation et fumée
+        run: bash packaging/tests/install-deb.sh --inside deb/secmet_*.deb
 
   rpm:
     name: .rpm Fedora ${{ matrix.version }}
@@ -206,6 +237,7 @@ jobs:
           secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
+          command -v pkexec
           rpm -ql secmet | grep -qx /usr/share/doc/secmet/Annexes/README.md
           rpm -ql secmet | grep -qx /usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt
           ./packaging/check-installed-docs.sh /usr/share/doc/secmet
@@ -409,8 +441,8 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && !contains(inputs.tag || github.ref_name, '-rc') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
-    needs: [deb, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && !contains(inputs.tag || github.ref_name, '-rc') && needs.deb.result == 'success' && needs.deb-install.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    needs: [deb, deb-install, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
     runs-on: ubuntu-latest
     # Seul travail qui lit la clé de version et écrit la release.
     environment: release

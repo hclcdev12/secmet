@@ -136,6 +136,7 @@ secmet-verify --help >/dev/null
 if secmet-helper 2>/dev/null; then exit 1; else test $? -eq 2; fi
 test -x /usr/lib/secmet/bin/testdisk
 test -f /usr/share/polkit-1/actions/secmet.policy
+command -v pkexec >/dev/null
 ./packaging/check-installed-docs.sh /usr/share/doc/secmet
 echo SMOKE_OK
 '
@@ -191,7 +192,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends build-essential pkg-config curl ca-certificates git \
-  libgtk-4-dev libglib2.0-dev policykit-1 testdisk dpkg-dev fakeroot >/dev/null
+  libgtk-4-dev libglib2.0-dev pkexec testdisk dpkg-dev fakeroot >/dev/null
 curl -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal
 . \"\$HOME/.cargo/env\"
 cp -a /src /build && cd /build
@@ -209,6 +210,17 @@ fi
 "
     DEB_DISTRO=ubuntu24.04 build_in_container deb-ubuntu24.04 docker.io/library/ubuntu:24.04 "$deb_script"
     DEB_DISTRO=ubuntu22.04 build_in_container deb-ubuntu22.04 docker.io/library/ubuntu:22.04 "$deb_script"
+    # Installation seule sur Debian (C8) : .deb Ubuntu 24.04 sur Debian 13,
+    # .deb Ubuntu 22.04 sur Debian 12 (comme le travail deb-install de package.yml).
+    for pair in ubuntu24.04:debian:13 ubuntu22.04:debian:12; do
+        distro="${pair%%:*}" image="docker.io/library/${pair#*:}"
+        log="$LOG_DIR/install-$distro-$(echo "${pair#*:}" | tr -d :).log"
+        step "Installation du .deb $distro ($image)"
+        SECMET_ENGINE="$ENGINE" "$PKG_DIR/tests/install-deb.sh" \
+            "$OUT_DIR/secmet_${VERSION}~${distro}_amd64.deb" "$image" > "$log" 2>&1 \
+            || die "installation du .deb $distro sur $image échouée, voir $log"
+        tail -1 "$log"
+    done
 
     rpm_script="
 set -euo pipefail

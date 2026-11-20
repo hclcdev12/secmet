@@ -29,7 +29,7 @@ if command -v pkexec >/dev/null 2>&1; then
         say_fail "pkexec sans bit setuid: $PKEXEC_BIN (make fix-pkexec)"
     fi
 else
-    say_fail "pkexec introuvable (apt install policykit-1)"
+    say_fail "pkexec introuvable (apt install pkexec)"
 fi
 
 # ── helper ────────────────────────────────────────────────────────────────────

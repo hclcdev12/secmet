@@ -535,7 +535,7 @@ Les fichiers publiés portent le nom de la distribution visée (`secmet_<version
 
 | Type | Paquets |
 |------|---------|
-| **Depends** | `libgtk-4-1`, `policykit-1` |
+| **Depends** | `libgtk-4-1`, `pkexec` \| `policykit-1` (`policykit-1` n'existe plus dans Debian 13 ; `pkexec` existe dans Ubuntu 22.04 et 24.04, Debian 12 et 13) |
 | **Recommends** | `testdisk`, `evince` \| `atril` \| `okular` |
 | **Replaces / Conflicts** | `shred-graphique` |
 
