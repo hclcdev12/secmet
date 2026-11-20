@@ -96,6 +96,8 @@ secmet-verify --qr "SM1:…"                  # texte lu dans le QR
 secmet-verify --trust fc5b6a969d0b1077 …    # clé ou key_id de confiance
 ```
 
+`secmet-verify` est installé par les paquets `.deb` et `.rpm`. Avec l'AppImage : `./SecMet_<version>_x86_64.AppImage verify SEC-….json` (mêmes options). Sur un poste de vérification sans SecMet, prendre le binaire autonome de la release : `chmod +x secmet-verify_<version>_x86_64`, puis `./secmet-verify_<version>_x86_64 SEC-….json`.
+
 Le programme contrôle la signature et n'accepte que les **clés de confiance** : `--trust`, variable `SECMET_TRUSTED_KEYS`, `/etc/secmet/trusted-keys`, sur la clé USB `SECMET_DATA_DIR/config/attestation-key.pub` et `SECMET_DATA_DIR/config/trusted-keys`, puis `~/.config/secmet/attestation-key.pub` (clé du poste) et `~/.config/secmet/trusted-keys`. Une signature valide avec une clé inconnue est signalée « clé non vérifiée » et le programme rend le code 1 (`--allow-untrusted` pour simplement afficher). Distribuez la clé publique du banc (`~/.config/secmet/attestation-key.pub`) aux vérificateurs.
 
 Pour un **lot** clôturé (§8, §9), `secmet-verify --manifest L-…-manifest.json --trust <clé>` vérifie le manifeste signé et contrôle que toutes les attestations listées sont présentes et intactes dans le dossier, et qu'aucune n'a été ajoutée.

@@ -4,7 +4,7 @@
 
 Ce guide s'adresse à l'**administrateur système** ou à l'**intégrateur** qui met en place le poste atelier. Il complète le [README](../../README.md) (installation du paquet) et le [guide utilisateur](Annexe_G_guide_utilisateur.md) (usage quotidien par l'opérateur).
 
-Chaque release de SecMet publie : un **paquet Debian** (`.deb`, variantes Ubuntu 24.04 et 22.04), un **paquet RPM** (`.rpm`, construit pour Fedora 42), une **AppImage**, l'**image de la clé USB SecMet** (`secmet-key_<version>_x86_64.img.xz`), le livrable de fabrication de la clé (`secmet-live_<version>_x86_64.tar`), l'outil **SecMet Clé USB** qui écrit la clé (`secmet-key-writer_<version>_x86_64.AppImage` pour Linux, `secmet-key-writer_<version>_x86_64.exe` pour Windows), et les fichiers signés `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json`. Le produit est le même dans tous les modes ci-dessous : seule la façon de provisionner le système Linux hôte change.
+Chaque release de SecMet publie : un **paquet Debian** (`.deb`, variantes Ubuntu 24.04 et 22.04), un **paquet RPM** (`.rpm`, construit pour Fedora 44 ; en 0.4.1, un second construit pour Fedora 42, le temps de la transition), une **AppImage**, l'**image de la clé USB SecMet** (`secmet-key_<version>_x86_64.img.xz`), le livrable de fabrication de la clé (`secmet-live_<version>_x86_64.tar`), l'outil **SecMet Clé USB** qui écrit la clé (`secmet-key-writer_<version>_x86_64.AppImage` pour Linux, `secmet-key-writer_<version>_x86_64.exe` pour Windows), les outils en ligne de commande `secmet-verify` et `secmet-release` en binaires Linux autonomes (`secmet-verify_<version>_x86_64`, `secmet-release_<version>_x86_64`), et les fichiers signés `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json`. Le produit est le même dans tous les modes ci-dessous : seule la façon de provisionner le système Linux hôte change.
 
 ### Pourquoi une clé USB (ou PXE) ?
 
@@ -56,7 +56,7 @@ Dans tous les cas, SecMet fonctionne **sur le banc** : aucun serveur applicatif 
 3. Vérifier PolicyKit : `pkexec` setuid et `/usr/share/polkit-1/actions/secmet.policy` présent (`make verify-polkit` en environnement de développement).
 4. Lancer SecMet depuis le menu applications.
 
-**Fedora** : `sudo dnf install ./secmet-<version>-1.fc42.x86_64.rpm` (fichier de la release) ou `./dist/secmet-<version>-1.<distribution>.x86_64.rpm` (`make rpm`) ; dnf résout `gtk4` et `polkit`, TestDisk est embarqué comme dans le `.deb`.
+**Fedora** : `sudo dnf install ./secmet-<version>-1.fc44.x86_64.rpm` (fichier de la release, Fedora 44 et 45) ou `./dist/secmet-<version>-1.<distribution>.x86_64.rpm` (`make rpm`) ; dnf résout `gtk4` et `polkit`, TestDisk est embarqué comme dans le `.deb`.
 
 **Alternative sans gestionnaire de paquets** : lancer l'**AppImage** (§6). Elle installe elle-même son composant système au premier lancement.
 
@@ -127,7 +127,7 @@ make appimage
 
 `make appimage` assemble l'AppImage **dans un conteneur Ubuntu 24.04** (`packaging/appimage.Containerfile`, podman ou docker requis sur la machine de construction, cible cargo séparée `target-appimage/`). Raison : les bibliothèques embarquées (GTK4, glib, TestDisk) sont liées à la glibc de la machine de construction ; une AppImage assemblée sur une distribution plus récente (Fedora, Arch…) refuse de démarrer sur Mint 22 / Ubuntu 24.04 avec `version GLIBC_2.4x not found`. La glibc 2.39 d'Ubuntu 24.04 est la plus ancienne supportée par le banc. `SECMET_APPIMAGE_NATIVE=1` force un assemblage local, à ses risques.
 
-Contenu : `secmet`, `secmet-helper`, GTK4 et ses chargeurs (dont SVG), TestDisk et ses bibliothèques privées, la policy PolicyKit, la documentation. `secmet-verify` et `secmet-release` ne sont pas dans l'AppImage : ils viennent avec le `.deb` et le `.rpm` (et sont présents sur la clé SecMet).
+Contenu : `secmet`, `secmet-helper`, `secmet-verify`, `secmet-release`, GTK4 et ses chargeurs (dont SVG), TestDisk et ses bibliothèques privées, la policy PolicyKit, la documentation (mêmes noms que dans les paquets, dont `usr/share/doc/secmet/copyright`) et le fichier `copyright` du paquet Ubuntu d'origine de chaque bibliothèque embarquée et de TestDisk (`usr/share/doc/<paquet>/copyright`, liste dans `usr/share/doc/secmet/bundled-libraries.txt` ; la construction échoue s'il en manque un). Les outils annexes se lancent par l'AppImage : `./SecMet_<version>_x86_64.AppImage verify <certificat.json>`, `./SecMet_<version>_x86_64.AppImage release verify <dossier>`, ou par un lien symbolique `secmet-verify` (ou `secmet-release`) vers l'AppImage.
 
 ### Premier lancement
 

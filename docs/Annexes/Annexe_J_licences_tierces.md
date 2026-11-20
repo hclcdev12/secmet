@@ -28,12 +28,13 @@ SecMet est un logiciel libre sous **GNU GPL version 3 ou ultérieure** (décisio
 
 ### 1.1 Livrables couverts
 
-Une release publie 11 fichiers. Ce document couvre les huit livrables logiciels :
+Une release publie 14 fichiers. Ce document couvre les onze livrables logiciels :
 
 | Livrable | Contenu | Sections |
 |---|---|---|
-| `secmet_<v>.ubuntu24.04_amd64.deb`, `secmet_<v>.ubuntu22.04_amd64.deb`, `secmet-<v>-1.fc42.x86_64.rpm` | `secmet` (GTK 4), `secmet-helper`, `secmet-verify`, `secmet-release`, TestDisk et ses bibliothèques privées | §2, §3.1, §4, §5 |
-| `SecMet_<v>_x86_64.AppImage` | les mêmes binaires, plus GTK 4 et sa chaîne copiés d'Ubuntu 24.04, plus TestDisk | §2, §3.2, §4, §5 |
+| `secmet_<v>.ubuntu24.04_amd64.deb`, `secmet_<v>.ubuntu22.04_amd64.deb`, `secmet-<v>-1.fc44.x86_64.rpm`, `secmet-<v>-1.fc42.x86_64.rpm` (Fedora 42 : 0.4.1 seulement, transition) | `secmet` (GTK 4), `secmet-helper`, `secmet-verify`, `secmet-release`, TestDisk et ses bibliothèques privées | §2, §3.1, §4, §5 |
+| `SecMet_<v>_x86_64.AppImage` | les mêmes binaires (dont `secmet-verify` et `secmet-release`), plus GTK 4 et sa chaîne copiés d'Ubuntu 24.04, plus TestDisk | §2, §3.2, §4, §5 |
+| `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | outils en ligne de commande seuls (construits sous Ubuntu 22.04), crates Rust liées statiquement, aucune bibliothèque embarquée (glibc de l'hôte seulement) ; licence GPL-3.0 et avis des crates : ceux du dépôt (`LICENSE`, §2) | §2 |
 | `secmet-key-writer_<v>_x86_64.AppImage` | SecMet Clé USB pour Linux (egui), aucune bibliothèque embarquée | §2, §3.3, §6.2 |
 | `secmet-key-writer_<v>_x86_64.exe` | SecMet Clé USB pour Windows (egui, wgpu/Direct3D 12, Schannel) | §2, §3.4, §6.2 |
 | `secmet-key_<v>_x86_64.img.xz`, `secmet-live_<v>_x86_64.tar` | image de la clé USB : système Ubuntu 24.04 complet, plus le `.deb` SecMet | §7 |
@@ -152,7 +153,7 @@ ls squashfs-root/usr/lib squashfs-root/usr/lib/secmet/lib    # bibliothèques
 ls squashfs-root/usr/share/doc                               # avis copyright des paquets Ubuntu
 ```
 
-Les fichiers `usr/share/doc/<paquet>/copyright` d'origine accompagnent la plupart des bibliothèques ; ils manquaient, dans l'assemblage 0.3.3 examiné, pour `liblzo2-2`, `libntfs-3g89t64`, `libuuid1`, `libcom-err2` et `testdisk` (leurs licences figurent au §5 et dans `copyright`).
+Chaque bibliothèque embarquée (`usr/lib/**/*.so*`, celles de TestDisk comprises) et `testdisk` sont accompagnés du fichier `usr/share/doc/<paquet>/copyright` de leur paquet Ubuntu d'origine : `packaging/bundle-tools.sh --copyrights` retrouve ce paquet (`dpkg -S`, avec et sans `/usr` à cause d'usrmerge) entre les deux passages de linuxdeploy, et la construction échoue s'il manque un paquet ou un copyright. La correspondance fichier → paquet est dans `usr/share/doc/secmet/bundled-libraries.txt`, et la fumée de `package.yml` et de `release.sh` (`packaging/appimage-smoke.sh`) la contrôle. Jusqu'à la 0.4.0, ces fichiers manquaient pour `liblzo2-2`, `libntfs-3g89t64`, `libuuid1`, `libcom-err2` et `testdisk`.
 
 ### 3.3 SecMet Clé USB, Linux (AppImage)
 
@@ -191,7 +192,7 @@ Lors de la construction, `packaging/bundle-tools.sh` copie `testdisk` et toutes 
 
 | Binaire embarqué | Licence | Origine |
 |---|---|---|
-| `testdisk` | **GPL-2.0+** (© Christophe Grenier, https://www.cgsecurity.org/) | Ubuntu 24.04 (`7.1-5+nmu1build2`) pour le `.deb` 24.04 et l'AppImage ; Ubuntu 22.04 pour le `.deb` 22.04 ; Fedora 42 pour le `.rpm` |
+| `testdisk` | **GPL-2.0+** (© Christophe Grenier, https://www.cgsecurity.org/) | Ubuntu 24.04 (`7.1-5+nmu1build2`) pour le `.deb` 24.04 et l'AppImage ; Ubuntu 22.04 pour le `.deb` 22.04 ; Fedora 44 et Fedora 42 pour les deux `.rpm` |
 | `libncursesw`, `libtinfo` (ncurses) | **MIT/X11** | idem |
 | `libuuid` (util-linux) | **BSD-3-Clause** | idem |
 | `libcom_err` (e2fsprogs) | licence de type MIT (MIT SIPB) | idem |
@@ -337,7 +338,8 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | | `/usr/share/doc/secmet/copyright` | Synthèse au format Debian (DEP-5), avec les textes des licences des crates et des bibliothèques de TestDisk |
 | | `/usr/share/doc/secmet/bundled-tools-compliance.txt`, `gpl-2.0.txt` | Conformité de TestDisk embarqué |
 | | `/usr/share/doc/secmet/USER_GUIDE.md`, `GUIDE_DEPLOIEMENT_BANC.md`, `Annexes/` | Annexes G, H et toutes les annexes |
-| AppImage SecMet | `usr/share/doc/secmet/` | Les mêmes documents (`copyright` s'y nomme `debian-copyright`), plus `usr/share/doc/<paquet>/copyright` des bibliothèques Ubuntu embarquées |
+| AppImage SecMet | `usr/share/doc/secmet/` | Les mêmes documents, sous les mêmes noms (dont `copyright`, `USER_GUIDE.md` et `GUIDE_DEPLOIEMENT_BANC.md`), plus `usr/share/doc/<paquet>/copyright` de chaque bibliothèque Ubuntu embarquée et de TestDisk (liste : `bundled-libraries.txt`) |
+| `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | — | Aucun fichier (exécutable seul) ; licence et avis : `LICENSE` et cette annexe dans le dépôt |
 | AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet seulement |
 | `.exe` SecMet Clé USB | — | Aucun fichier (exécutable seul) |
 | Image de clé, `.tar` | `/usr/share/doc/*/copyright` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) | Avis des paquets Ubuntu ; aucun texte sur la partition de démarrage ni dans le `LISEZMOI.txt` du `.tar` |

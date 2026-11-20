@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Construit un paquet RPM (Fedora, et dérivés avec gtk4 ≥ 4.0 et polkit).
+# Construit un paquet RPM (Fedora, et dérivés avec gtk4 ≥ 4.0 et polkit). Le
+# suffixe de distribution vient de %{?dist} (secmet.spec) : fc44 dans un
+# conteneur fedora:44, fc42 dans fedora:42 (les deux publiés en 0.4.1, D16).
 # Prérequis : rpm-build, rpmdevtools, gtk4-devel, glib2-devel, testdisk, Rust.
 set -euo pipefail
 
@@ -25,14 +27,14 @@ command -v rpmbuild >/dev/null 2>&1 || { echo "rpmbuild introuvable (dnf install
 needs_build=0
 if [[ "${SECMET_FORCE_BUILD:-0}" == "1" ]]; then
     needs_build=1
-elif [[ ! -f "$BINARY" || ! -f "$HELPER_BINARY" || ! -f "$VERIFY_BINARY" ]]; then
+elif [[ ! -f "$BINARY" || ! -f "$HELPER_BINARY" || ! -f "$VERIFY_BINARY" || ! -f "$RELEASE_BINARY" ]]; then
     needs_build=1
 elif find "$ROOT_DIR/src" "$ROOT_DIR/crates" "$ROOT_DIR/Cargo.toml" "$ROOT_DIR/Cargo.lock" \
         -type f -newer "$BINARY" 2>/dev/null | grep -q .; then
     needs_build=1
 fi
 if [[ "$needs_build" -eq 1 ]]; then
-    echo "Building release binaries (secmet + secmet-helper + secmet-verify)..."
+    echo "Building release binaries (secmet, secmet-helper, secmet-verify, secmet-release)..."
     ( cd "$ROOT_DIR" && cargo build --release --workspace )
 else
     echo "Using existing release binaries (skip cargo build)"

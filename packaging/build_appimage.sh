@@ -2,7 +2,9 @@
 # Construit une AppImage autonome (GUI GTK4 embarquée + composant système).
 # Le composant privilégié (helper + policy + outils) est installé sur l'hôte
 # au premier lancement par packaging/install-helper.sh, embarqué dans le
-# binaire et exécuté par pkexec — voir src/system_install.rs.
+# binaire et exécuté par pkexec — voir src/system_install.rs. Les outils
+# annexes secmet-verify et secmet-release y sont aussi, appelés par
+# « ./SecMet_<v>.AppImage verify … » et « … release … » (AppRun ci-dessous).
 #
 # L'assemblage se fait dans un conteneur Ubuntu 24.04 (packaging/
 # appimage.Containerfile) : les bibliothèques embarquées (GTK4, TestDisk)
@@ -50,6 +52,9 @@ source "$ROOT_DIR/scripts/env.sh"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT_DIR/target}"
 BINARY="$TARGET_DIR/release/secmet"
 HELPER_BINARY="$TARGET_DIR/release/secmet-helper"
+VERIFY_BINARY="$TARGET_DIR/release/secmet-verify"
+RELEASE_BINARY="$TARGET_DIR/release/secmet-release"
+ALL_BINARIES=("$BINARY" "$HELPER_BINARY" "$VERIFY_BINARY" "$RELEASE_BINARY")
 
 VERSION="$(grep -m1 '^version' "$ROOT_DIR/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')"
 DEB_ARCH="$(dpkg --print-architecture 2>/dev/null || echo "amd64")"
@@ -65,22 +70,26 @@ OUT="$DIST_DIR/SecMet_${VERSION}_${APPIMAGE_ARCH}.AppImage"
 needs_build=0
 if [[ "${SECMET_FORCE_BUILD:-0}" == "1" ]]; then
     needs_build=1
-elif [[ ! -f "$BINARY" || ! -f "$HELPER_BINARY" ]]; then
-    needs_build=1
-elif find "$ROOT_DIR/src" "$ROOT_DIR/crates" "$ROOT_DIR/Cargo.toml" "$ROOT_DIR/Cargo.lock" \
-        -type f -newer "$BINARY" 2>/dev/null | grep -q .; then
-    needs_build=1
+else
+    for bin in "${ALL_BINARIES[@]}"; do
+        if [[ ! -f "$bin" ]] || find "$ROOT_DIR/src" "$ROOT_DIR/crates" "$ROOT_DIR/Cargo.toml" "$ROOT_DIR/Cargo.lock" \
+                -type f -newer "$bin" 2>/dev/null | grep -q .; then
+            needs_build=1
+        fi
+    done
 fi
 
 if [[ "$needs_build" -eq 1 ]]; then
-    echo "Building release binaries (secmet + secmet-helper)..."
-    ( cd "$ROOT_DIR" && cargo build --release --workspace )
+    # Membres par défaut du workspace : sans SecMet Clé USB (AppImage à part).
+    echo "Building release binaries (secmet, secmet-helper, secmet-verify, secmet-release)..."
+    ( cd "$ROOT_DIR" && cargo build --release )
 else
     echo "Using existing release binaries (skip cargo build)"
 fi
 
-[[ -f "$BINARY" ]] || { echo "Release binary not found at: $BINARY"; exit 1; }
-[[ -f "$HELPER_BINARY" ]] || { echo "Helper binary not found at: $HELPER_BINARY"; exit 1; }
+for bin in "${ALL_BINARIES[@]}"; do
+    [[ -f "$bin" ]] || { echo "Release binary not found at: $bin"; exit 1; }
+done
 
 # --- Outils d'assemblage (linuxdeploy + plugin GTK, téléchargés une fois) ---
 LINUXDEPLOY="$TOOLS_DIR/linuxdeploy-${APPIMAGE_ARCH}.AppImage"
@@ -112,13 +121,29 @@ mkdir -p \
 
 install -m 0755 "$BINARY" "$STAGE_DIR/usr/bin/secmet"
 install -m 0755 "$HELPER_BINARY" "$STAGE_DIR/usr/bin/secmet-helper"
+# Outils annexes, comme dans le .deb et le .rpm : vérification des
+# certificats et des manifestes de lot, vérification d'une release.
+install -m 0755 "$VERIFY_BINARY" "$STAGE_DIR/usr/bin/secmet-verify"
+install -m 0755 "$RELEASE_BINARY" "$STAGE_DIR/usr/bin/secmet-release"
 
 # AppRun source : linuxdeploy le déplacera en AppRun.wrapped et générera son
 # propre AppRun (sources des hooks plugin-gtk puis exec de AppRun.wrapped).
 # Sans ce fichier, linuxdeploy produit un AppRun.wrapped vide (lancement mort).
+# Aiguillage vers les outils annexes, par le premier argument
+# (./SecMet_<v>.AppImage verify cert.json, … release verify <dossier>) ou par
+# le nom du lien qui lance l'AppImage ($ARGV0, posé par le runtime AppImage :
+# ln -s SecMet_<v>.AppImage secmet-verify).
 cat > "$STAGE_DIR/AppRun" <<'EOF'
 #! /bin/bash
 APPDIR="${APPDIR:-"$(dirname "$(readlink -f "$0")")"}"
+case "${1:-}" in
+    secmet-verify|verify)   shift; exec "$APPDIR/usr/bin/secmet-verify" "$@" ;;
+    secmet-release|release) shift; exec "$APPDIR/usr/bin/secmet-release" "$@" ;;
+esac
+case "$(basename "${ARGV0:-}")" in
+    secmet-verify*)  exec "$APPDIR/usr/bin/secmet-verify" "$@" ;;
+    secmet-release*) exec "$APPDIR/usr/bin/secmet-release" "$@" ;;
+esac
 exec "$APPDIR/usr/bin/secmet" "$@"
 EOF
 chmod 0755 "$STAGE_DIR/AppRun"
@@ -132,22 +157,25 @@ install -m 0644 "$ROOT_DIR/content/SecMet_icon.svg" \
 install -m 0644 "$PKG_DIR/secmet.policy" \
     "$STAGE_DIR/usr/share/secmet/secmet.policy"
 
-if [[ -f "$ROOT_DIR/LICENSE" ]]; then
-    install -m 0644 "$ROOT_DIR/LICENSE" "$STAGE_DIR/usr/share/doc/secmet/LICENSE"
-fi
-if [[ -f "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" ]]; then
-    install -m 0644 "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" \
-        "$STAGE_DIR/usr/share/doc/secmet/THIRD_PARTY_LICENSES.md"
-fi
-for doc in debian-copyright bundled-tools-compliance.txt gpl-2.0.txt; do
-    if [[ -f "$PKG_DIR/$doc" ]]; then
-        install -m 0644 "$PKG_DIR/$doc" "$STAGE_DIR/usr/share/doc/secmet/$doc"
-    fi
-done
-if [[ -f "$ROOT_DIR/content/LICENSE" ]]; then
-    install -m 0644 "$ROOT_DIR/content/LICENSE" \
-        "$STAGE_DIR/usr/share/doc/secmet/content-LICENSE"
-fi
+# Documents : mêmes noms que dans le .deb et le .rpm (packaging/stage-tree.sh),
+# dont copyright (packaging/debian-copyright). Les copyright des
+# bibliothèques embarquées sont ajoutés après le premier passage de
+# linuxdeploy (plus bas).
+DOC="$STAGE_DIR/usr/share/doc/secmet"
+install_doc() {
+    local src="$1" dst="$2"
+    [[ -f "$src" ]] && install -m 0644 "$src" "$DOC/$dst"
+    return 0
+}
+install_doc "$ROOT_DIR/LICENSE" LICENSE
+install_doc "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" THIRD_PARTY_LICENSES.md
+install_doc "$PKG_DIR/debian-copyright" copyright
+install_doc "$PKG_DIR/bundled-tools-compliance.txt" bundled-tools-compliance.txt
+install_doc "$PKG_DIR/gpl-2.0.txt" gpl-2.0.txt
+install_doc "$ROOT_DIR/content/LICENSE" content-LICENSE
+install_doc "$ROOT_DIR/docs/Annexes/Annexe_G_guide_utilisateur.md" USER_GUIDE.md
+install_doc "$ROOT_DIR/docs/Annexes/Annexe_H_deploiement_banc.md" GUIDE_DEPLOIEMENT_BANC.md
+[[ -f "$DOC/copyright" ]] || { echo "ERREUR: packaging/debian-copyright absent" >&2; exit 1; }
 if [[ -d "$ROOT_DIR/docs/Annexes" ]]; then
     mkdir -p "$STAGE_DIR/usr/share/doc/secmet/Annexes"
     install -m 0644 "$ROOT_DIR/docs/Annexes/"*.md \
@@ -188,7 +216,12 @@ export PATH="$TOOLS_DIR:$PATH"
 # AppImage extraits sans FUSE (linuxdeploy, plugin, appimagetool imbriqués).
 export APPIMAGE_EXTRACT_AND_RUN=1
 
-echo "Assembling AppImage with linuxdeploy (GTK4 bundling)..."
+# Deux passages de linuxdeploy : le premier dépose GTK et les dépendances
+# dans l'AppDir ; chaque bibliothèque embarquée reçoit alors le copyright de
+# son paquet (bundle-tools.sh --copyrights, bloquant : liste dans
+# usr/share/doc/secmet/bundled-libraries.txt) ; le second fabrique
+# l'AppImage (linuxdeploy reconnaît l'AppRun déjà enveloppé et le garde).
+echo "Deploying GTK4 into the AppDir with linuxdeploy..."
 # Le plugin nomme lui-même la sortie (<APP_NAME>-<arch>.AppImage) dans le CWD :
 # assembler dans un tmp local puis renommer vers dist/.
 TMP_OUT_DIR="$(mktemp -d /tmp/secmet-appimage.XXXXXX)"
@@ -197,9 +230,18 @@ TMP_OUT_DIR="$(mktemp -d /tmp/secmet-appimage.XXXXXX)"
         --appdir "$STAGE_DIR" \
         -e "$STAGE_DIR/usr/bin/secmet" \
         -e "$STAGE_DIR/usr/bin/secmet-helper" \
+        -e "$STAGE_DIR/usr/bin/secmet-verify" \
+        -e "$STAGE_DIR/usr/bin/secmet-release" \
         -d "$STAGE_DIR/usr/share/applications/secmet.desktop" \
         -i "$STAGE_DIR/usr/share/icons/hicolor/scalable/apps/secmet.svg" \
-        --plugin gtk \
+        --plugin gtk
+)
+echo "Copyright files of the bundled libraries..."
+"$PKG_DIR/bundle-tools.sh" --copyrights "$STAGE_DIR"
+echo "Assembling AppImage with linuxdeploy..."
+(
+    cd "$TMP_OUT_DIR" && "$LINUXDEPLOY" --appimage-extract-and-run \
+        --appdir "$STAGE_DIR" \
         --output appimage
 )
 OUT_FILE="$(find "$TMP_OUT_DIR" -maxdepth 1 -name '*.AppImage' | head -1)"
