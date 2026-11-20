@@ -124,11 +124,11 @@ install_md() {
     chmod 0644 "$DOC/$dst"
 }
 rewrite_line() { # <source> <installé> <ligne>
-    local src="$1" dst="$2" out="" rest="$3" m link path anchor r new
+    local src="$1" dst="$2" acc="" rest="$3" m link path anchor r new
     local re='\]\(([^)[:space:]]+)\)'
     while [[ "$rest" =~ $re ]]; do
         m="${BASH_REMATCH[0]}" link="${BASH_REMATCH[1]}"
-        out+="${rest%%"$m"*}"
+        acc+="${rest%%"$m"*}"
         rest="${rest#*"$m"}"
         case "$link" in
             *://*|mailto:*|\#*|/*) new="$link" ;;
@@ -145,9 +145,9 @@ rewrite_line() { # <source> <installé> <ligne>
                     new="$BLOB_URL/$r$anchor"
                 fi ;;
         esac
-        out+="](${new})"
+        acc+="](${new})"
     done
-    printf '%s' "$out$rest"
+    printf '%s' "$acc$rest"
 }
 
 # --- installation -----------------------------------------------------------

@@ -67,7 +67,7 @@ if [[ -n "$HOLDER" ]]; then
 else
     holder_line="[titulaire de l'offre à désigner (raison sociale, adresse postale, courriel) avant toute vente]"
 fi
-cat > "$L/OFFRE_SOURCES.txt" <<OFFRE
+cat > "$L/OFFRE_SOURCES.txt" <<EOF_OFFRE
 OFFRE ÉCRITE DE SOURCES — SecMet Live $VERSION (image de la clé USB SecMet)
 
 $holder_line s'engage, pendant au moins trois ans à compter de la dernière
@@ -85,7 +85,7 @@ Le code source de SecMet est publié à $REPO_URL (tag v$VERSION).
 Les sources des paquets Debian de l'image sont aussi conservées, à titre de
 commodité seulement, par https://snapshot.debian.org/ (paquet source et
 version du manifeste).
-OFFRE
+EOF_OFFRE
 
 cat > "$L/LISEZMOI-LICENCES.txt" <<TXT
 SecMet Live $VERSION : licences et sources

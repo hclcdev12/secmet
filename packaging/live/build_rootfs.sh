@@ -475,7 +475,7 @@ echo "packages.manifest : $n_manifest paquets"
 # démarrage et du livrable, résumé dans /usr/share/doc/secmet-live/ du
 # système (avant le squashfs).
 step "Licences"
-SRC="$SRC" "$SRC/packaging/live/licences.sh" "$ROOTFS" "$EFI_PKG" "$OUT/packages.manifest" "$OUT" "$VERSION"
+env SRC="$SRC" "$SRC/packaging/live/licences.sh" "$ROOTFS" "$EFI_PKG" "$OUT/packages.manifest" "$OUT" "$VERSION"
 step "squashfs"
 # /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
 # embarqué : la clé démarre sur les copies de la partition système.
