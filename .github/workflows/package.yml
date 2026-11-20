@@ -300,6 +300,21 @@ jobs:
           cp target/release/secmet-key-writer.exe "dist/secmet-key-writer_${version}_x86_64.exe"
           ls -la dist/
 
+      # Le runner a le runtime Visual C++ installé, pas un Windows neuf :
+      # l'exécutable ne doit pas dépendre de VCRUNTIME*.dll ni MSVCP*.dll
+      # (runtime lié en statique, .cargo/config.toml). Les api-ms-win-crt-*
+      # font partie de Windows 10 et 11.
+      - name: Aucune dépendance au runtime Visual C++
+        shell: bash
+        run: |
+          for exe in dist/secmet-key-writer_*.exe; do
+            if grep -a -i -o -E 'VCRUNTIME[0-9]+(_[0-9]+)?\.dll|MSVCP[0-9]+\.dll' "$exe" | sort -u | grep .; then
+              echo "ERREUR: $exe dépend du runtime Visual C++ (DLL ci-dessus), absent d'un Windows neuf" >&2
+              exit 1
+            fi
+          done
+          echo "aucune DLL du runtime Visual C++ importée"
+
       - name: Fumée (--version, --list-disks)
         shell: bash
         run: |

@@ -1,0 +1,6 @@
+# Windows (MSVC) : runtime C lié en statique. Sans cela, le .exe de SecMet
+# Clé USB dépend de VCRUNTIME140.dll (runtime Visual C++), absent d'un
+# Windows neuf : « VCRUNTIME140.dll introuvable » au lancement. Le .exe doit
+# rester un fichier unique, sans rien à installer à côté.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
