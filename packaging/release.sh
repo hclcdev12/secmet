@@ -291,7 +291,7 @@ if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
     mode_line="$(SECMET_LIVE_FULL="$FULL_LIVE" SECMET_RELEASES_REPO="$REPO" "$PKG_DIR/live/live-mode.sh" "$VERSION" 2>"$LOG_DIR/live-mode.log" \
         || echo "mode=full reason=live-mode.sh en erreur (voir $LOG_DIR/live-mode.log)")"
     echo "$mode_line"
-    "$PKG_DIR/live/tests/app-update.sh" > "$LOG_DIR/live-script-test.log" 2>&1 || die "test du script de mise à jour échoué, voir $LOG_DIR/live-script-test.log"
+    { "$PKG_DIR/live/tests/app-update.sh" && "$PKG_DIR/live/tests/image-check.sh"; } > "$LOG_DIR/live-script-test.log" 2>&1 || die "test des scripts de démarrage de la clé échoué, voir $LOG_DIR/live-script-test.log"
     if [[ "$mode_line" == mode=reuse* ]]; then
         previous="${mode_line#*previous=}"
         step "Clé USB reprise de la release $previous (système inchangé)"
@@ -309,9 +309,14 @@ if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
     else
         step "Image de la clé USB (conteneur privilégié)"
         "$PKG_DIR/live/build_live.sh" > "$LOG_DIR/live.log" 2>&1 || die "image de la clé échouée, voir $LOG_DIR/live.log"
-        "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
+        # Image avant livrable : make_key_image.sh --dist écrit
+        # dist/live/SYSTEM.sums, que bundle_live.sh met dans le .tar.
         step "Image publiable de la clé USB (.img.xz)"
         "$PKG_DIR/live/make_key_image.sh" --dist > "$LOG_DIR/live-dist.log" 2>&1 || die "image publiable échouée, voir $LOG_DIR/live-dist.log"
+        "$PKG_DIR/live/bundle_live.sh" > "$LOG_DIR/live-bundle.log" 2>&1 || die "livrable de la clé échoué, voir $LOG_DIR/live-bundle.log"
+        step "Système de la clé scellé (SYSTEM.sums.sig)"
+        SECMET_RELEASE_BIN="${CARGO_TARGET_DIR:-$ROOT_DIR/target}/release/secmet-release" "$PKG_DIR/live/seal_system.sh" --dir "$ROOT_DIR/dist" --version "$VERSION" \
+            --key "$KEY" --trust "$PUBKEY" > "$LOG_DIR/live-seal.log" 2>&1 || die "scellement du système de la clé échoué, voir $LOG_DIR/live-seal.log"
     fi
     cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" \
         "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.packages.tar" "$OUT_DIR/"

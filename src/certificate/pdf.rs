@@ -390,6 +390,10 @@ pub(crate) fn attestation_from_record(
     if let Some(key) = crate::clock::caveat_key() {
         caveats.push(caveat(key));
     }
+    // Système de la clé USB (annexe M §M.3) : contrôle au démarrage.
+    if let Some(key) = crate::system_integrity::caveat_key() {
+        caveats.push(caveat(key));
+    }
     if rec.root_traced == Some(false) {
         caveats.push(caveat(
             "disque système de l'hôte non identifié lors de l'inventaire (racine non \

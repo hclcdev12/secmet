@@ -3,7 +3,11 @@
 # dist/secmet-live_<version>_x86_64.tar, qui contient un dossier
 # secmet-live-<version>/ au schéma attendu par secmet-make-key.sh sur une
 # machine sans le dépôt (packaging/live/README.md, « Fabrication d'une clé ») :
-#   dist/live/           noyau, initrd, squashfs, efi/, bios/, VERSION
+#   dist/live/           noyau, initrd, squashfs, efi/, bios/, VERSION, et
+#                        SYSTEM.sums (empreintes du système, make live-dist)
+#                        si elles décrivent bien ce noyau et ce squashfs ;
+#                        SYSTEM.sums.sig est ajouté à la publication
+#                        (seal_system.sh)
 #   packaging/live/      secmet-make-key.sh, grub.cfg
 #   target/release/      secmet-release lié en statique (target-live/, make live) :
 #                        tourne sur toute distribution x86_64
@@ -53,6 +57,16 @@ cp "$LIVE/vmlinuz" "$LIVE/initrd.img" "$LIVE/filesystem.squashfs" "$LIVE/VERSION
 cp -r "$LIVE/efi" "$LIVE/licenses" "$D/dist/live/"
 [[ -d "$LIVE/bios" ]] && cp -r "$LIVE/bios" "$D/dist/live/"
 [[ -n "$STORE" ]] && cp -r "$STORE" "$D/dist/live/app"
+# Empreintes du système (Annexe M §M.3) : livrées seulement si leurs entrées
+# live/ correspondent à ce dist/live (sinon : make live-dist après make live).
+if [[ -f "$LIVE/SYSTEM.sums" ]]; then
+    if (cd "$LIVE" && grep -E '^[0-9a-f]{64}  live/' SYSTEM.sums | sed 's|  live/|  |' | sha256sum -c --quiet --strict >/dev/null 2>&1); then
+        cp "$LIVE/SYSTEM.sums" "$D/dist/live/"
+        [[ -f "$LIVE/SYSTEM.sums.sig" ]] && cp "$LIVE/SYSTEM.sums.sig" "$D/dist/live/"
+    else
+        echo "avertissement : $LIVE/SYSTEM.sums ne décrit pas ce système (make live-dist), non livré" >&2
+    fi
+fi
 cp "$ROOT_DIR/packaging/live/secmet-make-key.sh" "$ROOT_DIR/packaging/live/grub.cfg" "$D/packaging/live/"
 cp "$RELEASE_BIN" "$D/target/release/"
 # Licence de SecMet à la racine du livrable ; celles de l'image dans LICENCES/.

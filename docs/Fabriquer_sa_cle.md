@@ -49,7 +49,7 @@ L'outil peut aussi être ouvert directement sur un fichier `.img.xz` (glisser le
 xz -dc secmet-key_<version>_x86_64.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-**Sous Windows, après l'écriture** : Windows affiche une ou plusieurs fois « Vous devez formater le disque du lecteur … avant de pouvoir l'utiliser ». Répondre **Annuler** à chaque fois. C'est la partition de données Linux de la clé, que Windows ne sait pas lire ; la formater détruirait la clé. Il est normal que l'explorateur ne montre que deux lecteurs (`SECMET-SYS` et `SECMET-EXP`). Ne rien modifier ni ajouter sur `SECMET-SYS` : c'est le système de la clé, et son contenu n'est pas contrôlé au démarrage.
+**Sous Windows, après l'écriture** : depuis la 0.5.0, l'explorateur ne montre qu'un lecteur, `SECMET-EXP` (les livrables). Le système (`SECMET-SYS`) et les données (`SECMET-DATA`) sont cachés à Windows par des attributs de la table de partitions. Si Windows affiche malgré tout « Vous devez formater le disque du lecteur … avant de pouvoir l'utiliser » (image plus ancienne écrite avec Rufus, Imager ou `dd`), répondre **Annuler** à chaque fois : c'est la partition de données Linux de la clé, que Windows ne sait pas lire ; la formater détruirait la clé. Ne rien modifier ni ajouter sur `SECMET-SYS` s'il apparaît : c'est le système de la clé.
 
 Retirer la clé proprement (éjection) avant de la débrancher.
 
@@ -65,6 +65,8 @@ Ce premier démarrage fait deux choses de plus, une seule fois, en quelques seco
 2. **La clé de signature des certificats est créée** sur la clé. Chaque clé USB a la sienne, propre et unique : l'image publiée n'en contient aucune. Son identifiant (`key_id`, 16 caractères) figure sur chaque certificat PDF produit (« Clé de signature … identifiant … ») et dans le journal `logs/system/` de la partition de données ; sa clé publique est dans `config/attestation-key.pub`. C'est cet identifiant que le client enregistre comme clé de confiance pour vérifier les certificats ([Annexe M §M.6](Annexes/Annexe_M_cle_live_lots.md)).
 
 Les démarrages suivants sont ordinaires : la clé garde ses lots, ses certificats et sa clé de signature d'un poste à l'autre.
+
+**À chaque démarrage, la clé contrôle son propre système** (depuis la 0.5.0), en quelques secondes, en tâche de fond : les fichiers de démarrage et le système doivent être ceux de l'image publiée, dont les empreintes sont signées par la clé de version. S'ils ont été modifiés (par exemple par un programme sous Windows) ou se sont corrompus, un bandeau rouge l'indique dans SecMet et chaque certificat porte une **réserve** ; l'effacement reste possible. Réécrire alors la clé avec une image vérifiée. Une clé écrite avec une image d'avant la 0.5.0 n'a pas ces empreintes : ses certificats portent la réserve « intégrité … non vérifiée ». Ce contrôle détecte la corruption et la modification maladroite, pas un attaquant qui modifierait aussi le contrôle lui-même.
 
 ## Mettre à jour
 
@@ -87,5 +89,6 @@ Le menu de la clé est caché : maintenir **Échap** au démarrage pour l'affich
 | « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage (celle de Debian 13) est signée par Microsoft avec les autorités de 2011 et de 2023 : elle passe le Secure Boot d'origine des anciens PC comme des nouveaux |
 | « Secure Boot violation » sur un PC « Secured-core » récent | Le PC refuse tout chargeur qui n'est pas de Microsoft | Dans le BIOS, activer l'option « Autoriser l'autorité de certification tierce Microsoft UEFI » (« Allow Microsoft 3rd party UEFI CA ») |
 | Écran noir après le logo pendant plus d'une minute | Carte graphique récalcitrante | Redémarrer, maintenir Échap au démarrage, choisir « mode sans échec graphique » |
-| Windows propose de formater | Partition de données Linux | **Annuler** |
+| Windows propose de formater | Partition de données Linux (image d'avant la 0.5.0) | **Annuler** |
+| Bandeau rouge « Le système de cette clé USB ne correspond pas à l'image publiée » | Fichier de démarrage modifié ou corrompu sur `SECMET-SYS` (le détail est dans `logs/system/image-check.json`) | Clôturer le lot, réécrire la clé avec une image vérifiée (SecMet Clé USB) ; les certificats déjà produits portent la réserve |
 | La partition d'export reste à 1 Go | Elle n'était pas vide au premier démarrage, ou la clé n'a presque pas de place au-delà de l'image (moins de 64 Mio) | Vider `SECMET-EXP` et redémarrer la clé ; le journal `logs/system/` dit pourquoi (`secmet-first-boot`) |

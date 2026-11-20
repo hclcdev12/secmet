@@ -12,12 +12,18 @@
 # 3. vérification depuis l'image : journal de secmet-first-boot (clé de
 #    signature créée, partition d'export agrandie), attestation-key.hex en
 #    0600 pour l'opérateur sur la partition de données, partition d'export
-#    qui va jusqu'au bout de la clé ; si l'image porte un magasin
+#    qui va jusqu'au bout de la clé, attributs GPT (système et données
+#    cachés à Windows) intacts ; si l'image porte un magasin
 #    app/<version>/ (image reprise d'une release précédente,
-#    refresh_live.sh), cette version doit avoir été déployée au démarrage.
+#    refresh_live.sh), cette version doit avoir été déployée au démarrage ;
+#    auto-contrôle du système (secmet-image-check) : « ok » si l'image est
+#    scellée (publiée par la CI), « unsigned » sinon (construction locale).
 #
+# SECMET_CHECK_ALTER=1 : boot/grub/grub.cfg est modifié dans l'image avant
+# le démarrage (altération naïve simulée) ; l'auto-contrôle doit répondre
+# « altered ».
 # Prérequis : dist/secmet-key_*.img.xz (make live-dist), qemu-system-x86_64
-# avec KVM, e2fsprogs (e2fsck, debugfs), xz. Durée : 4 minutes.
+# avec KVM, e2fsprogs (e2fsck, debugfs), xz, mtools. Durée : 4 minutes.
 # usage : make live-dist-check   [SECMET_QEMU_FIRMWARE=uefi pour OVMF]
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -41,8 +47,35 @@ IMG="$WORK/key.img"
 xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 truncate -s "$KEY_SIZE" "$IMG"
 read -r exp_start exp_before < <(qemu_part "$IMG" SECMET-EXPORT)
+# Attributs GPT (Annexe M §M.3) : système et données cachés à Windows,
+# export visible ; identiques après le premier démarrage (agrandissement de
+# l'export par sfdisk -N).
+attrs_of() { sfdisk -J "$IMG" | python3 -c '
+import json, sys
+p = json.load(sys.stdin)["partitiontable"]["partitions"]
+print(" ".join(x.get("attrs", "-").replace(" ", "+") for x in p))'; }
+attrs_before="$(attrs_of)"
+[[ "$attrs_before" == "GUID:60,62,63 GUID:62,63 - -" ]] || fail "attributs GPT inattendus dans l'image : $attrs_before"
 disk_sectors=$(( $(stat -c %s "$IMG") / 512 ))
 echo "  export : $((exp_before / 2048)) Mio dans l'image, clé de $((disk_sectors / 2048)) Mio"
+# Auto-contrôle du système (secmet-image-check) : « ok » pour une image
+# scellée par la publication (SYSTEM.sums.sig), « unsigned » pour une image
+# construite localement ; SECMET_CHECK_ALTER=1 modifie d'abord
+# boot/grub/grub.cfg (commentaire ajouté, démarrage inchangé) et exige
+# « altered ».
+system_extract "$IMG" "$WORK/sys" >/dev/null
+[[ -f "$WORK/sys/SYSTEM.sums" ]] || fail "SYSTEM.sums absent de la partition système"
+expect_integrity=unsigned
+[[ -f "$WORK/sys/SYSTEM.sums.sig" ]] && expect_integrity=ok
+if [[ "${SECMET_CHECK_ALTER:-0}" == 1 ]]; then
+    command -v mcopy >/dev/null || fail "mcopy (mtools) introuvable"
+    read -r sys_start _ < <(qemu_part "$IMG" SECMET-SYS)
+    printf '# altération d essai (image-check.sh)\n' >> "$WORK/sys/boot/grub/grub.cfg"
+    MTOOLS_SKIP_CHECK=1 mcopy -o -i "$IMG@@$((sys_start * 512))" "$WORK/sys/boot/grub/grub.cfg" ::boot/grub/grub.cfg
+    expect_integrity=altered
+    echo "  boot/grub/grub.cfg modifié dans l'image : auto-contrôle « altered » attendu"
+fi
+rm -rf "$WORK/sys"
 
 export SECMET_QEMU_FIRMWARE="${SECMET_QEMU_FIRMWARE:-bios}"
 qemu_run_and_collect "$IMG" "$WORK" "$WAIT"
@@ -61,6 +94,7 @@ grep -q "secmet-first-boot\[.*partition d'export agrandie" "$QEMU_JOURNAL" || fa
 read -r exp_start2 exp_after < <(qemu_part "$IMG" SECMET-EXPORT)
 [[ "$exp_start2" == "$exp_start" ]] || fail "la partition d'export a bougé ($exp_start → $exp_start2)"
 [[ "$exp_after" -gt "$exp_before" ]] || fail "export : $exp_before → $exp_after secteurs"
+[[ "$(attrs_of)" == "$attrs_before" ]] || fail "attributs GPT modifiés au premier démarrage : $attrs_before → $(attrs_of)"
 tail_gap=$(( disk_sectors - exp_start - exp_after ))
 [[ "$tail_gap" -lt 131072 ]] || fail "l'export s'arrête à $((tail_gap / 2048)) Mio du bout de la clé"
 # Magasin app/<version>/ dans l'image (reprise d'une release précédente) :
@@ -73,4 +107,11 @@ if [[ -n "$store" ]]; then
         || fail "SecMet $store (magasin app/ de l'image) non déployée au démarrage (voir $QEMU_JOURNAL)"
     deployed=", SecMet $store déployée depuis app/"
 fi
-echo "image publiable : démarrage ${SECMET_QEMU_FIRMWARE}, clé de signature créée (key_id $key_id), export agrandi de $((exp_before / 2048)) à $((exp_after / 2048)) Mio$deployed"
+# Auto-contrôle du système : verdict au journal (secmet-image-check) et
+# rapport copié sur la partition de données.
+grep -h "secmet-image-check\[" "$QEMU_JOURNAL" | sed 's/.*secmet-image-check\[[0-9]*\]: /  /' || true
+grep -q "secmet-image-check\[[0-9]*\]: système de la clé : $expect_integrity " "$QEMU_JOURNAL" \
+    || fail "auto-contrôle du système : « $expect_integrity » attendu (voir $QEMU_JOURNAL)"
+debugfs -R "cat /logs/system/image-check.json" "$QEMU_DATA" 2>/dev/null | grep -q "\"status\": \"$expect_integrity\"" \
+    || fail "logs/system/image-check.json absent ou différent de « $expect_integrity »"
+echo "image publiable : démarrage ${SECMET_QEMU_FIRMWARE}, clé de signature créée (key_id $key_id), export agrandi de $((exp_before / 2048)) à $((exp_after / 2048)) Mio$deployed, auto-contrôle du système « $expect_integrity »"

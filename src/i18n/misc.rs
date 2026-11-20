@@ -111,4 +111,10 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("Mauvais", "Bad", "Schlecht"),
     ("Inconnu", "Unknown", "Unbekannt"),
     ("Indice", "Index", "Index"),
+    // ── Intégrité du système de la clé USB (src/ui/integrity_ui.rs) ──
+    (
+        "Le système de cette clé USB ne correspond pas à l'image publiée : il a été modifié ou s'est corrompu ({problem}). Les certificats porteront une réserve. Réécrivez la clé avec SecMet Clé USB.",
+        "This USB key's system does not match the published image: it has been modified or is corrupted ({problem}). Certificates will carry a caveat. Rewrite the key with SecMet Clé USB.",
+        "Das System dieses USB-Sticks entspricht nicht dem veröffentlichten Abbild: Es wurde verändert oder ist beschädigt ({problem}). Die Zertifikate erhalten einen Vorbehalt. Schreiben Sie den Stick mit SecMet Clé USB neu.",
+    ),
 ];

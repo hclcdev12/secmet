@@ -62,6 +62,12 @@ if findmnt -no SOURCE / | grep -q "^$DEV"; then die "$DEV porte le système en c
 part() { # <n> → chemin de la partition n
     if [[ "$DEV" =~ [0-9]$ ]]; then echo "${DEV}p$1"; else echo "${DEV}$1"; fi
 }
+# Attributs GPT (Annexe M §M.3, comme make_key_image.sh) : système en
+# lecture seule, masqué, sans lettre de lecteur (bits 60, 62, 63) ; données
+# masquées, sans lettre (62, 63) ; export sans attribut (visible sous
+# Windows). Ignorés par le firmware et par Linux. Jamais le bit 1.
+SYS_ATTRS="GUID:60,62,63"
+DATA_ATTRS="GUID:62,63"
 
 # Réécriture complète : tout démonter. Système seul : seule la partition 1
 # (les données et l'export, peut-être en usage, restent montés).
@@ -85,11 +91,11 @@ if [[ "$SYSTEM_ONLY" -eq 0 ]]; then
     # 1 : système (EFI System, GRUB + noyau + squashfs) ; 2 : données ext4 ;
     # 3 : export exFAT (reste) ; 4 : partition d'amorçage BIOS (1 Mio, avant
     # la première partition, qui commence à 2 Mio) où GRUB i386-pc loge son code pour les postes
-    # sans UEFI.
+    # sans UEFI. Attributs GPT : 1 et 2 cachés à Windows (voir set_attrs).
     sfdisk -q "$DEV" <<PART_EOF
 label: gpt
-start=2MiB, size=6GiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS"
-size=$DATA_SIZE, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA"
+start=2MiB, size=6GiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS", attrs="$SYS_ATTRS"
+size=$DATA_SIZE, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA", attrs="$DATA_ATTRS"
 type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, name="SECMET-EXPORT"
 start=1MiB, size=1MiB, type=21686148-6449-6E6F-744E-656564454649, name="BIOS boot"
 PART_EOF
@@ -106,6 +112,18 @@ PART_EOF
     mkfs.exfat -L SECMET-EXP "$(part 3)" >/dev/null
 fi
 
+# --system-only sur une clé d'avant la 0.5.0 : attributs posés sur la table
+# existante (sans toucher aux partitions), si elle a bien le schéma attendu.
+if [[ "$SYSTEM_ONLY" -eq 1 ]]; then
+    names="$(sfdisk -J "$DEV" 2>/dev/null | grep -o '"name": *"[^"]*"' | sed 's/.*"\([^"]*\)"$/\1/' | head -2 | paste -sd' ' -)"
+    if [[ "$names" == "SECMET-SYS SECMET-DATA" ]]; then
+        sfdisk -q --no-reread --part-attrs "$DEV" 1 "$SYS_ATTRS" && sfdisk -q --no-reread --part-attrs "$DEV" 2 "$DATA_ATTRS" \
+            || echo "avertissement : attributs GPT non posés (partitions visibles sous Windows)" >&2
+    else
+        echo "avertissement : table inattendue ($names), attributs GPT non posés" >&2
+    fi
+fi
+
 SYS="$(part 1)"; DATA="$(part 2)"
 MNT="$(mktemp -d)"
 cleanup() {
@@ -119,7 +137,7 @@ mkdir -p "$MNT/sys" "$MNT/data"
 # --- Partition système ---------------------------------------------------------
 echo "Système : noyau, initrd, squashfs, GRUB…"
 mount "$SYS" "$MNT/sys"
-rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot" "$MNT/sys/LICENCES"
+rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot" "$MNT/sys/LICENCES" "$MNT/sys/SYSTEM.sums" "$MNT/sys/SYSTEM.sums.sig"
 mkdir -p "$MNT/sys/live" "$MNT/sys/EFI/BOOT" "$MNT/sys/boot/grub"
 cp "$LIVE_DIR/vmlinuz" "$LIVE_DIR/initrd.img" "$LIVE_DIR/filesystem.squashfs" "$MNT/sys/live/"
 cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/boot/grub/grub.cfg"
@@ -137,6 +155,12 @@ if [[ -d "$LIVE_DIR/efi" ]]; then
     cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/BOOT/grub.cfg"
     cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/debian/grub.cfg"
 fi
+# Modules de GRUB BIOS copiés comme dans l'image publiée (make_key_image.sh),
+# même sans grub-install : ils sont listés dans SYSTEM.sums.
+if [[ -d "$LIVE_DIR/bios" ]]; then
+    mkdir -p "$MNT/sys/boot/grub/i386-pc"
+    cp "$LIVE_DIR"/bios/*.mod "$LIVE_DIR"/bios/*.lst "$MNT/sys/boot/grub/i386-pc/"
+fi
 # BIOS : GRUB i386-pc dans le secteur d'amorçage et la partition d'amorçage
 # BIOS (postes anciens sans UEFI). Une clé plus ancienne sans cette
 # partition reste UEFI seule.
@@ -144,6 +168,19 @@ if [[ -d "$LIVE_DIR/bios" ]] && command -v grub-install >/dev/null 2>&1; then
     if ! grub-install --target=i386-pc --boot-directory="$MNT/sys/boot" \
         --directory="$LIVE_DIR/bios" "$DEV" >/tmp/secmet-grub-bios.log 2>&1; then
         echo "avertissement : GRUB BIOS non installé (UEFI seul) : $(tail -1 /tmp/secmet-grub-bios.log)" >&2
+    fi
+fi
+# Empreintes du système et leur signature par la clé de version (livrable
+# d'une release : dist/live/SYSTEM.sums et SYSTEM.sums.sig, Annexe M §M.3),
+# vérifiées à chaque démarrage par secmet-image-check. Les fichiers copiés
+# ci-dessus sont ceux de l'image publiée, octet pour octet. Sans elles
+# (construction locale), la clé se déclare « non signée ».
+if [[ -f "$LIVE_DIR/SYSTEM.sums" ]]; then
+    cp "$LIVE_DIR/SYSTEM.sums" "$MNT/sys/"
+    [[ -f "$LIVE_DIR/SYSTEM.sums.sig" ]] && cp "$LIVE_DIR/SYSTEM.sums.sig" "$MNT/sys/"
+    if command -v sha256sum >/dev/null 2>&1 \
+        && ! (cd "$MNT/sys" && grep -v '^#' SYSTEM.sums | sha256sum -c --quiet --strict >/dev/null 2>&1); then
+        echo "avertissement : la partition système ne correspond pas à $LIVE_DIR/SYSTEM.sums (la clé se déclarera altérée)" >&2
     fi
 fi
 sync

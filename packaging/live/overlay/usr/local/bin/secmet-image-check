@@ -1,0 +1,76 @@
+#!/bin/sh
+# Clé SecMet (Annexe M §M.3) : auto-contrôle du système de la clé à chaque
+# démarrage. La partition système SECMET-SYS porte SYSTEM.sums (empreintes
+# du noyau, de l'initrd, du squashfs, des chargeurs EFI, des grub.cfg et des
+# modules de GRUB BIOS) et SYSTEM.sums.sig, signé par la clé de version au
+# moment de publier (CI). secmet-release verify-system les vérifie et écrit
+# le rapport lu par SecMet ; une image altérée porte une réserve sur les
+# certificats et un bandeau rouge, l'effacement reste possible.
+#
+# Limite : ce contrôle fait partie du système qu'il vérifie. Il détecte la
+# corruption et la modification naïve (grub.cfg ou initrd changés depuis un
+# autre poste), pas un attaquant qui modifie aussi ce script ou
+# secmet-release.
+#
+# Rapport : $OUT (status ok, altered, unsigned, unavailable, error ; pending
+# pendant le contrôle), copie sur la partition de données
+# (logs/system/image-check.json), verdict au journal.
+# Testable hors de la clé : SECMET_IMAGE_CHECK_RUN, SECMET_IMAGE_CHECK_MEDIUM
+# et SECMET_IMAGE_CHECK_DATA surchargent les dossiers, le PATH les commandes.
+set -u
+RUN="${SECMET_IMAGE_CHECK_RUN:-/run/secmet-image}"
+OUT="$RUN/system-integrity.json"
+MEDIUM="${SECMET_IMAGE_CHECK_MEDIUM:-/run/live/medium}"
+DATA="${SECMET_IMAGE_CHECK_DATA:-/media/secmet-data}"
+MNT="$RUN/sys"
+# Clé de version : celle de secmet-app-update et des releases.
+TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+mkdir -p "$RUN" && chmod 755 "$RUN"
+
+report() { # <status> <écart>
+    printf '{\n  "status": "%s",\n  "problems": ["%s"]\n}\n' "$1" "$2" > "$OUT.tmp" && mv -f "$OUT.tmp" "$OUT"
+}
+finish() {
+    if mountpoint -q "$DATA" 2>/dev/null && mkdir -p "$DATA/logs/system" 2>/dev/null; then
+        cp "$OUT" "$DATA/logs/system/image-check.json" 2>/dev/null || true
+    fi
+    mountpoint -q "$MNT" 2>/dev/null && umount "$MNT" 2>/dev/null
+    exit 0
+}
+printf '{\n  "status": "pending"\n}\n' > "$OUT.tmp" && mv -f "$OUT.tmp" "$OUT"
+
+# Partition système : le support de live-boot (monté en lecture seule hors
+# toram) s'il s'agit bien de SECMET-SYS, sinon montée en lecture seule.
+ROOT=""
+if [ -f "$MEDIUM/live/filesystem.squashfs" ] && mountpoint -q "$MEDIUM" 2>/dev/null; then
+    ROOT="$MEDIUM"
+else
+    DEV=$(blkid -L SECMET-SYS 2>/dev/null)
+    if [ -z "$DEV" ] || [ ! -e "$DEV" ]; then
+        logger -t secmet-image-check "système de la clé : indisponible (partition SECMET-SYS introuvable)"
+        report unavailable "partition SECMET-SYS introuvable (clé retirée ?)"
+        finish
+    fi
+    mkdir -p "$MNT"
+    if ! mount -o ro,nodev,nosuid,noexec "$DEV" "$MNT" 2>/dev/null; then
+        logger -t secmet-image-check "système de la clé : erreur (montage de $DEV impossible)"
+        report error "montage de $DEV impossible"
+        finish
+    fi
+    ROOT="$MNT"
+fi
+if ! command -v secmet-release >/dev/null 2>&1; then
+    logger -t secmet-image-check "système de la clé : erreur (secmet-release absent)"
+    report error "secmet-release absent"
+    finish
+fi
+
+t0=$(date +%s)
+secmet-release verify-system "$ROOT" --trust "$TRUST" --json "$OUT" > "$RUN/verify.log" 2>&1
+rc=$?
+[ -s "$OUT" ] || report error "secmet-release verify-system : code $rc"
+status=$(sed -n 's/^ *"status": *"\([a-z]*\)".*/\1/p' "$OUT" | head -1)
+[ "$status" = pending ] && { report error "secmet-release verify-system : code $rc"; status=error; }
+detail=$(grep -E '^  [^ ]' "$RUN/verify.log" | head -5 | sed 's/^  //' | paste -sd ';' -)
+logger -t secmet-image-check "système de la clé : $status ($(( $(date +%s) - t0 )) s ; $(sed -n 's/^système *: //p' "$RUN/verify.log"))${detail:+ ; $detail}"
+finish

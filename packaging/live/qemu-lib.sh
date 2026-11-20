@@ -22,6 +22,23 @@ d = [x for x in p if x.get("name") == sys.argv[1]][0]
 print(d["start"], d["size"])' "$2"
 }
 
+# system_extract <image> <dossier> → offset (octets) de la partition
+# SECMET-SYS, dont live/, EFI/, boot/ et SYSTEM.sums(.sig) sont copiés dans
+# <dossier> par mtools, sans montage (auto-contrôle du système, Annexe M
+# §M.3 : seal_system.sh, refresh_live.sh, image-check.sh).
+system_extract() {
+    local img=$1 dest=$2 start off f
+    read -r start _ < <(qemu_part "$img" SECMET-SYS)
+    off=$((start * 512))
+    mkdir -p "$dest"
+    MTOOLS_SKIP_CHECK=1 mcopy -s -n -i "$img@@$off" ::live ::EFI ::boot "$dest/" \
+        || fail "partition système illisible (mtools)"
+    for f in SYSTEM.sums SYSTEM.sums.sig; do
+        MTOOLS_SKIP_CHECK=1 mcopy -n -i "$img@@$off" "::$f" "$dest/$f" 2>/dev/null || true
+    done
+    echo "$off"
+}
+
 # qemu_run_and_collect <image> <dossier de travail> <attente en s>
 # Démarre l'image (qemu-test.sh --headless ; SECMET_QEMU_FIRMWARE=bios pour
 # SeaBIOS), attend que la minuterie ait copié le journal, éteint (ACPI, puis

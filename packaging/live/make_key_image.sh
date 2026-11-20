@@ -77,7 +77,7 @@ mcopy -i "$W/p1.img" "$OUT/efi/mmx64.efi" ::EFI/BOOT/mmx64.efi
 # le binaire signé), sinon le grub.cfg posé à côté de lui (EFI/BOOT) ; GRUB
 # BIOS lit boot/grub/grub.cfg.
 # Sans SECMET_KERNEL_EXTRA, grub.cfg tel quel : mêmes octets que ceux de
-# secmet-make-key.sh.
+# secmet-make-key.sh (SYSTEM.sums commun).
 if [ -n "${SECMET_KERNEL_EXTRA:-}" ]; then
     sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
 else
@@ -91,6 +91,22 @@ echo "  LICENCES/copyright : $(mdir -b -i "$W/p1.img" ::LICENCES/copyright | wc 
 # GRUB BIOS : modules et police dans boot/grub, comme grub-install les y met.
 mcopy -i "$W/p1.img" "$OUT"/bios/*.mod "$OUT"/bios/*.lst ::boot/grub/i386-pc/
 mcopy -i "$W/p1.img" /usr/share/grub/unicode.pf2 ::boot/grub/fonts/
+
+echo "== empreintes du système (SYSTEM.sums ; signature posée à la publication)"
+# Calculées sur les fichiers tels que la partition les contient (relus par
+# mcopy), vérifiées à chaque démarrage par secmet-image-check (Annexe M
+# §M.3). Image publiable : aussi dans dist/live/ pour le livrable .tar
+# (secmet-make-key.sh les copie) ; SYSTEM.sums.sig est ajouté aux deux par
+# seal_system.sh dans le travail « publish » (clé de version).
+mkdir -p "$W/sysx"
+mcopy -s -n -i "$W/p1.img" ::live ::EFI ::boot "$W/sysx/"
+bash "$SRC/packaging/live/system-sums.sh" "$W/sysx" "$(cat "$OUT/VERSION" 2>/dev/null || echo secmet)" > "$W/SYSTEM.sums"
+rm -rf "$W/sysx"
+mcopy -i "$W/p1.img" "$W/SYSTEM.sums" ::SYSTEM.sums
+if [ "$SECMET_KEY_DIST" = 1 ]; then
+    cp "$W/SYSTEM.sums" "$OUT/SYSTEM.sums"; rm -f "$OUT/SYSTEM.sums.sig"
+fi
+echo "  $(grep -vc "^#" "$W/SYSTEM.sums") fichiers"
 
 echo "== partition de données (ext4, mke2fs -d)"
 D="$W/data"
@@ -112,10 +128,16 @@ mkfs.exfat -L SECMET-EXP "$W/p3.img" >/dev/null
 
 echo "== assemblage GPT"
 rm -f "$IMG"; truncate -s "${TOTAL_MIB}M" "$IMG"
+# Attributs GPT (Annexe M §M.3) : système en lecture seule, masqué et sans
+# lettre de lecteur (bits 60, 62, 63), données masquées et sans lettre (62,
+# 63) : Windows ne les monte pas et ne propose plus de « formater » la
+# partition Linux. Bits propres au type, ignorés par le firmware et par
+# Linux (montage par étiquette). Export sans attribut : visible sous
+# Windows. Jamais le bit 1 (« No Block IO Protocol ») : clé non démarrable.
 sfdisk -q "$IMG" <<PART
 label: gpt
-start=${SYS_START}MiB, size=${SYS_MIB}MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS"
-start=${DATA_START}MiB, size=${DATA_MIB}MiB, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA"
+start=${SYS_START}MiB, size=${SYS_MIB}MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS", attrs="GUID:60,62,63"
+start=${DATA_START}MiB, size=${DATA_MIB}MiB, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA", attrs="GUID:62,63"
 start=${EXP_START}MiB, size=${EXP_MIB}MiB, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, name="SECMET-EXPORT"
 start=1MiB, size=1MiB, type=21686148-6449-6E6F-744E-656564454649, name="BIOS boot"
 PART

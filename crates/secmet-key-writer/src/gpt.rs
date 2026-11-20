@@ -17,12 +17,67 @@
 //! (`secmet-first-boot`) agrandit ensuite la partition d'export comme
 //! avant. L'empreinte affichée reste celle de l'image : la relecture
 //! compare ces secteurs à part.
+//!
+//! Au passage, les partitions système (`SECMET-SYS`) et Linux
+//! (`SECMET-DATA`) reçoivent les attributs GPT qui les cachent à Windows
+//! ([`windows_attributes`]) : sans lettre de lecteur, Windows ne propose
+//! plus de « formater » la partition Linux et ne monte plus la partition
+//! système. Les images à partir de la 0.5.0 les portent déjà
+//! (`make_key_image.sh`) : les octets sont alors inchangés ; une image plus
+//! ancienne les reçoit ici. La partition d'export reste visible.
 
 use std::io;
 
 /// Taille de secteur de l'image (GPT à secteurs de 512 octets).
 pub const SECTOR: u64 = 512;
 const HEADER_SIGNATURE: &[u8; 8] = b"EFI PART";
+
+/// Attribut GPT « lecture seule » (bit 60, propre au type de partition,
+/// convention Microsoft).
+pub const ATTR_READ_ONLY: u64 = 1 << 60;
+/// Attribut GPT « masquée » (bit 62, convention Microsoft).
+pub const ATTR_HIDDEN: u64 = 1 << 62;
+/// Attribut GPT « pas de lettre de lecteur par défaut » (bit 63,
+/// convention Microsoft ; « no-auto » pour systemd).
+pub const ATTR_NO_DRIVE_LETTER: u64 = 1 << 63;
+/// Type « EFI System » (C12A7328-F81F-11D2-BA4B-00A0C93EC93B), tel
+/// qu'écrit sur le disque (trois premiers champs en petit-boutiste).
+const TYPE_ESP: [u8; 16] = [
+    0x28, 0x73, 0x2A, 0xC1, 0x1F, 0xF8, 0xD2, 0x11, 0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9, 0x3B,
+];
+/// Type « Linux filesystem data » (0FC63DAF-8483-4772-8E79-3D69D8477DE4).
+const TYPE_LINUX: [u8; 16] = [
+    0xAF, 0x3D, 0xC6, 0x0F, 0x83, 0x84, 0x72, 0x47, 0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D, 0xE4,
+];
+
+/// Nom UTF-16LE d'une entrée GPT (octets 56 à 127), sans les zéros finaux.
+fn entry_name(entry: &[u8]) -> String {
+    let units: Vec<u16> = entry[56..128]
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
+        .take_while(|&u| u != 0)
+        .collect();
+    String::from_utf16_lossy(&units)
+}
+
+/// Attributs à poser sur une entrée de la clé SecMet pour que Windows ne
+/// la monte pas (Annexe M §M.3) : partition système (EFI System
+/// `SECMET-SYS`) lecture seule, masquée, sans lettre ; partition de données
+/// (Linux `SECMET-DATA`) masquée, sans lettre. Rien pour les autres, en
+/// particulier la partition d'export, qui doit rester lisible sous
+/// Windows. Les bits 48 à 63 dépendent du type et sont ignorés par le
+/// firmware (UEFI §5.3.3) ; le bit 1 (« No Block IO Protocol », qui
+/// rendrait la clé non démarrable) n'est jamais posé.
+pub fn windows_attributes(entry: &[u8]) -> u64 {
+    let kind: &[u8] = &entry[..16];
+    match entry_name(entry).as_str() {
+        "SECMET-SYS" if kind == TYPE_ESP => ATTR_READ_ONLY | ATTR_HIDDEN | ATTR_NO_DRIVE_LETTER,
+        "SECMET-DATA" if kind == TYPE_LINUX => ATTR_HIDDEN | ATTR_NO_DRIVE_LETTER,
+        _ => 0,
+    }
+}
 
 /// CRC-32 IEEE (celui de la GPT, de zlib et d'Ethernet).
 pub fn crc32(data: &[u8]) -> u32 {
@@ -121,9 +176,11 @@ fn is_protective_mbr(sector: &[u8]) -> bool {
 /// Secteurs à écrire pour compléter la GPT d'une image de `image_bytes`
 /// octets sur un disque de `disk_bytes` octets.
 pub struct Plan {
-    /// Secteurs 0 et 1 tels que l'image les contient.
+    /// Début de l'image tel qu'elle le contient : du secteur 0 à la fin de
+    /// la table des entrées.
     pub pristine_head: Vec<u8>,
-    /// Secteurs 0 et 1 complétés (entrée protectrice, en-tête primaire).
+    /// Même zone complétée (entrée protectrice, en-tête primaire, attributs
+    /// Windows des entrées).
     pub head: Vec<u8>,
     /// Premier secteur de la zone de secours (entrées puis en-tête, contiguë
     /// jusqu'au dernier secteur du disque).
@@ -159,10 +216,27 @@ pub fn plan(first: &[u8], disk_bytes: u64) -> io::Result<Option<Plan>> {
     if eend > first.len() as u64 {
         return Ok(None);
     }
-    let entries = &first[eo as usize..eend as usize];
-    if crc32(&entries[..entries_bytes as usize]) != u32_at(&header.raw, 88) {
+    let pristine_entries = &first[eo as usize..eend as usize];
+    if crc32(&pristine_entries[..entries_bytes as usize]) != u32_at(&header.raw, 88) {
         return Err(bad("CRC des entrées GPT invalide".into()));
     }
+    // Attributs Windows (voir `windows_attributes`), ajoutés à ceux de
+    // l'image (octets 48 à 55 de chaque entrée), puis CRC des entrées
+    // recalculé dans les deux en-têtes.
+    let mut entries = pristine_entries.to_vec();
+    let mut hidden = Vec::new();
+    for i in 0..header.entries_count as usize {
+        let e = &mut entries[i * header.entry_size as usize..(i + 1) * header.entry_size as usize];
+        let wanted = windows_attributes(e);
+        let attrs = u64_at(e, 48);
+        if attrs | wanted != attrs {
+            e[48..56].copy_from_slice(&(attrs | wanted).to_le_bytes());
+            hidden.push(entry_name(e));
+        }
+    }
+    let mut header = header;
+    let entries_crc = crc32(&entries[..entries_bytes as usize]);
+    header.raw[88..92].copy_from_slice(&entries_crc.to_le_bytes());
     let backup_entries_lba = last_lba - entries_sectors;
     let last_usable = backup_entries_lba - 1;
     if last_usable <= u64_at(&header.raw, 40) || header.alternate_lba > last_lba {
@@ -184,7 +258,7 @@ pub fn plan(first: &[u8], disk_bytes: u64) -> io::Result<Option<Plan>> {
         ));
     }
 
-    let pristine_head = first[..2 * SECTOR as usize].to_vec();
+    let pristine_head = first[..eend as usize].to_vec();
     let mut head = pristine_head.clone();
     // L'entrée protectrice du MBR couvre tout le disque (au plus 2^32 - 1
     // secteurs), comme l'exige la spécification.
@@ -196,17 +270,23 @@ pub fn plan(first: &[u8], disk_bytes: u64) -> io::Result<Option<Plan>> {
         }
     }
     let primary = header.rewrite(1, last_lba, last_usable, header.entries_lba);
-    head[SECTOR as usize..].copy_from_slice(&primary);
+    head[SECTOR as usize..2 * SECTOR as usize].copy_from_slice(&primary);
+    head[eo as usize..eend as usize].copy_from_slice(&entries);
     let backup = header.rewrite(last_lba, 1, last_usable, backup_entries_lba);
-    let mut tail = entries.to_vec();
+    let mut tail = entries;
     tail.extend_from_slice(&backup);
+    let hidden_note = if hidden.is_empty() {
+        String::new()
+    } else {
+        format!(" ; masquées pour Windows : {}", hidden.join(", "))
+    };
     Ok(Some(Plan {
         pristine_head,
         head,
         tail_lba: backup_entries_lba,
         tail,
         message: format!(
-            "GPT complétée : copie de secours au secteur {last_lba}, {} utilisables (l'image en déclarait {})",
+            "GPT complétée : copie de secours au secteur {last_lba}, {} utilisables (l'image en déclarait {}){hidden_note}",
             crate::fmt_size((last_usable + 1) * SECTOR),
             crate::fmt_size((header.alternate_lba + 1) * SECTOR)
         ),
@@ -221,16 +301,57 @@ mod tests {
     /// en-tête primaire, 128 entrées dont une partition de 2048 à
     /// `image_sectors - 40`.
     fn image_head(image_sectors: u64) -> Vec<u8> {
+        let mut entries = vec![0u8; 128 * 128];
+        entries[0] = 1; // type GUID non nul : entrée utilisée
+        entries[32..40].copy_from_slice(&2048u64.to_le_bytes());
+        entries[40..48].copy_from_slice(&(image_sectors - 40).to_le_bytes());
+        head_with_entries(image_sectors, &entries)
+    }
+
+    /// Entrée GPT de type `kind`, nommée `name`, avec les attributs `attrs`.
+    fn entry(kind: [u8; 16], name: &str, first: u64, last: u64, attrs: u64) -> Vec<u8> {
+        let mut e = vec![0u8; 128];
+        e[..16].copy_from_slice(&kind);
+        e[16] = 0x42; // GUID unique quelconque
+        e[32..40].copy_from_slice(&first.to_le_bytes());
+        e[40..48].copy_from_slice(&last.to_le_bytes());
+        e[48..56].copy_from_slice(&attrs.to_le_bytes());
+        for (i, u) in name.encode_utf16().enumerate() {
+            e[56 + 2 * i..58 + 2 * i].copy_from_slice(&u.to_le_bytes());
+        }
+        e
+    }
+
+    /// Image au schéma de la clé SecMet : système, données, export, BIOS
+    /// boot ; `sys_attrs` et `data_attrs` déjà présents dans l'image.
+    fn secmet_head(image_sectors: u64, sys_attrs: u64, data_attrs: u64) -> Vec<u8> {
+        const TYPE_BASIC: [u8; 16] = [
+            0xA2, 0xA0, 0xD0, 0xEB, 0xE5, 0xB9, 0x33, 0x44, 0x87, 0xC0, 0x68, 0xB6, 0xB7, 0x26,
+            0x99, 0xC7,
+        ];
+        const TYPE_BIOS: [u8; 16] = *b"Hah!IdontNeedEFI";
+        let mut entries = Vec::new();
+        entries.extend(entry(TYPE_ESP, "SECMET-SYS", 4096, 8191, sys_attrs));
+        entries.extend(entry(TYPE_LINUX, "SECMET-DATA", 8192, 12287, data_attrs));
+        entries.extend(entry(
+            TYPE_BASIC,
+            "SECMET-EXPORT",
+            12288,
+            image_sectors - 40,
+            0,
+        ));
+        entries.extend(entry(TYPE_BIOS, "BIOS boot", 2048, 4095, 0));
+        entries.resize(128 * 128, 0);
+        head_with_entries(image_sectors, &entries)
+    }
+
+    fn head_with_entries(image_sectors: u64, entries: &[u8]) -> Vec<u8> {
         let mut d = vec![0u8; 34 * SECTOR as usize];
         d[0x1BE + 4] = 0xEE;
         d[0x1BE + 8..0x1BE + 12].copy_from_slice(&1u32.to_le_bytes());
         d[0x1BE + 12..0x1BE + 16].copy_from_slice(&((image_sectors - 1) as u32).to_le_bytes());
         d[510] = 0x55;
         d[511] = 0xAA;
-        let mut entries = vec![0u8; 128 * 128];
-        entries[0] = 1; // type GUID non nul : entrée utilisée
-        entries[32..40].copy_from_slice(&2048u64.to_le_bytes());
-        entries[40..48].copy_from_slice(&(image_sectors - 40).to_le_bytes());
         let mut h = vec![0u8; 512];
         h[..8].copy_from_slice(HEADER_SIGNATURE);
         h[8..12].copy_from_slice(&0x0001_0000u32.to_le_bytes());
@@ -242,12 +363,16 @@ mod tests {
         h[72..80].copy_from_slice(&2u64.to_le_bytes());
         h[80..84].copy_from_slice(&128u32.to_le_bytes());
         h[84..88].copy_from_slice(&128u32.to_le_bytes());
-        h[88..92].copy_from_slice(&crc32(&entries).to_le_bytes());
+        h[88..92].copy_from_slice(&crc32(entries).to_le_bytes());
         let crc = crc32(&h[..92]);
         h[16..20].copy_from_slice(&crc.to_le_bytes());
         d[512..1024].copy_from_slice(&h);
-        d[1024..1024 + entries.len()].copy_from_slice(&entries);
+        d[1024..1024 + entries.len()].copy_from_slice(entries);
         d
+    }
+
+    fn attrs_of(entries: &[u8], i: usize) -> u64 {
+        u64_at(&entries[i * 128..], 48)
     }
 
     fn header_crc_ok(h: &[u8]) -> bool {
@@ -268,7 +393,12 @@ mod tests {
         let first = image_head(image);
         let p = plan(&first, total * SECTOR).unwrap().expect("plan");
         assert!(p.message.starts_with("GPT complétée"), "{}", p.message);
-        assert_eq!(p.pristine_head, first[..1024].to_vec());
+        assert!(!p.message.contains("masquées"), "{}", p.message);
+        // Du secteur 0 à la fin des entrées (2 + 32 secteurs).
+        assert_eq!(p.pristine_head, first[..34 * 512].to_vec());
+        assert_eq!(p.head.len(), 34 * 512);
+        // Image sans partition SecMet : entrées inchangées.
+        assert_eq!(&p.head[1024..], &first[1024..]);
         // MBR protecteur : signature intacte, entrée étendue au disque.
         assert_eq!(&p.head[510..512], &[0x55, 0xAA]);
         assert_eq!(u32_at(&p.head, 0x1BE + 12), (total - 1) as u32);
@@ -291,6 +421,88 @@ mod tests {
         assert_eq!(u64_at(b, 32), 1);
         assert_eq!(u64_at(b, 72), total - 33);
         assert_eq!(u64_at(b, 48), total - 34);
+    }
+
+    #[test]
+    fn hides_system_and_data_partitions_from_windows() {
+        let image = 16384u64;
+        let total = 32768u64;
+        // Image antérieure à la 0.5.0 : aucun attribut ; bit 0 « Required »
+        // déjà posé sur la partition de données, à conserver.
+        let first = secmet_head(image, 0, 1);
+        let p = plan(&first, total * SECTOR).unwrap().expect("plan");
+        assert!(
+            p.message
+                .ends_with("masquées pour Windows : SECMET-SYS, SECMET-DATA"),
+            "{}",
+            p.message
+        );
+        let entries = &p.head[1024..];
+        assert_eq!(attrs_of(entries, 0), (1 << 60) | (1 << 62) | (1 << 63));
+        assert_eq!(attrs_of(entries, 1), 1 | (1 << 62) | (1 << 63));
+        // Export et BIOS boot : intacts ; jamais le bit 1 (No Block IO).
+        assert_eq!(attrs_of(entries, 2), 0);
+        assert_eq!(attrs_of(entries, 3), 0);
+        for i in 0..4 {
+            assert_eq!(attrs_of(entries, i) & 0b10, 0);
+        }
+        // Seuls les octets 48 à 55 des deux entrées changent.
+        for (i, (a, b)) in entries.iter().zip(&first[1024..]).enumerate() {
+            let changed = (i < 256) && (48..56).contains(&(i % 128));
+            if !changed {
+                assert_eq!(a, b, "octet {i} des entrées modifié");
+            }
+        }
+        // CRC des entrées et des en-têtes cohérents, secours identique.
+        let crc = crc32(&entries[..128 * 128]);
+        assert_eq!(u32_at(&p.head[512..], 88), crc);
+        assert!(header_crc_ok(&p.head[512..]));
+        assert_eq!(&p.tail[..128 * 128], entries);
+        let backup = &p.tail[32 * 512..];
+        assert_eq!(u32_at(backup, 88), crc);
+        assert!(header_crc_ok(backup));
+        // L'image d'origine sert toujours à l'empreinte.
+        assert_eq!(p.pristine_head, first);
+    }
+
+    #[test]
+    fn keeps_attributes_already_in_the_image() {
+        let image = 16384u64;
+        let sys = (1u64 << 60) | (1 << 62) | (1 << 63);
+        let data = (1u64 << 62) | (1 << 63);
+        let first = secmet_head(image, sys, data);
+        let p = plan(&first, 32768 * SECTOR).unwrap().expect("plan");
+        assert!(!p.message.contains("masquées"), "{}", p.message);
+        // Image 0.5.0 : entrées recopiées octet pour octet (octets 48 à 55
+        // compris) dans la table primaire et dans la copie de secours.
+        assert_eq!(&p.head[1024..], &first[1024..]);
+        assert_eq!(&p.tail[..128 * 128], &first[1024..1024 + 128 * 128]);
+        assert_eq!(attrs_of(&p.tail, 0), sys);
+        assert_eq!(attrs_of(&p.tail, 1), data);
+    }
+
+    #[test]
+    fn attributes_follow_type_and_name() {
+        let sys = entry(TYPE_ESP, "SECMET-SYS", 1, 2, 0);
+        assert_eq!(
+            windows_attributes(&sys),
+            ATTR_READ_ONLY | ATTR_HIDDEN | ATTR_NO_DRIVE_LETTER
+        );
+        let data = entry(TYPE_LINUX, "SECMET-DATA", 1, 2, 0);
+        assert_eq!(
+            windows_attributes(&data),
+            ATTR_HIDDEN | ATTR_NO_DRIVE_LETTER
+        );
+        // Autre nom, ou bon nom sur un autre type : rien.
+        assert_eq!(windows_attributes(&entry(TYPE_ESP, "EFI", 1, 2, 0)), 0);
+        assert_eq!(
+            windows_attributes(&entry(TYPE_LINUX, "SECMET-SYS", 1, 2, 0)),
+            0
+        );
+        assert_eq!(
+            windows_attributes(&entry(TYPE_LINUX, "SECMET-EXPORT", 1, 2, 0)),
+            0
+        );
     }
 
     #[test]

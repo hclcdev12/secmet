@@ -11,6 +11,7 @@ mod dialogs;
 mod disk_list;
 mod enrichment;
 mod erase;
+mod integrity_ui;
 mod lot_ui;
 mod pdf_ui;
 mod settings_ui;
