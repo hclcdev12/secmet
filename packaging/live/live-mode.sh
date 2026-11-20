@@ -32,6 +32,9 @@ INPUTS=(
     packaging/live/build_live.sh
     packaging/live/build_rootfs.sh
     packaging/live/live.Containerfile
+    packaging/live/efi-pin.sha256
+    packaging/live/fetch_efi.sh
+    packaging/live/licences.sh
     packaging/live/grub.cfg
     packaging/live/make_key_image.sh
     packaging/live/overlay

@@ -18,8 +18,9 @@
 #          22.04, .rpm Fedora 44 et 42, AppImage), SecMet Clé USB (AppImage
 #          et .exe), les binaires Linux autonomes secmet-verify_<version>_x86_64
 #          et secmet-release_<version>_x86_64, le livrable de fabrication de
-#          la clé USB (secmet-live_<version>_x86_64.tar) et l'image prête à
-#          écrire (secmet-key_<version>_x86_64.img.xz), sauf --skip-live,
+#          la clé USB (secmet-live_<version>_x86_64.tar), l'image prête à
+#          écrire (secmet-key_<version>_x86_64.img.xz) et le manifeste des
+#          paquets de l'image (secmet-key_<version>_x86_64.packages.tar), sauf --skip-live,
 #          SHA256SUMS, SHA256SUMS.sig, latest.json et les journaux de
 #          construction (logs/). --publish envoie exactement les fichiers
 #          listés par SHA256SUMS, plus SHA256SUMS, SHA256SUMS.sig et
@@ -284,7 +285,8 @@ if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
     # Une image ou un livrable d'une construction précédente de la même
     # version ne doit pas être repris par erreur.
     rm -f "$OUT_DIR"/*.img.xz "$OUT_DIR"/*.tar \
-        "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz"
+        "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" \
+        "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.packages.tar"
     step "Cadence de l'image de la clé USB"
     mode_line="$(SECMET_LIVE_FULL="$FULL_LIVE" SECMET_RELEASES_REPO="$REPO" "$PKG_DIR/live/live-mode.sh" "$VERSION" 2>"$LOG_DIR/live-mode.log" \
         || echo "mode=full reason=live-mode.sh en erreur (voir $LOG_DIR/live-mode.log)")"
@@ -311,7 +313,8 @@ if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
         step "Image publiable de la clé USB (.img.xz)"
         "$PKG_DIR/live/make_key_image.sh" --dist > "$LOG_DIR/live-dist.log" 2>&1 || die "image publiable échouée, voir $LOG_DIR/live-dist.log"
     fi
-    cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" "$OUT_DIR/"
+    cp -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz" \
+        "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.packages.tar" "$OUT_DIR/"
     if [[ -r /dev/kvm ]]; then
         if [[ "$mode_line" != mode=reuse* ]]; then
             step "Contrôle QEMU de la mise à jour au démarrage de la clé"
@@ -338,7 +341,7 @@ for f in "$OUT_DIR"/secmet_*~*_amd64.deb; do
 done
 
 # --- 2d. Livrables attendus ---------------------------------------------------
-# Les 11 fichiers signés d'une release (14 publiés avec SHA256SUMS,
+# Les 12 fichiers signés d'une release (15 publiés avec SHA256SUMS,
 # SHA256SUMS.sig et latest.json). Sans image de clé (--skip-live), la
 # release serait incohérente (SecMet Clé USB et la reprise de l'image
 # suivante la cherchent) : --publish la refuse.
@@ -349,6 +352,7 @@ expected=(
     "secmet-key-writer_${VERSION}_x86_64.AppImage" "secmet-key-writer_${VERSION}_x86_64.exe"
     "secmet-verify_${VERSION}_x86_64" "secmet-release_${VERSION}_x86_64"
     "secmet-live_${VERSION}_x86_64.tar" "secmet-key_${VERSION}_x86_64.img.xz"
+    "secmet-key_${VERSION}_x86_64.packages.tar"
 )
 missing=()
 for f in "${expected[@]}"; do [[ -f "$OUT_DIR/$f" ]] || missing+=("$f"); done

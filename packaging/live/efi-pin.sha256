@@ -1,0 +1,30 @@
+# Chaîne de démarrage UEFI de la clé SecMet (Secure Boot), épinglée.
+# Lu par packaging/live/fetch_efi.sh pendant make live : chaque paquet est
+# récupéré à sa version exacte (miroir Debian, sinon snapshot.debian.org),
+# son empreinte vérifiée, puis celle de chaque binaire EFI et les émetteurs
+# de leurs signatures (sbverify --list). Toute différence fait échouer la
+# construction. Pour passer à une version plus récente :
+#   SECMET_EFI_UPDATE=1 make live
+# prend les versions courantes de trixie, affiche les lignes à recopier ici
+# (aussi dans dist/live/efi/efi-pin.sha256.new), puis repasser la matrice
+# Secure Boot (make live-image, make live-sb-check, --require-2023) avant de
+# les recopier. Toujours épingler le couple shim et GRUB ensemble.
+#
+# shim 16.1 de Debian 13 : signé par « Microsoft Corporation UEFI CA 2011 »
+# et par « Microsoft UEFI CA 2023 » (double signature) ; il démarre sur les
+# PC dont la base db n'a que l'une des deux autorités (packaging/live/sb-matrix.sh,
+# V1 à V3). MokManager (mmx64.efi) est dans un paquet séparé chez Debian.
+#
+# deb    <paquet> <version exacte> <sha256 du .deb>
+# efi    <paquet> <chemin dans le paquet> <sha256>
+# issuer <paquet> <chemin dans le paquet> <émetteur attendu (sbverify)>
+deb    shim-signed                1.51~1+deb13u1+16.1-2~deb13u1  3c802fa303c0e6bf126adee74028d1042e3120360d159c2c05181dc9b2f61005
+deb    shim-helpers-amd64-signed  1+16.1+2~deb13u1               7e950d75d5a40ecc0a99f727452ce35780b47a04d9a2cc3b1ff7c2bb316c033e
+deb    grub-efi-amd64-signed      1+2.12+9+deb13u2               da8bb31308a3682a7d9343fc42bf7f603ad85bb5483eeb3ece23e2f1be2e9bbd
+efi    shim-signed                usr/lib/shim/shimx64.efi.signed                    e103c5d02657879f141b086ed703584d28bb9e2721b423333be085ee1b4d397b
+efi    shim-helpers-amd64-signed  usr/lib/shim/mmx64.efi.signed                      30ea13138310f0819c1d875fcf3a6cdce8a1607cfd7578053a2df894a41630ae
+efi    grub-efi-amd64-signed      usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed  425ffb5b84e8738084815d9df4a33c0e5f64409c7aadeb3dd3bcf60357551c5a
+issuer shim-signed                usr/lib/shim/shimx64.efi.signed                    Microsoft Corporation UEFI CA 2011
+issuer shim-signed                usr/lib/shim/shimx64.efi.signed                    Microsoft UEFI CA 2023
+issuer shim-helpers-amd64-signed  usr/lib/shim/mmx64.efi.signed                      Debian Secure Boot CA
+issuer grub-efi-amd64-signed      usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed  Debian Secure Boot CA

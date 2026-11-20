@@ -1,6 +1,6 @@
 <?xml version="1.1" encoding="UTF-8"?>
 <!-- Clé SecMet : bureau sombre et plat. GTK 3 (Thunar, Zathura, panneau) :
-     Arc-Dark ; icônes elementary-xfce-dark ; police Ubuntu ; rendu des
+     Arc-Dark ; icônes elementary-xfce-dark ; police Cantarell ; rendu des
      polices lissé. GTK 4 (SecMet) garde son thème par défaut sombre
      (GTK_THEME dans secmet-live). -->
 <channel name="xsettings" version="1.0">
@@ -11,8 +11,8 @@
     <property name="EnableInputFeedbackSounds" type="bool" value="false"/>
   </property>
   <property name="Gtk" type="empty">
-    <property name="FontName" type="string" value="Ubuntu 10"/>
-    <property name="MonospaceFontName" type="string" value="Ubuntu Mono 11"/>
+    <property name="FontName" type="string" value="Cantarell 10"/>
+    <property name="MonospaceFontName" type="string" value="DejaVu Sans Mono 10"/>
     <property name="CursorThemeName" type="string" value="Adwaita"/>
     <property name="CursorThemeSize" type="int" value="24"/>
     <property name="DecorationLayout" type="string" value="menu:minimize,maximize,close"/>

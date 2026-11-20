@@ -2,6 +2,8 @@
 
 Chaque version publiée de SecMet contient une **image de clé USB prête à écrire** : `secmet-key_<version>_x86_64.img.xz`, sur la page [Releases](https://github.com/hclcdev12/secmet/releases). Il suffit de l'écrire sur une clé avec **SecMet Clé USB**, le petit outil publié avec chaque version, ou avec un outil d'écriture d'images gratuit ; aucune ligne de commande, pas besoin de Linux. La clé démarre ensuite n'importe quel PC ou portable (UEFI, Secure Boot actif ou non, et anciens BIOS) sur SecMet, avec ses lots, ses certificats et sa clé de signature conservés sur la clé ([Annexe M](Annexes/Annexe_M_cle_live_lots.md)).
 
+Le système de la clé, **SecMet Live**, est basé sur Debian 13 (trixie) depuis la version 0.5.0. *Debian est une marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni affilié au projet Debian, ni approuvé par lui.*
+
 ## Il vous faut
 
 - Une clé USB de **16 Go ou plus** (12 Go au minimum). USB 3 conseillé : l'écriture et les effacements sont plus rapides. **Tout ce qu'elle contient sera effacé.**
@@ -82,7 +84,8 @@ Le menu de la clé est caché : maintenir **Échap** au démarrage pour l'affich
 | Symptôme | Cause probable | Que faire |
 |----------|----------------|-----------|
 | Le PC ignore la clé | Démarrage USB désactivé, BIOS protégé | Activer le démarrage USB ; sinon, démonter le disque et le traiter au banc ([Annexe M §M.9](Annexes/Annexe_M_cle_live_lots.md)) |
-| « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage est signée par Canonical et passe le Secure Boot d'origine |
+| « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage (celle de Debian 13) est signée par Microsoft avec les autorités de 2011 et de 2023 : elle passe le Secure Boot d'origine des anciens PC comme des nouveaux |
+| « Secure Boot violation » sur un PC « Secured-core » récent | Le PC refuse tout chargeur qui n'est pas de Microsoft | Dans le BIOS, activer l'option « Autoriser l'autorité de certification tierce Microsoft UEFI » (« Allow Microsoft 3rd party UEFI CA ») |
 | Écran noir après le logo pendant plus d'une minute | Carte graphique récalcitrante | Redémarrer, maintenir Échap au démarrage, choisir « mode sans échec graphique » |
 | Windows propose de formater | Partition de données Linux | **Annuler** |
 | La partition d'export reste à 1 Go | Elle n'était pas vide au premier démarrage, ou la clé n'a presque pas de place au-delà de l'image (moins de 64 Mio) | Vider `SECMET-EXP` et redémarrer la clé ; le journal `logs/system/` dit pourquoi (`secmet-first-boot`) |

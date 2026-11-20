@@ -14,6 +14,8 @@
 #   <sortie>/secmet-live_<version>_x86_64.tar      livrable de fabrication :
 #       dist/live/ de la release précédente + dist/live/app/<version>/, que
 #       secmet-make-key.sh copie sur la partition de données (bundle_live.sh)
+#   <sortie>/secmet-key_<version>_x86_64.packages.tar  manifeste des paquets,
+#       celui de l'image reprise avec un en-tête qui le dit
 #
 # usage : packaging/live/refresh_live.sh --previous <dossier> --deb <secmet_<version>…ubuntu24.04_amd64.deb>
 #             --key <clé de version .hex> --trust <clé publique hex>
@@ -86,6 +88,8 @@ echo "== livrable précédent"
 tar -C "$WORK" -xf "$TAR"
 PREV_DIR="$WORK/secmet-live-$PREV_VERSION"
 [[ -f "$PREV_DIR/dist/live/filesystem.squashfs" && -f "$PREV_DIR/dist/live/VERSION" ]] || die "livrable sans dist/live complet"
+[[ -d "$PREV_DIR/dist/live/licenses" ]] || die "livrable $PREV_VERSION sans licences de l'image (image antérieure à Debian 13) : construction complète (--full-live, full_live)"
+[[ -f "$PREV_DIR/dist/live/packages.manifest" ]] || die "livrable $PREV_VERSION sans manifeste des paquets (image antérieure à Debian 13) : construction complète (--full-live, full_live)"
 echo "  système : $(cat "$PREV_DIR/dist/live/VERSION")"
 
 echo "== magasin app/$VERSION (signé par la clé de version)"
@@ -104,8 +108,8 @@ IMG="$WORK/key.img"
 # des blocs (des milliers de petites écritures : 5 min sur GitHub au lieu de 20 s).
 xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 read -r start size < <(qemu_part "$IMG" SECMET-DATA)
-# Options ext4 de la partition d origine (celles du mke2fs d Ubuntu 24.04
-# dans le conteneur de construction), reprises à l identique : le format ne
+# Options ext4 de la partition d origine (celles du mke2fs du conteneur de
+# construction, Debian 13), reprises à l identique : le format ne
 # dépend pas de la machine qui refait la partition.
 dd if="$IMG" of="$WORK/sb.img" bs=512 skip="$start" count=64 status=none
 # dumpe2fs se plaint du fichier tronqué (code 1) mais lit le superbloc.
@@ -172,5 +176,5 @@ mkdir -p "$PREV_DIR/dist/live/app"
 cp -r "$WORK/app/." "$PREV_DIR/dist/live/app/"
 SECMET_LIVE_DIR="$PREV_DIR/dist/live" SECMET_RELEASE_BIN="$PREV_DIR/target/release/secmet-release" SECMET_LIVE_VERSION="$VERSION" \
     "$LIVE/bundle_live.sh" | sed 's/^/  /'
-[[ "$OUT" -ef "$ROOT_DIR/dist" ]] || mv -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$OUT/"
-echo "image de la clé reprise de $PREV_VERSION pour $VERSION : $(basename "$OUT_IMG"), secmet-live_${VERSION}_x86_64.tar"
+[[ "$OUT" -ef "$ROOT_DIR/dist" ]] || mv -f "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.packages.tar" "$OUT/"
+echo "image de la clé reprise de $PREV_VERSION pour $VERSION : $(basename "$OUT_IMG"), secmet-live_${VERSION}_x86_64.tar, secmet-key_${VERSION}_x86_64.packages.tar"
