@@ -57,6 +57,10 @@ par la clé à chaque démarrage (comme après « Installer la mise à jour »).
 cat > "$D/LISEZMOI.txt" <<TXT
 SecMet $VERSION : image de la clé USB ($(cat "$LIVE/VERSION"))$store_note
 
+Système de la clé : SecMet Live, basé sur Debian 13 (trixie). Debian est une
+marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni
+affilié au projet Debian, ni approuvé par lui.
+
 Fabriquer une clé (root ; EFFACE la clé, 12 Go au moins) :
     sudo $NAME/packaging/live/secmet-make-key.sh /dev/sdX
 Mettre à jour la partition système d'une clé existante (données conservées) :

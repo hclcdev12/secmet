@@ -217,6 +217,7 @@ for bg in "$ROOTFS"/usr/share/backgrounds/xfce/*; do cp "$ROOTFS/usr/share/backg
 # roue), lion SecMet au centre et mention SecMet en bas (images de
 # l'overlay), fond sombre assorti au bureau ; pas de messages.
 PT="$ROOTFS/usr/share/plymouth/themes"
+[[ -f "$PT/spinner/spinner.plymouth" ]] || { echo "thème Plymouth spinner absent (plymouth-themes)" >&2; exit 1; }
 if [[ -d "$PT/spinner" ]]; then
     cp -n "$PT"/spinner/*.png "$PT/secmet/" 2>/dev/null || true
     sed -e 's|^ImageDir=.*|ImageDir=/usr/share/plymouth/themes/secmet|' \
@@ -235,6 +236,52 @@ if [[ -d "$PT/spinner" ]]; then
     in_chroot update-alternatives --set default.plymouth \
         /usr/share/plymouth/themes/secmet/secmet.plymouth >/dev/null
     echo "Plymouth : thème $(in_chroot /usr/sbin/plymouth-set-default-theme)"
+fi
+# Marque (B6, rapport 8) : le système s'appelle SecMet Live. « Basé sur
+# Debian 13 » est une mention factuelle permise par la politique de marque
+# de Debian, avec l'avertissement de non-affiliation ; ni nom ni logo Debian
+# dans le produit. Restent, parce qu'ils sont techniques et qu'on ne peut
+# pas les changer sans perdre la signature ou casser les outils :
+# /etc/debian_version, EFI/debian (préfixe du GRUB signé), la section .sbat,
+# la version du noyau et les noms de paquets.
+DEBIAN_NOTICE="Debian est une marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni affilié au projet Debian, ni approuvé par lui."
+cat > "$ROOTFS/usr/lib/os-release" <<OS_EOF
+PRETTY_NAME="SecMet Live $VERSION"
+NAME="SecMet Live"
+VERSION_ID="$VERSION"
+VERSION="$VERSION (basé sur Debian 13 trixie)"
+VERSION_CODENAME=trixie
+ID=secmet
+ID_LIKE=debian
+HOME_URL="https://github.com/hclcdev12/secmet"
+SUPPORT_URL="https://github.com/hclcdev12/secmet"
+BUG_REPORT_URL="https://github.com/hclcdev12/secmet/issues"
+OS_EOF
+ln -sf ../usr/lib/os-release "$ROOTFS/etc/os-release"
+# Console texte (entrée « console de dépannage ») et connexion réseau.
+printf 'SecMet Live %s \\n \\l\n\n' "$VERSION" > "$ROOTFS/etc/issue"
+printf 'SecMet Live %s\n' "$VERSION" > "$ROOTFS/etc/issue.net"
+# La notice de Debian (« The programs included with the Debian GNU/Linux
+# system are free software… ABSOLUTELY NO WARRANTY ») est gardée en
+# substance, au nom de SecMet Live.
+cat > "$ROOTFS/etc/motd" <<MOTD_EOF
+
+SecMet Live $VERSION, basé sur Debian 13 (trixie).
+
+Les programmes de ce système sont des logiciels libres, sauf les
+micrologiciels (firmware) redistribués sous la licence de leur fabricant ;
+les conditions de chacun sont dans /usr/share/doc/*/copyright, le résumé
+dans /usr/share/doc/secmet-live/ et dans LICENCES/ de la partition SECMET-SYS.
+SecMet Live est fourni SANS AUCUNE GARANTIE, dans les limites permises par
+la loi.
+
+$DEBIAN_NOTICE
+MOTD_EOF
+# Logo Debian de Plymouth (thèmes bgrt et two-step non configurés) : retiré.
+rm -f "$ROOTFS/usr/share/plymouth/debian-logo.png"
+# desktop-base apporte logos, fonds et thèmes Debian : jamais dans l'image.
+if in_chroot dpkg-query -W -f '${Status}' desktop-base 2>/dev/null | grep -q 'ok installed'; then
+    echo "desktop-base installé (logos et thèmes Debian) : à exclure" >&2; exit 1
 fi
 # Icônes : cache hicolor (icône SecMet du .deb, menu et barre).
 in_chroot gtk-update-icon-cache -f -q /usr/share/icons/hicolor >/dev/null 2>&1 || true
@@ -336,6 +383,13 @@ rm -f "$ROOTFS/etc/resolv.conf"
 # démarrage relance ldconfig (10 s sur le chemin critique), la reconstruction
 # du catalogue du journal et systemd-update-done.
 touch "$ROOTFS/etc/.updated" "$ROOTFS/var/.updated"
+# Marque : contrôle bloquant de os-release, puis rapport des mentions de
+# Debian qui restent dans /etc et les thèmes de démarrage (relu à chaque
+# changement de la liste des paquets ; les fichiers de paquets qui citent
+# Debian dans un commentaire ou une URL sont attendus).
+grep -qx 'NAME="SecMet Live"' "$ROOTFS/etc/os-release" || { echo "os-release : NAME attendu SecMet Live" >&2; exit 1; }
+echo "Mentions de Debian restantes (/etc, /usr/share/plymouth) :"
+(cd "$ROOTFS" && grep -rIil debian etc usr/share/plymouth 2>/dev/null | sort | sed 's/^/  /') || true
 unmount_all
 trap - EXIT
 

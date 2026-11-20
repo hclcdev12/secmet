@@ -2,6 +2,8 @@
 
 Chaque version publiée de SecMet contient une **image de clé USB prête à écrire** : `secmet-key_<version>_x86_64.img.xz`, sur la page [Releases](https://github.com/hclcdev12/secmet/releases). Il suffit de l'écrire sur une clé avec **SecMet Clé USB**, le petit outil publié avec chaque version, ou avec un outil d'écriture d'images gratuit ; aucune ligne de commande, pas besoin de Linux. La clé démarre ensuite n'importe quel PC ou portable (UEFI, Secure Boot actif ou non, et anciens BIOS) sur SecMet, avec ses lots, ses certificats et sa clé de signature conservés sur la clé ([Annexe M](Annexes/Annexe_M_cle_live_lots.md)).
 
+Le système de la clé, **SecMet Live**, est basé sur Debian 13 (trixie) depuis la version 0.5.0. *Debian est une marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni affilié au projet Debian, ni approuvé par lui.*
+
 ## Il vous faut
 
 - Une clé USB de **16 Go ou plus** (12 Go au minimum). USB 3 conseillé : l'écriture et les effacements sont plus rapides. **Tout ce qu'elle contient sera effacé.**
