@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Arborescence commune des paquets (.deb, .rpm) : binaires, lanceur, icône,
-# policy PolicyKit, documentation, TestDisk embarqué. Les métadonnées propres
-# à chaque format (DEBIAN/control, spec RPM) sont ajoutées par l'appelant.
+# policy PolicyKit, documentation (install-docs.sh), TestDisk embarqué. Les
+# métadonnées propres à chaque format (DEBIAN/control, spec RPM) sont
+# ajoutées par l'appelant.
 #
 # Usage : stage-tree.sh <stage_dir> <secmet> <secmet-helper> <secmet-verify> [secmet-release]
 set -euo pipefail
@@ -23,8 +24,7 @@ mkdir -p \
     "$STAGE_DIR/usr/bin" \
     "$STAGE_DIR/usr/share/applications" \
     "$STAGE_DIR/usr/share/polkit-1/actions" \
-    "$STAGE_DIR/usr/share/icons/hicolor/scalable/apps" \
-    "$STAGE_DIR/usr/share/doc/secmet/Annexes"
+    "$STAGE_DIR/usr/share/icons/hicolor/scalable/apps"
 
 install -m 0755 "$BINARY" "$STAGE_DIR/usr/bin/secmet"
 install -m 0755 "$HELPER_BINARY" "$STAGE_DIR/usr/bin/secmet-helper"
@@ -39,22 +39,9 @@ install -m 0644 "$ROOT_DIR/content/SecMet_icon.svg" \
 install -m 0644 "$PKG_DIR/secmet.policy" \
     "$STAGE_DIR/usr/share/polkit-1/actions/secmet.policy"
 
-DOC="$STAGE_DIR/usr/share/doc/secmet"
-install_doc() {
-    local src="$1" dst="$2"
-    [[ -f "$src" ]] && install -m 0644 "$src" "$DOC/$dst"
-    return 0
-}
-install_doc "$ROOT_DIR/LICENSE" LICENSE
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" THIRD_PARTY_LICENSES.md
-install_doc "$PKG_DIR/debian-copyright" copyright
-install_doc "$PKG_DIR/bundled-tools-compliance.txt" bundled-tools-compliance.txt
-install_doc "$PKG_DIR/gpl-2.0.txt" gpl-2.0.txt
-install_doc "$ROOT_DIR/content/LICENSE" content-LICENSE
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_G_guide_utilisateur.md" USER_GUIDE.md
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_H_deploiement_banc.md" GUIDE_DEPLOIEMENT_BANC.md
-if compgen -G "$ROOT_DIR/docs/Annexes/*.md" >/dev/null; then
-    install -m 0644 "$ROOT_DIR/docs/Annexes/"*.md "$DOC/Annexes/"
-fi
+# Documentation : liste et noms communs avec l'AppImage (install-docs.sh,
+# contrôlée par check-installed-docs.sh), avis de licences tierces compris.
+VERSION="$(grep -m1 '^version' "$ROOT_DIR/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')"
+"$PKG_DIR/install-docs.sh" "$STAGE_DIR/usr/share/doc/secmet" "$VERSION"
 
 "$PKG_DIR/bundle-tools.sh" "$STAGE_DIR"

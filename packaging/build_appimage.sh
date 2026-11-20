@@ -157,33 +157,12 @@ install -m 0644 "$ROOT_DIR/content/SecMet_icon.svg" \
 install -m 0644 "$PKG_DIR/secmet.policy" \
     "$STAGE_DIR/usr/share/secmet/secmet.policy"
 
-# Documents : mêmes noms que dans le .deb et le .rpm (packaging/stage-tree.sh),
-# dont copyright (packaging/debian-copyright). Les copyright des
-# bibliothèques embarquées sont ajoutés après le premier passage de
-# linuxdeploy (plus bas).
-DOC="$STAGE_DIR/usr/share/doc/secmet"
-install_doc() {
-    local src="$1" dst="$2"
-    [[ -f "$src" ]] && install -m 0644 "$src" "$DOC/$dst"
-    return 0
-}
-install_doc "$ROOT_DIR/LICENSE" LICENSE
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" THIRD_PARTY_LICENSES.md
-install_doc "$PKG_DIR/debian-copyright" copyright
-install_doc "$PKG_DIR/bundled-tools-compliance.txt" bundled-tools-compliance.txt
-install_doc "$PKG_DIR/gpl-2.0.txt" gpl-2.0.txt
-install_doc "$ROOT_DIR/content/LICENSE" content-LICENSE
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_G_guide_utilisateur.md" USER_GUIDE.md
-install_doc "$ROOT_DIR/docs/Annexes/Annexe_H_deploiement_banc.md" GUIDE_DEPLOIEMENT_BANC.md
-# Avis de licences tierces générés (packaging/licenses, make licenses).
-cat "$PKG_DIR/licenses/secmet-linux.txt" "$PKG_DIR/licenses/appimage-runtime.txt" \
-    > "$DOC/THIRD_PARTY_LICENSES.txt"
-[[ -f "$DOC/copyright" ]] || { echo "ERREUR: packaging/debian-copyright absent" >&2; exit 1; }
-if [[ -d "$ROOT_DIR/docs/Annexes" ]]; then
-    mkdir -p "$STAGE_DIR/usr/share/doc/secmet/Annexes"
-    install -m 0644 "$ROOT_DIR/docs/Annexes/"*.md \
-        "$STAGE_DIR/usr/share/doc/secmet/Annexes/"
-fi
+# Documents : même liste et mêmes noms que le .deb et le .rpm
+# (install-docs.sh, contrôlée par check-installed-docs.sh), dont copyright
+# (packaging/debian-copyright) et les avis de licences tierces complétés par
+# le runtime AppImage. Les copyright des bibliothèques embarquées sont
+# ajoutés après le premier passage de linuxdeploy (plus bas).
+"$PKG_DIR/install-docs.sh" "$STAGE_DIR/usr/share/doc/secmet" "$VERSION" --appimage
 
 "$PKG_DIR/bundle-tools.sh" "$STAGE_DIR"
 

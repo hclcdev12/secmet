@@ -535,7 +535,7 @@ Les fichiers publiés portent le nom de la distribution visée (`secmet_<version
 
 | Type | Paquets |
 |------|---------|
-| **Depends** | `libgtk-4-1`, `policykit-1` |
+| **Depends** | `libgtk-4-1`, `pkexec` \| `policykit-1` (`policykit-1` n'existe plus dans Debian 13 ; `pkexec` existe dans Ubuntu 22.04 et 24.04, Debian 12 et 13) |
 | **Recommends** | `testdisk`, `evince` \| `atril` \| `okular` |
 | **Replaces / Conflicts** | `shred-graphique` |
 
@@ -547,7 +547,7 @@ Les fichiers publiés portent le nom de la distribution visée (`secmet_<version
 | `/usr/share/applications/secmet.desktop`, `/usr/share/icons/hicolor/scalable/apps/secmet.svg` | Lanceur |
 | `/usr/share/polkit-1/actions/secmet.policy` | PolicyKit |
 | `/usr/lib/secmet/bin/testdisk`, `/usr/lib/secmet/lib/` | TestDisk embarqué |
-| `/usr/share/doc/secmet/` | Licences, guide utilisateur, guide de déploiement, annexes, conformité |
+| `/usr/share/doc/secmet/` | Licences (`LICENSE`, `copyright`, `content-LICENSE`, avis tiers `THIRD_PARTY_LICENSES.txt`), conformité de TestDisk, `Fabriquer_sa_cle.md`, PDF d'exemple, `Annexes/` (index et annexes citées), copies `USER_GUIDE.md` et `GUIDE_DEPLOIEMENT_BANC.md` ; liste commune avec l'AppImage (`packaging/install-docs.sh`, annexe J §11) |
 
 ### 10.4 Développement
 

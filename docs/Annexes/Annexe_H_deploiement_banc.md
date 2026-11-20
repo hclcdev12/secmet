@@ -43,8 +43,8 @@ Dans tous les cas, SecMet fonctionne **sur le banc** : aucun serveur applicatif 
 
 ## 3. Machine dédiée (référence)
 
-1. Installer Debian/Ubuntu/Mint (amd64) sur le banc.
-2. Installer le paquet, apt résolvant les dépendances (`libgtk-4-1`, `policykit-1`) et les recommandations (`testdisk`, lecteur PDF) :
+1. Installer Debian/Ubuntu/Mint (amd64) sur le banc : paquet `ubuntu24.04` pour Ubuntu 24.04, Mint 22 et Debian 13, `ubuntu22.04` pour Ubuntu 22.04, Mint 21 et Debian 12 (installation vérifiée dans des conteneurs Debian 12 et 13 à chaque release).
+2. Installer le paquet, apt résolvant les dépendances (`libgtk-4-1`, `pkexec` ou à défaut `policykit-1`) et les recommandations (`testdisk`, lecteur PDF) :
 
    ```bash
    sudo apt install ./secmet_<version>.ubuntu24.04_amd64.deb   # fichier de la release (ubuntu22.04 pour une glibc < 2.39)

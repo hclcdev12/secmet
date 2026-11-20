@@ -16,7 +16,7 @@ APT_PACKAGES=(
     curl
     libgtk-4-dev
     libglib2.0-dev
-    policykit-1
+    pkexec
     testdisk
 )
 
@@ -163,7 +163,7 @@ verify_environment() {
             else
                 say "  pkexec sans setuid: $pkexec_bin"
                 say "    -> make fix-pkexec"
-                say "    -> ou: sudo apt install --reinstall policykit-1"
+                say "    -> ou: sudo apt install --reinstall pkexec"
                 ok=false
             fi
         fi

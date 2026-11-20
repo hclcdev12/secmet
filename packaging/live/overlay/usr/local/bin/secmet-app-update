@@ -5,6 +5,15 @@
 # et si ses signatures sont valides (clé de version). La précédente version
 # reste comme repli ; en cas d'échec, l'image garde sa version.
 #
+# Lot ouvert (décision D14) : un lot de portée « machines » survit aux
+# redémarrages. Une version V n'est déployée que si chaque lot ouvert de
+# lots/ l'a été sous V (« "software": "secmet V" » dans son lot.json).
+# Sinon V est reportée, avec un message au journal, et la version du lot
+# est conservée : celle de l'image, ou une version plus ancienne du magasin
+# qui est celle du lot. Un lot ouvert dont la version ne se lit pas compte
+# comme ouvert sous une version inconnue : rien n'est déployé. La nouvelle
+# version entre au premier démarrage qui suit la clôture du lot.
+#
 # Testable hors de la clé (packaging/live/tests/app-update.sh) : les deux
 # dossiers se surchargent par SECMET_APP_UPDATE_DATA et SECMET_APP_UPDATE_RUN,
 # les commandes système (mountpoint, dpkg-query, dpkg, secmet-release,
@@ -12,7 +21,14 @@
 DATA="${SECMET_APP_UPDATE_DATA:-/media/secmet-data}"
 RUN="${SECMET_APP_UPDATE_RUN:-/run}"
 STORE="$DATA/app"
-TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+LOTS="$DATA/lots"
+# Clés de version acceptées (décision D7), une par ligne : même liste que
+# RELEASE_PUBLIC_KEYS (src/update.rs, contrôlé par un test). Une signature
+# par l'une d'elles suffit : la future clé s'ajoute ici avant d'être
+# utilisée, l'ancienne se retire ensuite.
+TRUST_KEYS="
+bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+"
 mountpoint -q "$DATA" || exit 0
 # Clé fabriquée sans app/ (racine root 0755) : l'opérateur ne pourrait pas
 # le créer et « Installer la mise à jour » échouerait (EACCES).
@@ -21,6 +37,27 @@ if [ ! -d "$STORE" ]; then
     exit 0
 fi
 installed=$(dpkg-query -W -f='${Version}' secmet 2>/dev/null | sed 's/~.*//')
+
+# Lots ouverts, un par ligne : « <identifiant> <version> », version « ? »
+# si elle ne se lit pas. lot.json est écrit par serde_json::to_string_pretty :
+# champs du lot indentés de deux espaces, ceux des entrées machine davantage
+# (format couvert par un test de src/lot.rs). Statut illisible : ouvert.
+open_lots() {
+    for f in "$LOTS"/*/lot.json; do
+        [ -f "$f" ] || continue
+        st=$(sed -n 's/^  "status": "\([a-z_]*\)",\{0,1\}$/\1/p' "$f" | head -1)
+        case "$st" in closed|abandoned) continue ;; esac
+        sw=$(sed -n 's/^  "software": "secmet \([^" ]*\)",\{0,1\}$/\1/p' "$f" | head -1)
+        printf '%s %s\n' "$(basename "$(dirname "$f")")" "${sw:-?}"
+    done
+}
+lots=$(open_lots)
+
+# Arguments --trust de secmet-release, un par clé de version.
+set --
+for k in $TRUST_KEYS; do
+    set -- "$@" --trust "$k"
+done
 # Du plus récent au plus ancien. Pas de clés « -k…n » avec un « -r » global :
 # GNU sort n'applique pas l'option globale aux clés qui ont la leur, le tri
 # restait ascendant et la clé redéployait la plus ancienne version (0.3.8
@@ -34,8 +71,15 @@ for version in $(ls "$STORE" 2>/dev/null | sort -rV); do
         logger -t secmet-app-update "version $version pas plus récente que $installed : rien à faire"
         exit 0
     fi
+    # Un lot ouvert sous une autre version que $version : report. Les
+    # versions plus anciennes du magasin restent candidates (celle du lot).
+    blocker=$(printf '%s\n' "$lots" | awk -v v="$version" 'NF == 2 && $2 != v { print; exit }')
+    if [ -n "$blocker" ]; then
+        logger -t secmet-app-update "version $version reportée : lot ${blocker%% *} ouvert sous secmet ${blocker#* } ; déploiement au démarrage qui suivra sa clôture"
+        continue
+    fi
     tv=$(date +%s)
-    if ! secmet-release verify "$dir" --trust "$TRUST" --file "$(basename "$deb")" >/dev/null 2>&1; then
+    if ! secmet-release verify "$dir" "$@" --file "$(basename "$deb")" >/dev/null 2>&1; then
         logger -t secmet-app-update "version $version : signature ou empreinte invalide, ignorée"
         continue
     fi

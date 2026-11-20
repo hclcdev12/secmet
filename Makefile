@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-sb-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check
+.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-sb-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check test-live-scripts test-docs
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -97,6 +97,9 @@ test-live-scripts: ## Test des scripts de démarrage de la clé (mise à jour, a
 	@./packaging/live/tests/app-update.sh
 	@./packaging/live/tests/image-check.sh
 
+test-docs: ## Test de la documentation installée (install-docs.sh, check-installed-docs.sh)
+	@./packaging/tests/install-docs.sh
+
 live-key: ## Écrit la clé USB SecMet : make live-key DEV=/dev/sdX (root, efface la clé)
 	@test -n "$(DEV)" || { echo "usage : make live-key DEV=/dev/sdX"; exit 1; }
 	@sudo ./packaging/live/secmet-make-key.sh "$(DEV)"
@@ -121,5 +124,6 @@ test: deps ## Lance les tests unitaires
 	@$(CARGO_ENV) $(CARGO) test --workspace
 	@./packaging/live/tests/app-update.sh
 	@./packaging/live/tests/image-check.sh
+	@./packaging/tests/install-docs.sh
 
 .DEFAULT_GOAL := help

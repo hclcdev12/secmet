@@ -34,7 +34,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential pkg-config \
             libgtk-4-dev libglib2.0-dev \
-            policykit-1 testdisk
+            pkexec testdisk
 
       - name: Toolchain Rust stable
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
@@ -71,24 +71,26 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Bits d'exécution (un script ou un crochet non exécutable est ignoré en silence)
         run: |
-          for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh \
+          for f in scripts/*.sh packaging/*.sh packaging/tests/*.sh packaging/live/*.sh packaging/live/tests/*.sh \
                    packaging/live/overlay/usr/local/bin/* packaging/live/overlay/etc/initramfs-tools/hooks/* \
                    packaging/live/overlay/usr/lib/systemd/system-sleep/*; do
             test -x "$f" || { echo "non exécutable : $f"; exit 1; }
           done
       - name: Syntaxe bash
         run: |
-          for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh; do bash -n "$f"; done
+          for f in scripts/*.sh packaging/*.sh packaging/tests/*.sh packaging/live/*.sh packaging/live/tests/*.sh; do bash -n "$f"; done
           for f in packaging/live/overlay/usr/local/bin/*; do sh -n "$f"; done
       - name: shellcheck
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
-          shellcheck -S warning scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh
+          shellcheck -S warning scripts/*.sh packaging/*.sh packaging/tests/*.sh packaging/live/*.sh packaging/live/tests/*.sh
           shellcheck -S warning -s sh packaging/live/overlay/usr/local/bin/*
       - name: Scripts de démarrage de la clé (doublures)
         run: |
           ./packaging/live/tests/app-update.sh
           ./packaging/live/tests/image-check.sh
+      - name: Documentation installée (install-docs.sh, contrôle et cas refusés)
+        run: ./packaging/tests/install-docs.sh
 
   audit:
     name: cargo audit (RustSec)
