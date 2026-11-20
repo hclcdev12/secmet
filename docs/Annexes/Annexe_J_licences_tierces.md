@@ -47,7 +47,7 @@ Une release publie 14 fichiers. Ce document couvre les onze livrables logiciels 
 
 | Fichier | Contenu | Où il est livré |
 |---|---|---|
-| `secmet-linux.txt` | crates de `secmet`, `secmet-helper`, `secmet-verify`, `secmet-release` (Linux) | intégré à l'application (« À propos ») ; AppImage SecMet, `usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
+| `secmet-linux.txt` | crates de `secmet`, `secmet-helper`, `secmet-verify`, `secmet-release` (Linux) | intégré à l'application (« À propos ») ; `.deb` et `.rpm`, `/usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt` (0.5.0) ; AppImage SecMet, même chemin, avec `appimage-runtime.txt` |
 | `key-writer-linux.txt` | crates de SecMet Clé USB (Linux) et textes des polices d'egui | AppImage SecMet Clé USB, `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
 | `key-writer-windows.txt` | crates de SecMet Clé USB (Windows MSVC et MinGW), polices d'egui, runtime MinGW (`windows-mingw.txt`) | **intégré au `.exe`** : fenêtre « À propos », option `--licenses`, bouton « Enregistrer… » |
 | `fonts-egui.txt` | `UFL.txt`, `OFL.txt`, `Hack-Regular.txt`, `emoji-icon-font-mit-license.txt` de `epaint_default_fonts`, copiés du registre cargo avec contrôle sha256 (§6.2) | dans les deux avis de SecMet Clé USB |
@@ -340,7 +340,7 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | TestDisk (GPL) embarqué bloque-t-il ? | **Non** (programme séparé, agrégat), à condition de livrer la licence (fait) et les sources correspondantes : l'offre actuelle ne suffit pas pour une vente (§8) |
 | La clé USB (Ubuntu) peut-elle être vendue ? | **Oui**, comme agrégat, à condition de fournir les sources des paquets GPL/LGPL/AGPL (§8) et de respecter la politique de marque de Canonical (§7.3) |
 | QDiskInfo (inspiration) oblige-t-il la GPL ? | Sans objet (réécriture indépendante, et SecMet est GPL) |
-| Points d'attention principaux | **Offre de sources** (TestDisk, AppImage, clé) ; **avis tiers** absents sur la clé et dans le `.deb`/`.rpm` (fichier ; l'application les affiche) ; **marque Ubuntu** de la clé |
+| Points d'attention principaux | **Offre de sources** (TestDisk, AppImage, clé) ; **avis tiers** absents de la partition de démarrage de la clé (ils sont dans le système de la clé, paquet SecMet compris, et l'application les affiche) ; **marque Ubuntu** de la clé |
 
 ---
 
@@ -350,15 +350,19 @@ Aucun de ces points n'est réalisé en 0.4.0.
 |---|---|---|
 | `.deb`, `.rpm` | `/usr/share/doc/secmet/LICENSE` | Licence GPL-3.0 SecMet (notice + texte intégral) |
 | | `/usr/share/doc/secmet/content-LICENSE` | Nom et logo SecMet ; icône Bootstrap (MIT) |
+| | `/usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt` | Avis de licences tierces générés (`secmet-linux.txt`, §1.1), depuis la 0.5.0 |
 | | `/usr/share/doc/secmet/THIRD_PARTY_LICENSES.md` | Ce document (copie de l'Annexe J) |
-| | `/usr/share/doc/secmet/copyright` | Synthèse au format Debian (DEP-5), avec les textes des licences des crates et des bibliothèques de TestDisk |
+| | `/usr/share/doc/secmet/copyright` | Synthèse au format Debian (DEP-5), avec les textes des licences des crates et des bibliothèques de TestDisk ; **même nom dans tous les livrables** (source : `packaging/debian-copyright`) |
 | | `/usr/share/doc/secmet/bundled-tools-compliance.txt`, `gpl-2.0.txt` | Conformité de TestDisk embarqué |
-| | `/usr/share/doc/secmet/USER_GUIDE.md`, `GUIDE_DEPLOIEMENT_BANC.md`, `Annexes/` | Annexes G, H et toutes les annexes |
-| | (application) | Fenêtre « À propos » : notice, texte de `LICENSE`, avis `secmet-linux.txt` intégrés au binaire. Le fichier `THIRD_PARTY_LICENSES.txt` n'est pas encore installé par le `.deb` et le `.rpm` (reporté en phase 3 avec les autres changements de `stage-tree.sh`) |
-| AppImage SecMet | `usr/share/doc/secmet/` | Les mêmes documents, sous les mêmes noms (dont `copyright`, `USER_GUIDE.md` et `GUIDE_DEPLOIEMENT_BANC.md`), plus `usr/share/doc/<paquet>/copyright` de chaque bibliothèque Ubuntu embarquée et de TestDisk (liste : `bundled-libraries.txt`) |
+| | `/usr/share/doc/secmet/Fabriquer_sa_cle.md`, `exemple_pdf.pdf`, `exemple_lot.pdf`, `Annexes/` | Mêmes emplacements relatifs que `docs/` dans le dépôt ; `Annexes/` : l'index `README.md` et les annexes qu'il cite, versionnées |
+| | `/usr/share/doc/secmet/USER_GUIDE.md`, `GUIDE_DEPLOIEMENT_BANC.md` | Copies des annexes G et H |
+| | (application) | Fenêtre « À propos » : notice, texte de `LICENSE`, avis `secmet-linux.txt` intégrés au binaire |
+| AppImage SecMet | `usr/share/doc/secmet/` | Les mêmes documents, sous les mêmes noms (même script), plus `usr/share/doc/<paquet>/copyright` de chaque bibliothèque Ubuntu embarquée et de TestDisk (liste : `bundled-libraries.txt`) |
 | | `usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt` | Avis des crates (`secmet-linux.txt`) et du runtime AppImage (`appimage-runtime.txt`), §1.1 |
 | `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | — | Aucun fichier (exécutable seul) ; licence et avis : `LICENSE` et cette annexe dans le dépôt |
 | AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet |
 | | `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt` | Avis des crates, des polices d'egui et du runtime AppImage (`key-writer-linux.txt` + `appimage-runtime.txt`), affiché par « À propos » et `--licenses` |
 | `.exe` SecMet Clé USB | (dans l'exécutable) | Avis `key-writer-windows.txt` et `LICENSE` intégrés : fenêtre « À propos » (bouton « Enregistrer… »), `secmet-key-writer.exe --licenses` |
 | Image de clé, `.tar` | `/usr/share/doc/*/copyright` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) | Avis des paquets Ubuntu ; aucun texte sur la partition de démarrage ni dans le `LISEZMOI.txt` du `.tar` |
+
+**Une seule liste (0.5.0, décision D18).** Le `.deb`, le `.rpm` (`packaging/stage-tree.sh`) et l'AppImage (`build_appimage.sh`) installent la documentation par le même script, `packaging/install-docs.sh <dossier> <version> [--appimage]`. Les liens relatifs des documents installés sont réécrits : vers le fichier installé quand il l'est (`../../LICENSE` devient `../LICENSE`, `../../content/LICENSE` devient `../content-LICENSE`, les annexes citées par les copies de la racine deviennent `Annexes/…`), sinon vers GitHub **au tag de la version** (`https://github.com/hclcdev12/secmet/blob/v<version>/<chemin>`, par exemple `packaging/live/README.md` ou le `README.md` du dépôt ; adresse prise dans `crates/secmet-attest/src/legal.rs`). Une annexe absente de l'index `docs/Annexes/README.md` ou non versionnée (`git ls-files`, quand git est disponible ; sinon l'index seul) n'est jamais installée. `packaging/check-installed-docs.sh` termine l'installation et fait échouer la construction si `copyright`, `LICENSE` ou `THIRD_PARTY_LICENSES.txt` manque, si l'ancien nom `debian-copyright` reparaît, si une annexe installée est hors index ou non versionnée, ou si un lien relatif ne mène à aucun fichier installé ; il est aussi lancé après l'installation des paquets (`package.yml`, `release.sh`) et sur l'AppImage extraite (`appimage-smoke.sh`). Test sans paquet : `make test-docs` (`packaging/tests/install-docs.sh`, dans `make test` et en CI).

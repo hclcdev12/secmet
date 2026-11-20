@@ -261,6 +261,7 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make live-image` | Clé SecMet virtuelle `dist/live/secmet-key.img` pour QEMU (conteneur privilégié, après `make live`) |
 | `make live-test` | Démarre la clé virtuelle dans QEMU (UEFI OVMF), avec écran |
 | `make test-live-scripts` | Test du script de mise à jour au démarrage de la clé, avec doublures (sans QEMU) |
+| `make test-docs` | Test de la documentation installée (liste, noms, liens réécrits, annexes non versionnées refusées), sans paquet |
 | `make live-check` | Contrôle QEMU sans écran : la clé virtuelle déploie la version la plus récente de son magasin `app/` |
 | `make live-dist` | Image publiable de la clé `dist/secmet-key_<version>_x86_64.img.xz`, à écrire telle quelle avec Raspberry Pi Imager, Rufus ou `dd` (après `make live`) |
 | `make key-writer` | SecMet Clé USB (`crates/secmet-key-writer`, egui) : outil graphique qui télécharge l'image de la clé, vérifie la signature de la release avec la clé de version, puis l'empreinte de l'image, l'écrit sur une clé USB et la relit (Linux et Windows) ; une image de la version courante déjà présente dans le dossier des téléchargements est prise d'office au lancement (« Autre image » ramène au choix) ; `make key-writer-appimage` l'assemble en `dist/secmet-key-writer_<version>_x86_64.AppImage` (conteneur Ubuntu 24.04), `make key-writer-exe` en `dist/secmet-key-writer_<version>_x86_64.exe` (compilation croisée MinGW, sur la machine ou dans le même conteneur ; en CI, runner Windows) ; pendant l'écriture, dès le premier bloc, l'outil complète la GPT (copie de secours au bout de la clé, MBR protecteur étendu), sans quoi Windows la « répare » en cassant le MBR protecteur |
@@ -344,6 +345,7 @@ scripts/
 
 packaging/
   stage-tree.sh        # Arborescence commune des paquets (binaires, policy, docs, TestDisk)
+  install-docs.sh      # Documentation installée, commune au .deb, au .rpm et à l'AppImage (contrôle : check-installed-docs.sh)
   build_deb.sh         # Construction du .deb
   build_rpm.sh         # Construction du .rpm (spec : secmet.spec)
   build_appimage.sh    # Construction de l'AppImage (délègue au conteneur)

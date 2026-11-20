@@ -136,6 +136,7 @@ secmet-verify --help >/dev/null
 if secmet-helper 2>/dev/null; then exit 1; else test $? -eq 2; fi
 test -x /usr/lib/secmet/bin/testdisk
 test -f /usr/share/polkit-1/actions/secmet.policy
+./packaging/check-installed-docs.sh /usr/share/doc/secmet
 echo SMOKE_OK
 '
 # Binaires Linux autonomes secmet-verify et secmet-release : construits avec

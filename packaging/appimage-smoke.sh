@@ -3,7 +3,8 @@
 # binaires, outils annexes secmet-verify et secmet-release et leur
 # aiguillage par AppRun, copyright de SecMet et de chaque bibliothèque
 # embarquée (liste usr/share/doc/secmet/bundled-libraries.txt écrite par
-# bundle-tools.sh --copyrights). Appelé par package.yml (travail appimage)
+# bundle-tools.sh --copyrights), avis de licences tierces et documentation
+# de SecMet (check-installed-docs.sh). Appelé par package.yml (travail appimage)
 # et par release.sh.
 #
 # usage : packaging/appimage-smoke.sh <squashfs-root>
@@ -33,6 +34,12 @@ rmdir "$empty"
 
 DOC="$R/usr/share/doc/secmet"
 [[ -s "$DOC/copyright" ]] || fail "usr/share/doc/secmet/copyright absent"
+grep -qF "Composants du runtime AppImage" "$DOC/THIRD_PARTY_LICENSES.txt" 2>/dev/null \
+    || fail "usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt absent ou sans le runtime AppImage"
+# Même documentation que le .deb et le .rpm (install-docs.sh) : noms, index
+# des annexes, liens relatifs.
+"$(dirname "${BASH_SOURCE[0]}")/check-installed-docs.sh" "$DOC" >/dev/null \
+    || fail "documentation installée incomplète (check-installed-docs.sh)"
 LIST="$DOC/bundled-libraries.txt"
 [[ -s "$LIST" ]] || fail "usr/share/doc/secmet/bundled-libraries.txt absent"
 listed="$(grep -v '^#' "$LIST" | cut -d' ' -f1 | sort -u)"

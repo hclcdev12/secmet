@@ -124,6 +124,7 @@ jobs:
           secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
+          ./packaging/check-installed-docs.sh /usr/share/doc/secmet
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -205,6 +206,9 @@ jobs:
           secmet-helper 2>/dev/null && exit 1 || test $? -eq 2
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
+          rpm -ql secmet | grep -qx /usr/share/doc/secmet/Annexes/README.md
+          rpm -ql secmet | grep -qx /usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt
+          ./packaging/check-installed-docs.sh /usr/share/doc/secmet
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
