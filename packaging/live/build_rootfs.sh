@@ -372,6 +372,12 @@ sed -i 's|size=$( expr $(ls -la ${MODULETORAMFILE} \| awk .{print $5}.) / 1024 +
 grep -q 'stat -c %s' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch taille toram non appliqué" >&2; exit 1; }
 step "initramfs live-boot"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
+# Manifeste des paquets (B3) : chaque paquet installé du système, avec son
+# paquet source et les sources intégrées à sa construction (Built-Using,
+# Static-Built-Using des paquets Rust et Go). Complété plus bas par la
+# chaîne de démarrage, qui n'est pas dans le squashfs.
+in_chroot dpkg-query -W -f '${db:Status-Abbrev}|${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${Built-Using}\t${Static-Built-Using}\n' \
+    | sed -n 's/^ii *|//p' | LC_ALL=C sort > /tmp/rootfs.manifest
 in_chroot apt-get clean
 rm -rf "$ROOTFS/var/lib/apt/lists/"* "$ROOTFS/tmp/"* "$ROOTFS/usr/sbin/policy-rc.d"
 # debootstrap copie le resolv.conf de la machine de construction dans le
@@ -425,6 +431,29 @@ cp "$EFI_PKG/shim-helpers-amd64-signed/usr/lib/shim/mmx64.efi.signed" "$OUT/efi/
 cp "$EFI_PKG/grub-efi-amd64-signed/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$OUT/efi/grubx64.efi"
 cp "$EFI_PKG/versions.tsv" "$OUT/efi/versions.tsv"
 [[ -f "$EFI_PKG/efi-pin.sha256.new" ]] && cp "$EFI_PKG/efi-pin.sha256.new" "$OUT/efi/"
+# Manifeste complet : système (squashfs), puis partition SECMET-SYS (chaîne
+# UEFI épinglée, GRUB BIOS du conteneur). Publié avec la release
+# (secmet-key_<version>_x86_64.packages.tar, bundle_live.sh).
+step "Manifeste des paquets"
+{
+    echo "# SecMet Live $VERSION : paquets de l'image de la clé USB, système basé sur Debian 13 (trixie)."
+    echo "# Construit le $(date -u +%F) par packaging/live/build_rootfs.sh (sources : https://github.com/hclcdev12/secmet)."
+    echo "# Colonnes (tabulations) : paquet, version, architecture, paquet source, version source, Built-Using, Static-Built-Using."
+    echo "# Debian est une marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni affilié au projet Debian, ni approuvé par lui."
+    echo "#"
+    echo "# Système (live/filesystem.squashfs)"
+    cat /tmp/rootfs.manifest
+    echo "#"
+    echo "# Partition de démarrage SECMET-SYS (EFI/BOOT, boot/grub), hors du système"
+    cut -f1-6 "$EFI_PKG/versions.tsv" | sed 's/$/\t/'
+    dpkg-query -W -f '${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${Built-Using}\t\n' grub-pc-bin
+} > "$OUT/packages.manifest"
+n_manifest=$(grep -vc '^#' "$OUT/packages.manifest")
+for must in linux-image-amd64 testdisk secmet live-boot shim-signed shim-helpers-amd64-signed grub-efi-amd64-signed grub-pc-bin; do
+    grep -q "^$must"$'\t' "$OUT/packages.manifest" || { echo "manifeste : $must absent" >&2; exit 1; }
+done
+[[ "$n_manifest" -ge 500 ]] || { echo "manifeste : $n_manifest paquets seulement" >&2; exit 1; }
+echo "packages.manifest : $n_manifest paquets"
 cp -a /usr/lib/grub/i386-pc/. "$OUT/bios/"
 chmod 0644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs "$OUT"/efi/*
 echo "secmet $(dpkg-deb -f "$DEB" Version) ; noyau $(basename "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)")" > "$OUT/VERSION"

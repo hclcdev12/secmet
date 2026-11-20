@@ -8,6 +8,10 @@
 #   target/release/      secmet-release lié en statique (target-live/, make live) :
 #                        tourne sur toute distribution x86_64
 #   LISEZMOI.txt         la commande de fabrication
+# et le manifeste des paquets de l'image, publié à part avec la release :
+# dist/secmet-key_<version>_x86_64.packages.tar (un seul fichier,
+# secmet-key_<version>_x86_64.packages.txt ; en .tar pour être listé dans
+# SHA256SUMS signé comme les autres livrables).
 # Refuse une image qui n'est pas de la version de Cargo.toml (make live d'abord),
 # sauf si dist/live/app/<version>/ porte le paquet de cette version signé
 # (image reprise d'une release précédente, refresh_live.sh) : le magasin est
@@ -36,6 +40,7 @@ fi
 for f in vmlinuz initrd.img efi/shimx64.efi efi/grubx64.efi efi/mmx64.efi; do
     [[ -f "$LIVE/$f" ]] || die "$LIVE/$f absent"
 done
+[[ -f "$LIVE/packages.manifest" ]] || die "$LIVE/packages.manifest absent (image antérieure au manifeste des paquets : construction complète, make live ou --full-live)"
 
 NAME="secmet-live-$VERSION"
 OUT="$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar"
@@ -43,7 +48,7 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 D="$STAGE/$NAME"
 mkdir -p "$D/dist/live" "$D/packaging/live" "$D/target/release"
-cp "$LIVE/vmlinuz" "$LIVE/initrd.img" "$LIVE/filesystem.squashfs" "$LIVE/VERSION" "$D/dist/live/"
+cp "$LIVE/vmlinuz" "$LIVE/initrd.img" "$LIVE/filesystem.squashfs" "$LIVE/VERSION" "$LIVE/packages.manifest" "$D/dist/live/"
 cp -r "$LIVE/efi" "$D/dist/live/"
 [[ -d "$LIVE/bios" ]] && cp -r "$LIVE/bios" "$D/dist/live/"
 [[ -n "$STORE" ]] && cp -r "$STORE" "$D/dist/live/app"
@@ -73,3 +78,18 @@ TXT
 mkdir -p "$ROOT_DIR/dist"
 tar -C "$STAGE" --owner=0 --group=0 --numeric-owner -cf "$OUT" "$NAME"
 echo "$OUT ($(du -h "$OUT" | cut -f1))$([[ -n "$STORE" ]] && echo " ; système $image_version, SecMet $VERSION dans app/")"
+
+# Manifeste publié. Image reprise d'une release précédente : même système,
+# en-tête qui le dit (la version de SecMet déployée au démarrage est celle
+# du magasin app/, pas celle du paquet secmet listé).
+PKG_NAME="secmet-key_${VERSION}_x86_64.packages"
+mkdir -p "$STAGE/manifest"
+{
+    if [[ -n "$STORE" ]]; then
+        echo "# Image de la clé de SecMet $VERSION : système repris tel quel de l'image $image_version (release v$image_version),"
+        echo "# SecMet $VERSION installé au démarrage depuis app/$VERSION de la partition de données."
+    fi
+    cat "$LIVE/packages.manifest"
+} > "$STAGE/manifest/$PKG_NAME.txt"
+tar -C "$STAGE/manifest" --owner=0 --group=0 --numeric-owner -cf "$ROOT_DIR/dist/$PKG_NAME.tar" "$PKG_NAME.txt"
+echo "$ROOT_DIR/dist/$PKG_NAME.tar ($(grep -vc '^#' "$STAGE/manifest/$PKG_NAME.txt") paquets)"

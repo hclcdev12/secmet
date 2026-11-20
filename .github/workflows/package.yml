@@ -18,7 +18,8 @@ name: Package
 # formes signées : le livrable de fabrication secmet-live_<version>_x86_64.tar
 # (image, secmet-make-key.sh, secmet-release) et l'image prête à écrire
 # secmet-key_<version>_x86_64.img.xz (Imager, Rufus, dd ;
-# docs/Fabriquer_sa_cle.md). Deux cadences (packaging/live/live-mode.sh) :
+# docs/Fabriquer_sa_cle.md), avec le manifeste des paquets de l'image
+# (secmet-key_<version>_x86_64.packages.tar). Deux cadences (packaging/live/live-mode.sh) :
 #   - si un fichier du système de la clé a changé depuis la release
 #     précédente, le travail « live » reconstruit l'image (conteneur
 #     privilégié, 14 min) ;
@@ -379,7 +380,7 @@ jobs:
       - name: Livrable de la clé USB
         run: |
           ./packaging/live/bundle_live.sh
-          tar -tf dist/secmet-live_*_x86_64.tar | grep -E 'filesystem.squashfs|secmet-make-key.sh|secmet-release$'
+          tar -tf dist/secmet-live_*_x86_64.tar | grep -E 'filesystem.squashfs|secmet-make-key.sh|secmet-release$|packages.manifest$'
 
       - name: Script de mise à jour au démarrage (doublures)
         run: ./packaging/live/tests/app-update.sh
@@ -398,6 +399,7 @@ jobs:
           path: |
             dist/secmet-live_*_x86_64.tar
             dist/secmet-key_*_x86_64.img.xz
+            dist/secmet-key_*_x86_64.packages.tar
           if-no-files-found: error
           compression-level: 0
 
@@ -435,7 +437,7 @@ jobs:
       - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' -o -name 'secmet-verify_*_x86_64' -o -name 'secmet-release_*_x86_64' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' -o -name 'secmet-key_*.packages.tar' -o -name 'secmet-verify_*_x86_64' -o -name 'secmet-release_*_x86_64' \) -exec mv {} release/ \;
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
@@ -506,7 +508,7 @@ jobs:
 
       # Ce qui est publié est exactement ce qui est signé : les fichiers de
       # SHA256SUMS (2e colonne) plus SHA256SUMS, SHA256SUMS.sig et
-      # latest.json ; chacun des 11 livrables attendus doit y être.
+      # latest.json ; chacun des 12 livrables attendus doit y être.
       - name: Liste des fichiers publiés (tirée de SHA256SUMS)
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -517,7 +519,8 @@ jobs:
                    "SecMet_${v}_x86_64.AppImage" \
                    "secmet-key-writer_${v}_x86_64.AppImage" "secmet-key-writer_${v}_x86_64.exe" \
                    "secmet-verify_${v}_x86_64" "secmet-release_${v}_x86_64" \
-                   "secmet-live_${v}_x86_64.tar" "secmet-key_${v}_x86_64.img.xz"; do
+                   "secmet-live_${v}_x86_64.tar" "secmet-key_${v}_x86_64.img.xz" \
+                   "secmet-key_${v}_x86_64.packages.tar"; do
             grep -qx "[0-9a-f]\{64\}  $f" release/SHA256SUMS || { echo "livrable absent de SHA256SUMS : $f"; exit 1; }
           done
           { awk '{ sub(/^\*/, "", $2); print $2 }' release/SHA256SUMS; printf '%s\n' SHA256SUMS SHA256SUMS.sig latest.json; } | sort > assets.txt
@@ -537,7 +540,7 @@ jobs:
             if [ -s tag-notes.md ]; then cat tag-notes.md; printf '\n\n'; fi
             # Texte générique dans un heredoc : il contient des apostrophes.
             cat <<NOTES
-          Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_${v}_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_${v}_x86_64.AppImage sous Linux, secmet-key-writer_${v}_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_${v}_x86_64.tar : image, secmet-make-key.sh, secmet-release).
+          Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_${v}_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_${v}_x86_64.AppImage sous Linux, secmet-key-writer_${v}_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_${v}_x86_64.tar : image, secmet-make-key.sh, secmet-release) ; paquets du système de la clé (basé sur Debian 13) : secmet-key_${v}_x86_64.packages.tar.
           Fedora : secmet-${v}-1.fc44.x86_64.rpm (Fedora 44 et 45) ; secmet-${v}-1.fc42.x86_64.rpm reste publié le temps de la transition.
           Outils en ligne de commande, binaires Linux autonomes (chmod +x) : secmet-verify_${v}_x86_64 (certificats et manifestes de lot) et secmet-release_${v}_x86_64 (vérification d'une release) ; aussi dans l'AppImage (./SecMet_${v}_x86_64.AppImage verify …, … release …) et dans les paquets.
           Empreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version ${key_id}).

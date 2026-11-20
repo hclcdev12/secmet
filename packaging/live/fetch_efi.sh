@@ -12,7 +12,9 @@
 #
 # usage : packaging/live/fetch_efi.sh <dossier>
 #   <dossier>/<paquet>/…        contenu de chaque paquet (dpkg-deb -x)
-#   <dossier>/versions.tsv      paquet, version, sha256 du .deb
+#   <dossier>/versions.tsv      paquet, version, architecture, paquet source,
+#                               version source, Built-Using, sha256 du .deb
+#                               (manifeste des paquets de l'image)
 # env   : SECMET_EFI_UPDATE=1   prend les versions courantes du miroir au lieu
 #                               des versions épinglées, écrit les lignes à
 #                               recopier dans <dossier>/efi-pin.sha256.new ;
@@ -70,7 +72,8 @@ while read -r kind pkg ver sha; do
     fi
     mkdir -p "$DEST/$pkg"
     dpkg-deb -x "$deb" "$DEST/$pkg"
-    printf '%s\t%s\t%s\n' "$pkg" "$got_ver" "$got_sha" >> "$DEST/versions.tsv"
+    printf '%s\t%s\n' "$(dpkg-deb --show --showformat '${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${Built-Using}' "$deb")" \
+        "$got_sha" >> "$DEST/versions.tsv"
 done < <(grep -v '^\s*#' "$PIN")
 
 while read -r kind pkg path sha; do

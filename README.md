@@ -266,7 +266,7 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make key-writer` | SecMet Clé USB (`crates/secmet-key-writer`, egui) : outil graphique qui télécharge l'image de la clé, vérifie la signature de la release avec la clé de version, puis l'empreinte de l'image, l'écrit sur une clé USB et la relit (Linux et Windows) ; une image de la version courante déjà présente dans le dossier des téléchargements est prise d'office au lancement (« Autre image » ramène au choix) ; `make key-writer-appimage` l'assemble en `dist/secmet-key-writer_<version>_x86_64.AppImage` (conteneur Ubuntu 24.04), `make key-writer-exe` en `dist/secmet-key-writer_<version>_x86_64.exe` (compilation croisée MinGW, sur la machine ou dans le même conteneur ; en CI, runner Windows) ; pendant l'écriture, dès le premier bloc, l'outil complète la GPT (copie de secours au bout de la clé, MBR protecteur étendu), sans quoi Windows la « répare » en cassant le MBR protecteur |
 | `make live-dist-check` | Contrôle QEMU sans écran, en BIOS : premier démarrage de l'image publiable sur une clé de 16 Go (clé de signature créée, partition d'export agrandie) |
 | `make live-key DEV=/dev/sdX` | Écrit une clé USB SecMet (root ; efface la clé) |
-| `make release` | Chaîne de publication : contrôles, les 14 fichiers d'une release (5 paquets construits et fumés en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 44 et 42, AppImage ; SecMet Clé USB en AppImage et `.exe` ; `secmet-verify` et `secmet-release` en binaires autonomes ; image de la clé `.img.xz` et livrable `.tar` ; `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) signés avec la clé de version du poste ; rien n'est publié |
+| `make release` | Chaîne de publication : contrôles, les 15 fichiers d'une release (5 paquets construits et fumés en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 44 et 42, AppImage ; SecMet Clé USB en AppImage et `.exe` ; `secmet-verify` et `secmet-release` en binaires autonomes ; image de la clé `.img.xz`, livrable `.tar` et manifeste des paquets de l'image `.packages.tar` ; `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) signés avec la clé de version du poste ; rien n'est publié |
 | `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation : exactement les fichiers listés par `SHA256SUMS`, plus `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` ; release créée en brouillon, publiée une fois la liste vérifiée ; refusée s'il manque un livrable (image de la clé comprise) |
 | `make fuzz-check` | Compile les cibles de fuzz (`fuzz/`) sans instrumentation |
 | `make licenses` | Régénère les avis de licences tierces `packaging/licenses/*.txt` (`cargo-about`, version épinglée), à commiter après chaque changement de `Cargo.lock` |
@@ -299,7 +299,7 @@ Le push d'un tag annoté `vX.Y.Z` suffit (un tag `vX.Y.Z-rcN` construit tout san
 ```bash
 secmet-release keygen ~/.config/secmet/release-key.hex   # une fois ; sauvegarder la clé hors ligne
 git tag -a vX.Y.Z -m "<notes de la version>" && git push origin main vX.Y.Z
-make release      # dist/release/X.Y.Z/ : les 14 fichiers, dont SHA256SUMS, SHA256SUMS.sig, latest.json
+make release      # dist/release/X.Y.Z/ : les 15 fichiers, dont SHA256SUMS, SHA256SUMS.sig, latest.json
 make publish      # release GitHub sur https://github.com/hclcdev12/secmet (confirmation)
 secmet-release verify dist/release/X.Y.Z --trust <clé publique ou key_id>
 ```

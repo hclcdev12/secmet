@@ -71,7 +71,7 @@ make deb        # dist/secmet_<version>_amd64.deb (TestDisk embarqué sous /usr/
 make rpm        # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
 make appimage   # dist/SecMet_<version>_x86_64.AppImage, assemblée dans un conteneur Ubuntu 24.04
 make live       # dist/live/ : image de la clé USB SecMet (conteneur Debian 13 privilégié) ; make live-key DEV=/dev/sdX l'écrit
-make release    # dist/release/<version>/ : les 14 fichiers (5 paquets fumés en conteneurs : .deb 24.04 et 22.04, .rpm fc44 et fc42, AppImage ; SecMet Clé USB AppImage et .exe ; secmet-verify et secmet-release autonomes ; .img.xz et .tar de la clé ; SHA256SUMS(.sig), latest.json signés)
+make release    # dist/release/<version>/ : les 15 fichiers (5 paquets fumés en conteneurs : .deb 24.04 et 22.04, .rpm fc44 et fc42, AppImage ; SecMet Clé USB AppImage et .exe ; secmet-verify et secmet-release autonomes ; .img.xz, .tar et .packages.tar de la clé ; SHA256SUMS(.sig), latest.json signés)
 make publish    # idem, puis release GitHub (confirmation) ; n'envoie pas encore .img.xz ni .tar (release.sh, liste assets) ; le push d'un tag vX.Y.Z suffit (package.yml)
 ```
 
