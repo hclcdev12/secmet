@@ -63,7 +63,7 @@ Version: $DEB_VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Depends: libgtk-4-1, policykit-1
+Depends: libgtk-4-1, pkexec | policykit-1
 Recommends: testdisk, evince | atril | okular
 Replaces: shred-graphique
 Conflicts: shred-graphique
