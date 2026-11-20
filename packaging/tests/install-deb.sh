@@ -29,6 +29,9 @@ inside() {
     export DEBIAN_FRONTEND=noninteractive
     . /etc/os-release
     echo "== $PRETTY_NAME : $(basename "$deb")"
+    # Images de conteneur minimales (Ubuntu) : /usr/share/doc écarté par
+    # dpkg ; levé pour contrôler la documentation comme sur un poste.
+    rm -f /etc/dpkg/dpkg.cfg.d/excludes
     apt-get update -qq
     apt-get install -y -qq "$deb" >/dev/null || fail "apt-get install a échoué sur $PRETTY_NAME"
     dpkg -s secmet | grep -E '^(Version|Depends):'

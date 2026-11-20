@@ -130,6 +130,9 @@ jobs:
       - name: Installation et fumée
         run: |
           export DEBIAN_FRONTEND=noninteractive
+          # L'image Ubuntu du conteneur écarte /usr/share/doc (dpkg) : levé
+          # pour contrôler la documentation installée comme sur un poste.
+          rm -f /etc/dpkg/dpkg.cfg.d/excludes
           apt-get install -y ./dist/secmet_*.deb
           dpkg -s secmet | grep -E '^(Version|Depends)'
           secmet-verify --help >/dev/null
@@ -243,6 +246,9 @@ jobs:
 
       - name: Installation et fumée
         run: |
+          # L'image Fedora du conteneur installe sans documentation
+          # (tsflags=nodocs) : levé pour la contrôler comme sur un poste.
+          sed -i '/^tsflags=nodocs/d' /etc/dnf/dnf.conf
           dnf install -y dist/secmet-*.rpm
           rpm -q secmet
           secmet-verify --help >/dev/null

@@ -198,6 +198,7 @@ curl -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal
 . \"\$HOME/.cargo/env\"
 cp -a /src /build && cd /build
 ./packaging/build_deb.sh
+rm -f /etc/dpkg/dpkg.cfg.d/excludes
 apt-get install -y -qq ./dist/secmet_*.deb >/dev/null
 dpkg -s secmet | grep -E '^(Version|Depends)'
 $smoke_deb_rpm
@@ -231,6 +232,7 @@ curl -sSf https://sh.rustup.rs | sh -s -- -y -q --profile minimal
 . \"\$HOME/.cargo/env\"
 cp -a /src /build && cd /build
 ./packaging/build_rpm.sh
+sed -i '/^tsflags=nodocs/d' /etc/dnf/dnf.conf
 dnf install -y -q dist/secmet-*.rpm >/dev/null
 rpm -q secmet
 $smoke_deb_rpm
