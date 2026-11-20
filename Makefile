@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check
+.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -99,6 +99,13 @@ live-key: ## Écrit la clé USB SecMet : make live-key DEV=/dev/sdX (root, effac
 
 fuzz-check: ## Compile les cibles de fuzz (stable, sans instrumentation)
 	@$(CARGO_ENV) cargo check --manifest-path fuzz/Cargo.toml --all-targets
+
+licenses: ## Régénère les avis de licences tierces packaging/licenses/*.txt (cargo-about épinglé, à commiter)
+	@$(CARGO_ENV) ./packaging/licenses/generate.sh
+
+licenses-check: ## Licences des dépendances (cargo deny) puis avis de packaging/licenses à jour et complets
+	@$(CARGO_ENV) cargo deny --workspace --locked check licenses
+	@$(CARGO_ENV) ./packaging/licenses/generate.sh --check
 
 install-deb: deb ## Installe le .deb via apt (résout Depends, dont testdisk)
 	@deb=$$(ls -1t dist/secmet_*.deb 2>/dev/null | head -1); \

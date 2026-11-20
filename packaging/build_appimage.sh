@@ -139,6 +139,8 @@ if [[ -f "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" ]]; then
     install -m 0644 "$ROOT_DIR/docs/Annexes/Annexe_J_licences_tierces.md" \
         "$STAGE_DIR/usr/share/doc/secmet/THIRD_PARTY_LICENSES.md"
 fi
+cat "$PKG_DIR/licenses/secmet-linux.txt" "$PKG_DIR/licenses/appimage-runtime.txt" \
+    > "$STAGE_DIR/usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt"
 for doc in debian-copyright bundled-tools-compliance.txt gpl-2.0.txt; do
     if [[ -f "$PKG_DIR/$doc" ]]; then
         install -m 0644 "$PKG_DIR/$doc" "$STAGE_DIR/usr/share/doc/secmet/$doc"

@@ -1,0 +1,52 @@
+# cargo-deny : contrôle des licences des crates tierces (cargo deny check
+# licenses), lancé par le travail « licenses » de .github/workflows/ci.yml
+# et par `make licenses-check`. Plan B point 8, Annexe J §1.1.
+#
+# Liste blanche de licences permissives ; toute autre licence passe par une
+# exception nommée, crate par crate. La GPL n'est pas autorisée de façon
+# générale : les crates de SecMet (GPL-3.0-or-later) sont privées
+# (publish = false) et donc ignorées, ce qui garde ouvertes les autres
+# options de licence du projet. La liste `accepted` de
+# packaging/licenses/about.toml (cargo-about) doit rester identique à `allow`.
+
+[graph]
+# Les trois cibles livrées : Linux (application, outils, SecMet Clé USB),
+# Windows MSVC (.exe de la CI) et Windows MinGW (.exe de la publication
+# locale).
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "x86_64-pc-windows-gnu",
+]
+# Seules les dépendances livrées comptent (pas tempfile & co).
+exclude-dev = true
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.93
+exceptions = [
+    # Licence copyleft faible par fichier ; source sur crates.io (Annexe J).
+    { crate = "option-ext", allow = ["MPL-2.0"] },
+    # Données des autorités de certification (ureq, rustls).
+    { crate = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
+    # Polices d'egui (SecMet Clé USB) : Ubuntu-Light (UFL), Noto Emoji (OFL),
+    # Hack (MIT et Bitstream Vera), emoji-icon-font (MIT). Textes complets
+    # dans packaging/licenses/fonts-egui.txt.
+    { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
+]
+
+# Crates du dépôt (publish = false) : pas contrôlées ici.
+[licenses.private]
+ignore = true

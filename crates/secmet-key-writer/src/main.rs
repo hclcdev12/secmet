@@ -12,7 +12,8 @@
 //!
 //! `--list-disks` : disques candidats ; `--verify <image>` : vérification
 //! de l'image seule (signature de la release et empreinte), pour le
-//! dépannage.
+//! dépannage ; `--licenses` : mentions légales et avis de licences tierces
+//! ([`about`]).
 //!
 //! Windows : exécutable sans console (sous-système « windows ») ; les modes
 //! en ligne de commande s'attachent à la console du parent. L'interface
@@ -22,6 +23,7 @@
 // Pas de fenêtre de console noire au lancement sous Windows.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod about;
 mod disks;
 mod gpt;
 mod gui;
@@ -36,7 +38,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if matches!(
         args.get(1).map(String::as_str),
-        Some("--list-disks" | "--verify" | "--version")
+        Some("--list-disks" | "--verify" | "--version" | "--licenses")
     ) {
         cli_console();
     }
@@ -67,6 +69,7 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
+        Some("--licenses") => about::print_licenses(),
         Some("--version") => {
             println!("secmet-key-writer {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS

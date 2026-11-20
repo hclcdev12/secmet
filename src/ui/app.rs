@@ -93,6 +93,13 @@ pub(super) fn build_ui(app: &Application) {
     settings_overlay.set_child(Some(&settings_button));
     settings_overlay.add_overlay(&super::update_ui::indicator());
     header.pack_end(&settings_overlay);
+    let about_button = Button::from_icon_name("help-about-symbolic");
+    about_button.set_tooltip_text(Some(&tr("À propos")));
+    {
+        let window = window.clone();
+        about_button.connect_clicked(move |_| super::about::show_about_dialog(&window));
+    }
+    header.pack_end(&about_button);
     let settings_button_for_wiring = settings_button.clone();
     header.set_title_widget(Some(&{
         let title = trf("{app} – Effacement sécurisé", &[("app", APP_NAME)]);

@@ -1,0 +1,21 @@
+==============================================================================
+Exécutable Windows compilé avec MinGW-w64 (publication locale, make publish)
+Windows executable built with MinGW-w64 (local release, make publish)
+==============================================================================
+
+Le .exe produit par packaging/build_key_writer_exe.sh (cible
+x86_64-pc-windows-gnu) contient, liés statiquement :
+
+- le code de démarrage et des fonctions du runtime C de MinGW-w64
+  (mingw-w64-crt) : licence ZPL-2.1, parties dans le domaine public et
+  notices permissives listées dans COPYING.MinGW-w64-runtime.txt du projet
+  MinGW-w64 (https://www.mingw-w64.org/, fichier
+  COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt de ses sources) ;
+- des fonctions de libgcc (GCC), sous GPL-3.0 avec la GCC Runtime Library
+  Exception 3.1 reproduite ci-dessous : l'exception permet de distribuer le
+  programme sous la licence de son choix ; le texte de la GPL-3 est celui de
+  SecMet (LICENSE).
+
+Le .exe du travail key-writer-windows de la CI (cible MSVC) n'en contient
+aucun ; cette section est jointe sans condition à l'avis Windows.
+

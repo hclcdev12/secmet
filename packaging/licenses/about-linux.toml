@@ -1,0 +1,32 @@
+# cargo-about : avis de licences tierces, cible Linux (application, outils, AppImage de SecMet Clé USB).
+# Généré par packaging/licenses/generate.sh (make licenses). La liste
+# `accepted` et les exceptions par crate reprennent deny.toml à la racine.
+targets = ["x86_64-unknown-linux-gnu"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+private = { ignore = true }
+# Crates sans fichier de licence exploitable : textes fournis par
+# cargo-about (ring : licence d'origine OpenSSL/ISC).
+workarounds = ["ring"]
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "Unlicense",
+    "Unicode-3.0",
+]
+
+[option-ext]
+accepted = ["MPL-2.0"]
+
+[webpki-roots]
+accepted = ["CDLA-Permissive-2.0"]
+
+# Les textes complets des polices sont dans fonts-egui.txt.
+[epaint_default_fonts]
+accepted = ["OFL-1.1", "Ubuntu-font-1.0"]

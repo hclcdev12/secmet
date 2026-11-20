@@ -3,7 +3,8 @@
 # depuis Linux, en compilation croisée : cible x86_64-pc-windows-gnu, éditeur
 # de liens MinGW. Un seul fichier .exe, sans bibliothèque à côté (TLS
 # Schannel, xz en Rust pur). C'est le même exécutable que celui du travail
-# key-writer-windows de package.yml (runner Windows, cible MSVC).
+# key-writer-windows de package.yml (runner Windows, cible MSVC). Il intègre
+# son avis de licences tierces (packaging/licenses/key-writer-windows.txt).
 #
 # Prérequis : rustup target add x86_64-pc-windows-gnu ; paquet mingw64-gcc
 # (Fedora) ou gcc-mingw-w64-x86-64 (Debian / Ubuntu). Sans MinGW sur la
@@ -67,4 +68,8 @@ if command -v x86_64-w64-mingw32-objdump >/dev/null 2>&1; then
         exit 1
     fi
 fi
+# Avis de licences tierces intégré au binaire (include_str!, « À propos »
+# et --licenses) : le texte n'est pas compressé dans le .exe.
+grep -q "SIL OPEN FONT LICENSE" "$OUT" \
+    || { echo "ERREUR: avis de licences tierces absent de $OUT" >&2; exit 1; }
 ls -la "$OUT"
