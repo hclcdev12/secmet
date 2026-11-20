@@ -27,7 +27,10 @@ name: Package
 #     avec la clé de version) et refait seulement sa partition de données,
 #     avec le nouveau .deb dans app/<version>/ signé : la clé le déploie au
 #     démarrage (packaging/live/refresh_live.sh, quelques minutes).
-#   full_live (à la main) impose la reconstruction (base Ubuntu rafraîchie).
+#   full_live (à la main) impose la reconstruction (base Debian 13 rafraîchie,
+#   chaîne de démarrage toujours celle de packaging/live/efi-pin.sha256).
+# Système de la clé : Debian 13 depuis la 0.5.0 (conteneur debian:13) ; la
+# première release qui change de base est forcément une construction complète.
 #
 # Secret : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex), rangé dans
 # l'environnement GitHub « release » : seul le travail « publish », qui
@@ -372,10 +375,17 @@ jobs:
       - name: Construction de l'image (docker --privileged)
         env:
           SECMET_ENGINE: docker
+          # Titulaire de l'offre de sources (OFFRE_SOURCES.txt de la clé,
+          # décision D1) : variable du dépôt, pas un secret.
+          SECMET_SOURCE_OFFER_HOLDER: ${{ vars.SECMET_SOURCE_OFFER_HOLDER }}
         run: |
           ./packaging/live/build_live.sh
           cat dist/live/VERSION
           ls -la dist/live/
+          # Chaîne UEFI épinglée (versions contrôlées par fetch_efi.sh) et
+          # taille du manifeste des paquets.
+          cut -f1,2,7 dist/live/efi/versions.tsv
+          echo "$(grep -vc '^#' dist/live/packages.manifest) paquets dans le manifeste"
 
       - name: Livrable de la clé USB
         run: |
