@@ -10,6 +10,7 @@ name = "secmet"
 version = "0.4.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
+publish = false
 
 [lib]
 name = "secmet"

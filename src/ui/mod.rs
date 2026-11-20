@@ -2,6 +2,7 @@
 //!
 //! Découpe du monolithe historique `ui.rs` en sous-modules.
 
+mod about;
 mod app;
 mod app_theme;
 mod auth;

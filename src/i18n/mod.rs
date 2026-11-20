@@ -8,6 +8,7 @@
 //! Les certificats PDF sont rédigés dans la langue de l'interface au moment
 //! de leur génération ; les journaux de session restent en français.
 
+mod about;
 mod certificate;
 mod clock;
 mod lot;
@@ -92,6 +93,7 @@ fn table() -> &'static Table {
             update::TABLE,
             lot::TABLE,
             clock::TABLE,
+            about::TABLE,
         ] {
             for (fr, en, de) in entries {
                 map.insert(*fr, (*en, *de));
@@ -241,6 +243,7 @@ mod tests {
             update::TABLE,
             lot::TABLE,
             clock::TABLE,
+            about::TABLE,
         ] {
             for (fr, en, de) in entries {
                 if let Some(previous) = seen.insert(fr, (en, de)) {
@@ -265,6 +268,7 @@ mod tests {
             update::TABLE,
             lot::TABLE,
             clock::TABLE,
+            about::TABLE,
         ] {
             for (fr, en, de) in entries {
                 let names = |s: &str| {

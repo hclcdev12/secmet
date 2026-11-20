@@ -66,6 +66,11 @@ install -m 0644 "$PKG_DIR/secmet-key-writer.desktop" "$STAGE_DIR/usr/share/appli
 install -m 0644 "$ROOT_DIR/content/SecMet_icon.svg" \
     "$STAGE_DIR/usr/share/icons/hicolor/scalable/apps/secmet-key-writer.svg"
 install -m 0644 "$ROOT_DIR/LICENSE" "$STAGE_DIR/usr/share/doc/secmet-key-writer/LICENSE"
+# Avis de licences tierces (crates, polices egui, runtime AppImage), lu par
+# la fenêtre « À propos » et par --licenses : généré par make licenses.
+cat "$PKG_DIR/licenses/key-writer-linux.txt" "$PKG_DIR/licenses/appimage-runtime.txt" \
+    > "$STAGE_DIR/usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt"
+chmod 0644 "$STAGE_DIR/usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt"
 # AppRun : l'exécutable lui-même (aucune variable d'environnement à poser).
 # linuxdeploy n'embarque aucune bibliothèque : le binaire ne lie que la
 # glibc et charge Wayland/X11/EGL de l'hôte à l'exécution.

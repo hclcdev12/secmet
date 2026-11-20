@@ -1,7 +1,7 @@
 name: CI
 
 # Intégration continue : format, clippy strict, tests, audit des dépendances,
-# syntaxe des scripts. Tourne sur main.
+# licences des dépendances, syntaxe des scripts. Tourne sur main.
 
 on:
   push:
@@ -97,6 +97,22 @@ jobs:
       - uses: taiki-e/install-action@cdd500fcb345d29dabc5617aab1edf24d5211116 # cargo-audit
       - name: cargo audit
         run: cargo audit
+
+  licenses:
+    name: Licences des dépendances (cargo-deny, avis cargo-about à jour)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      # Versions épinglées : la sortie de cargo-about en dépend
+      # (ABOUT_VERSION de packaging/licenses/generate.sh).
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
+        with:
+          tool: cargo-deny@0.22.0,cargo-about@0.9.3
+      - name: cargo deny check licenses (toutes les crates du dépôt, 3 cibles)
+        run: cargo deny --workspace --locked check licenses
+      - name: Avis de licences tierces à jour et complets (packaging/licenses)
+        run: ./packaging/licenses/generate.sh --check
 
   fuzz-build:
     name: Cibles de fuzz compilables

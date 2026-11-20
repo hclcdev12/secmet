@@ -175,6 +175,9 @@ install_doc "$PKG_DIR/gpl-2.0.txt" gpl-2.0.txt
 install_doc "$ROOT_DIR/content/LICENSE" content-LICENSE
 install_doc "$ROOT_DIR/docs/Annexes/Annexe_G_guide_utilisateur.md" USER_GUIDE.md
 install_doc "$ROOT_DIR/docs/Annexes/Annexe_H_deploiement_banc.md" GUIDE_DEPLOIEMENT_BANC.md
+# Avis de licences tierces générés (packaging/licenses, make licenses).
+cat "$PKG_DIR/licenses/secmet-linux.txt" "$PKG_DIR/licenses/appimage-runtime.txt" \
+    > "$DOC/THIRD_PARTY_LICENSES.txt"
 [[ -f "$DOC/copyright" ]] || { echo "ERREUR: packaging/debian-copyright absent" >&2; exit 1; }
 if [[ -d "$ROOT_DIR/docs/Annexes" ]]; then
     mkdir -p "$STAGE_DIR/usr/share/doc/secmet/Annexes"

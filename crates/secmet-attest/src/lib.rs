@@ -9,6 +9,7 @@
 //! | [`qr`]        | `SM1:` + Base45(zlib(enveloppe)) et matrice de modules              |
 //! | [`pdf`]       | Écrivain PDF minimal (polices standard) et mise en page du certificat |
 //! | [`lang`]      | Langue de rédaction du PDF (français, anglais, allemand)             |
+//! | [`legal`]     | Titulaire du droit d'auteur, licence, dépôt des sources (« À propos ») |
 //! | [`keystore`]  | Clé de signature du poste, fichier `0600`, créée au premier usage     |
 //! | [`export`]    | Du contenu au PDF + JSON signé sur disque, et vérification hors ligne |
 //! | [`release`]   | Versions publiées : `SHA256SUMS` et `latest.json` signés (clé de version) |
@@ -26,6 +27,7 @@ pub mod canonical;
 pub mod export;
 pub mod keystore;
 pub mod lang;
+pub mod legal;
 pub mod manifest;
 pub mod model;
 pub mod pdf;

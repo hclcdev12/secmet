@@ -216,6 +216,8 @@ struct App {
     /// L'image courante déjà présente dans le dossier de téléchargement a
     /// été prise automatiquement (une seule fois par lancement).
     auto_picked: bool,
+    /// Fenêtre « À propos » ouverte.
+    about: Option<crate::about::About>,
 }
 
 impl App {
@@ -240,6 +242,7 @@ impl App {
             show_log: false,
             pending_notice: None,
             auto_picked: false,
+            about: None,
         };
         app.fetch_latest();
         app
@@ -644,6 +647,9 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 ui.toggle_value(&mut self.show_log, "Détails");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("À propos").clicked() {
+                        self.about = Some(crate::about::About::new());
+                    }
                     ui.weak(format!("SecMet Clé USB {}", env!("CARGO_PKG_VERSION")));
                 });
             });
@@ -666,6 +672,12 @@ impl eframe::App for App {
             }
             ui.add_space(4.0);
         });
+
+        if let Some(about) = &mut self.about {
+            if !about.show(&ctx) {
+                self.about = None;
+            }
+        }
 
         egui::CentralPanel::default().show(root, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {

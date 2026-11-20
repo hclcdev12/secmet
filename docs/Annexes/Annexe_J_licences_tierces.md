@@ -41,6 +41,22 @@ Une release publie 14 fichiers. Ce document couvre les onze livrables logiciels 
 
 `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` sont des données produites par SecMet (empreintes, signature, description de la version) : aucune licence tierce.
 
+**Titulaire et mentions légales.** Le titulaire du droit d'auteur (« SecMet Contributors » tant que la raison sociale n'est pas décidée), la licence et l'adresse du dépôt des sources sont définis à un seul endroit du code, `crates/secmet-attest/src/legal.rs`, repris par l'application et par SecMet Clé USB. Un changement de titulaire touche ce fichier, `LICENSE` et `content/LICENSE`.
+
+**Avis de licences tierces.** Ils sont générés par `cargo-about` (version épinglée dans `packaging/licenses/generate.sh`), par livrable et par cible, et **commités** dans `packaging/licenses/` :
+
+| Fichier | Contenu | Où il est livré |
+|---|---|---|
+| `secmet-linux.txt` | crates de `secmet`, `secmet-helper`, `secmet-verify`, `secmet-release` (Linux) | intégré à l'application (« À propos ») ; AppImage SecMet, `usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
+| `key-writer-linux.txt` | crates de SecMet Clé USB (Linux) et textes des polices d'egui | AppImage SecMet Clé USB, `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
+| `key-writer-windows.txt` | crates de SecMet Clé USB (Windows MSVC et MinGW), polices d'egui, runtime MinGW (`windows-mingw.txt`) | **intégré au `.exe`** : fenêtre « À propos », option `--licenses`, bouton « Enregistrer… » |
+| `fonts-egui.txt` | `UFL.txt`, `OFL.txt`, `Hack-Regular.txt`, `emoji-icon-font-mit-license.txt` de `epaint_default_fonts`, copiés du registre cargo avec contrôle sha256 (§6.2) | dans les deux avis de SecMet Clé USB |
+| `appimage-runtime.txt` | type2-runtime (MIT), libfuse 3 (LGPL-2.1, lié statiquement au runtime), squashfuse (BSD-2-Clause), zstd (BSD-3-Clause), zlib, linuxdeploy-plugin-gtk (MIT) | les deux AppImage |
+
+`make licenses` régénère ces fichiers ; `make licenses-check` (et le travail `licenses` de la CI) lance `cargo deny --workspace --locked check licenses` (liste blanche et exceptions de `deny.toml` : `option-ext` MPL-2.0, `webpki-roots` CDLA-Permissive-2.0, `epaint_default_fonts` OFL-1.1 et UFL ; pas de GPL autorisée de façon générale, les crates du dépôt sont `publish = false`), vérifie que les avis commités sont à jour, puis que chaque crate de `cargo tree` (dépendances normales, par cible) y figure. Une mise à jour de `Cargo.lock` demande donc `make licenses`.
+
+Les fenêtres « À propos » de l'application (bouton de la barre de titre, en français, anglais et allemand) et de SecMet Clé USB (pied de page, en français) donnent le nom, la version, le titulaire, la notice GPL-3 « sans aucune garantie », le texte intégral de `LICENSE`, le lien vers les sources de la version et les avis tiers (« Appropriate Legal Notices » de la GPL-3 §5(d)).
+
 ---
 
 ## 2. Crates Rust (liaison statique)
@@ -103,7 +119,7 @@ cargo tree --locked -e normal,no-proc-macro --prefix none --format '{p} {l}' \
 # --target x86_64-unknown-linux-gnu, une fois avec --target x86_64-pc-windows-msvc
 ```
 
-`cargo license --all-features` ou `cargo metadata` sans filtre de cible ne conviennent pas : ils unifient les fonctionnalités et les cibles et font apparaître des crates qui ne sont pas compilées (`openssl`, `clipboard-win`). Pour produire un fichier d'avis complet (textes des licences), `cargo about generate` s'utilise de la même façon, par cible.
+`cargo license --all-features` ou `cargo metadata` sans filtre de cible ne conviennent pas : ils unifient les fonctionnalités et les cibles et font apparaître des crates qui ne sont pas compilées (`openssl`, `clipboard-win`). Les fichiers d'avis complets (textes des licences) sont produits de la même façon, par cible, par `cargo about generate` (§1.1).
 
 ---
 
@@ -157,7 +173,7 @@ Chaque bibliothèque embarquée (`usr/lib/**/*.so*`, celles de TestDisk comprise
 
 ### 3.3 SecMet Clé USB, Linux (AppImage)
 
-Le binaire ne lie que `libc`, `libm` et `libgcc_s`. X11, Wayland, EGL, OpenGL, xkbcommon et D-Bus sont chargés à l'exécution depuis le système hôte (`dlopen`) et **ne sont pas embarqués**. L'AppImage contient le binaire, l'icône, le fichier `LICENSE` de SecMet et le runtime AppImage décrit au §3.2.
+Le binaire ne lie que `libc`, `libm` et `libgcc_s`. X11, Wayland, EGL, OpenGL, xkbcommon et D-Bus sont chargés à l'exécution depuis le système hôte (`dlopen`) et **ne sont pas embarqués**. L'AppImage contient le binaire, l'icône, le fichier `LICENSE` de SecMet, l'avis `THIRD_PARTY_LICENSES.txt` (§1.1, §11) et le runtime AppImage décrit au §3.2.
 
 ### 3.4 SecMet Clé USB, Windows (`.exe`)
 
@@ -324,7 +340,7 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | TestDisk (GPL) embarqué bloque-t-il ? | **Non** (programme séparé, agrégat), à condition de livrer la licence (fait) et les sources correspondantes : l'offre actuelle ne suffit pas pour une vente (§8) |
 | La clé USB (Ubuntu) peut-elle être vendue ? | **Oui**, comme agrégat, à condition de fournir les sources des paquets GPL/LGPL/AGPL (§8) et de respecter la politique de marque de Canonical (§7.3) |
 | QDiskInfo (inspiration) oblige-t-il la GPL ? | Sans objet (réécriture indépendante, et SecMet est GPL) |
-| Points d'attention principaux | **Offre de sources** (TestDisk, AppImage, clé) ; **avis tiers** absents à côté de SecMet Clé USB et sur la clé ; **marque Ubuntu** de la clé |
+| Points d'attention principaux | **Offre de sources** (TestDisk, AppImage, clé) ; **avis tiers** absents sur la clé et dans le `.deb`/`.rpm` (fichier ; l'application les affiche) ; **marque Ubuntu** de la clé |
 
 ---
 
@@ -338,8 +354,11 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | | `/usr/share/doc/secmet/copyright` | Synthèse au format Debian (DEP-5), avec les textes des licences des crates et des bibliothèques de TestDisk |
 | | `/usr/share/doc/secmet/bundled-tools-compliance.txt`, `gpl-2.0.txt` | Conformité de TestDisk embarqué |
 | | `/usr/share/doc/secmet/USER_GUIDE.md`, `GUIDE_DEPLOIEMENT_BANC.md`, `Annexes/` | Annexes G, H et toutes les annexes |
+| | (application) | Fenêtre « À propos » : notice, texte de `LICENSE`, avis `secmet-linux.txt` intégrés au binaire. Le fichier `THIRD_PARTY_LICENSES.txt` n'est pas encore installé par le `.deb` et le `.rpm` (reporté en phase 3 avec les autres changements de `stage-tree.sh`) |
 | AppImage SecMet | `usr/share/doc/secmet/` | Les mêmes documents, sous les mêmes noms (dont `copyright`, `USER_GUIDE.md` et `GUIDE_DEPLOIEMENT_BANC.md`), plus `usr/share/doc/<paquet>/copyright` de chaque bibliothèque Ubuntu embarquée et de TestDisk (liste : `bundled-libraries.txt`) |
+| | `usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt` | Avis des crates (`secmet-linux.txt`) et du runtime AppImage (`appimage-runtime.txt`), §1.1 |
 | `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | — | Aucun fichier (exécutable seul) ; licence et avis : `LICENSE` et cette annexe dans le dépôt |
-| AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet seulement |
-| `.exe` SecMet Clé USB | — | Aucun fichier (exécutable seul) |
+| AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet |
+| | `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt` | Avis des crates, des polices d'egui et du runtime AppImage (`key-writer-linux.txt` + `appimage-runtime.txt`), affiché par « À propos » et `--licenses` |
+| `.exe` SecMet Clé USB | (dans l'exécutable) | Avis `key-writer-windows.txt` et `LICENSE` intégrés : fenêtre « À propos » (bouton « Enregistrer… »), `secmet-key-writer.exe --licenses` |
 | Image de clé, `.tar` | `/usr/share/doc/*/copyright` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) | Avis des paquets Ubuntu ; aucun texte sur la partition de démarrage ni dans le `LISEZMOI.txt` du `.tar` |

@@ -269,6 +269,8 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 | `make release` | Chaîne de publication : contrôles, les 14 fichiers d'une release (5 paquets construits et fumés en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 44 et 42, AppImage ; SecMet Clé USB en AppImage et `.exe` ; `secmet-verify` et `secmet-release` en binaires autonomes ; image de la clé `.img.xz` et livrable `.tar` ; `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) signés avec la clé de version du poste ; rien n'est publié |
 | `make publish` | Comme `make release`, puis publication de la release GitHub après confirmation : exactement les fichiers listés par `SHA256SUMS`, plus `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` ; release créée en brouillon, publiée une fois la liste vérifiée ; refusée s'il manque un livrable (image de la clé comprise) |
 | `make fuzz-check` | Compile les cibles de fuzz (`fuzz/`) sans instrumentation |
+| `make licenses` | Régénère les avis de licences tierces `packaging/licenses/*.txt` (`cargo-about`, version épinglée), à commiter après chaque changement de `Cargo.lock` |
+| `make licenses-check` | `cargo deny check licenses` (liste blanche de `deny.toml`), puis contrôle que les avis commités sont à jour et ne manquent aucune crate livrée |
 | `make clean` | Nettoie `target/` (via rustup, pas besoin de `cargo` dans le PATH) |
 | `make fix-pkexec` | Restaure le bit setuid de `pkexec` (PolicyKit) |
 | `make verify-polkit` | Vérifie pkexec, helper et policy Polkit (cohérence des chemins) |
@@ -284,7 +286,7 @@ Installation dans un autre préfixe : `make dev PREFIX=$HOME/.local` puis `make 
 
 | Workflow | Déclencheur | Contenu |
 |----------|-------------|---------|
-| `ci.yml` | push / PR sur `main`, manuel | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, shellcheck des scripts, compilation des cibles de fuzz |
+| `ci.yml` | push / PR sur `main`, manuel | `cargo fmt`, `clippy -D warnings`, tests du workspace et des crates sans GTK, `cargo audit`, licences des dépendances (`cargo deny`, avis de `packaging/licenses/` à jour), shellcheck des scripts, compilation des cibles de fuzz |
 | `fuzz.yml` | push / PR touchant `crates/` ou `fuzz/` (60 s par cible), hebdomadaire (30 min), manuel (durée au choix) | cargo-fuzz (nightly, libFuzzer) sur neuf décodeurs purs : sense ATA, IDENTIFY, SMART, NVMe, trames IPC, QR et JSON d'attestation, mountinfo, canaris ; entrées fautives publiées en artefact |
 | `package.yml` | push sur `main`, tags `vX.Y.Z`, manuel | `.deb` Ubuntu 24.04 et 22.04 (version `<version>~<distribution>`, publiée sous `secmet_<version>.ubuntu24.04_amd64.deb` et `secmet_<version>.ubuntu22.04_amd64.deb`), `.rpm` Fedora 44 et 42 (transition), AppImage (avec `secmet-verify` et `secmet-release`), binaires autonomes `secmet-verify` et `secmet-release` (construits avec le `.deb` Ubuntu 22.04) ; chaque paquet installé et fumé dans son conteneur ; sur un tag ou à la main, image de la clé USB et son livrable `.tar` (reconstruits seulement si le système de la clé a changé depuis la release précédente, sinon repris avec le nouveau `.deb` dans leur magasin `app/`) ; sur un tag, signature et release GitHub |
 
@@ -367,6 +369,6 @@ Autres dossiers : `fuzz/` (cibles cargo-fuzz, hors workspace), `docs/` (annexes,
 
 Le code est libre : toute version redistribuée, modifiée ou intégrée doit rester sous GPL avec ses sources. Le nom **SecMet** et le lion du logo sont réservés (marque non déposée à ce jour) : ils identifient le logiciel officiel et ne sont pas couverts par la GPL (voir [content/LICENSE](content/LICENSE)) ; une version modifiée doit être renommée.
 
-SecMet s'appuie sur des composants open source : GTK 4, crates Rust (toutes sous licences permissives, sauf une en MPL-2.0), TestDisk embarqué, et pour la clé USB un système Ubuntu 24.04 complet ; SecMet Clé USB utilise egui et wgpu. Détail des licences tierces et conformité distribution : [Annexe J](docs/Annexes/Annexe_J_licences_tierces.md). Annexes : [docs/Annexes/README.md](docs/Annexes/README.md).
+SecMet s'appuie sur des composants open source : GTK 4, crates Rust (toutes sous licences permissives, sauf une en MPL-2.0), TestDisk embarqué, et pour la clé USB un système Ubuntu 24.04 complet ; SecMet Clé USB utilise egui et wgpu. Les avis de licences tierces sont générés par livrable dans `packaging/licenses/` (`make licenses`), affichés par la fenêtre « À propos » de l'application et de SecMet Clé USB (intégrés au `.exe`, qui les écrit aussi avec `--licenses`) et installés dans les deux AppImage ; le titulaire du droit d'auteur, la licence et l'adresse des sources sont définis dans `crates/secmet-attest/src/legal.rs`. Détail des licences tierces et conformité distribution : [Annexe J](docs/Annexes/Annexe_J_licences_tierces.md). Annexes : [docs/Annexes/README.md](docs/Annexes/README.md).
 
 Le module d'infos disque SMART s'inspire conceptuellement de [QDiskInfo](https://github.com/edisionnano/QDiskInfo) (GPL-3.0) ; la logique et l'UI sont une réécriture indépendante en Rust/GTK4, sans inclusion de sources QDiskInfo.

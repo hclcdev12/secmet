@@ -1,0 +1,22 @@
+==============================================================================
+Composants du runtime AppImage (les deux AppImage : SecMet et SecMet Clé USB)
+AppImage runtime components (both AppImages: SecMet and SecMet Clé USB)
+==============================================================================
+
+Chaque fichier .AppImage commence par le runtime « type2-runtime »
+(https://github.com/AppImage/type2-runtime), qui monte l'image squashfs
+qu'il contient. Ce runtime est lié statiquement à libfuse 3 (LGPL-2.1),
+squashfuse (BSD-2-Clause), zstd (BSD-3-Clause) et zlib (Zlib). L'AppImage
+de SecMet contient aussi le crochet AppRun du greffon linuxdeploy-plugin-gtk
+(MIT). Le runtime et linuxdeploy sont pris au canal « continuous » de leurs
+projets au moment de la construction (décision D10, épinglage à venir).
+
+LGPL-2.1 §6 : le runtime peut être remplacé par une version construite avec
+une libfuse modifiée, en reconstruisant type2-runtime depuis ses sources
+puis en réassemblant l'arborescence extraite (--appimage-extract) avec
+appimagetool.
+
+------------------------------------------------------------------------------
+type2-runtime — MIT
+------------------------------------------------------------------------------
+
