@@ -11,7 +11,7 @@ Notes courtes pour travailler sur le dépôt (v0.4.1).
 | `secmet-core` | `crates/secmet-core` | Moteur de décision NIST SP 800-88 (plan par disque), canaris ChaCha20 ; crate pure, sans GTK ni ioctl |
 | `secmet-helper` | `crates/secmet-helper` | Daemon privilégié `secmet-helper serve` : sessions, ouverture `O_EXCL | O_DIRECT`, exécution des plans, TestDisk, coffre ATA |
 | `secmet-attest` | `crates/secmet-attest` | Attestation JSON canonique signée Ed25519, QR Base45, PDF natif, binaire `secmet-verify` ; versions signées (`release`, `secmet-release`) ; manifeste de lot signé (`manifest`) |
-| `secmet-key-writer` | `crates/secmet-key-writer` | SecMet Clé USB (egui, Linux et Windows) : vérification de la release signée puis de l'empreinte, écriture de l'image de la clé avec complétion de la GPT pendant l'écriture, relecture ; hors `default-members` (`make key-writer`, `cargo build -p secmet-key-writer`), rust-version 1.95 |
+| `secmet-key-writer` | `crates/secmet-key-writer` | SecMet Clé USB (egui, Linux et Windows) : vérification de la release signée puis de l'empreinte, écriture de l'image de la clé avec complétion de la GPT pendant l'écriture (attributs GPT qui cachent `SECMET-SYS` et `SECMET-DATA` à Windows, `gpt::windows_attributes`), relecture ; hors `default-members` (`make key-writer`, `cargo build -p secmet-key-writer`), rust-version 1.95 |
 
 ```bash
 source scripts/env.sh

@@ -55,7 +55,7 @@ Scénarios issus de l'[Annexe M](Annexe_M_cle_live_lots.md) (§M.11), joués sur
 | R-31 | Même portable traité deux fois | Proposition de remplacer l'entrée ; ancienne entrée « remplacée » |
 | R-32 | Clôture du lot | PDF groupé avec « Machines traitées : 3 » et séries par ligne ; manifeste valide avec `secmet-verify --manifest` ; livrables copiés sur `SECMET-EXP` |
 | R-33 | Attestation retirée ou modifiée dans le dossier du lot après clôture | Désaccord signalé par `secmet-verify --manifest` (attestation manquante, modifiée ou en trop) |
-| R-34 | Clé branchée sur un PC Windows | Partition d'export `SECMET-EXP` lisible ; si Windows propose de formater une partition qu'il ne lit pas, **Annuler** ne modifie rien |
+| R-34 | Clé branchée sur un PC Windows | Partition d'export `SECMET-EXP` lisible et seule visible (depuis la 0.5.0, `SECMET-SYS` et `SECMET-DATA` sont cachées par leurs attributs GPT) ; si Windows propose malgré tout de formater une partition qu'il ne lit pas, **Annuler** ne modifie rien |
 | R-35 | Horloge du BIOS en 2000 | Date signalée au démarrage ; **Garder l'horloge du poste** ou **Utiliser cette date** ; réserve sur la date du certificat |
 | R-36 | Lot ouvert sans aucun disque effacé, puis **Clôturer** | **Abandonner le lot** proposé ; lot archivé avec son journal, sans certificat groupé ni manifeste ; rien copié sur l'export |
 | R-37 | Clôture avec la partition d'export absente ou pleine | Clôture aboutie, message explicite ; **Réessayer la copie** ou **Recopier les lots clôturés sur la partition d'export** copie les livrables manquants |

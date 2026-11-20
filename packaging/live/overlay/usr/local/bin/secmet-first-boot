@@ -50,6 +50,8 @@ else
 fi
 logger -t secmet-first-boot "agrandissement de la partition d'export ($EXP) : $((GAP / 2048)) Mio libres"
 # En-tête GPT de secours replacé en fin de disque, puis partition étendue.
+# sfdisk -N ne change que la partition 3 : les attributs GPT des partitions
+# 1 et 2 (cachées à Windows, Annexe M §M.3) sont conservés.
 sfdisk -q --relocate gpt-bak-std "$DISK" 2>/dev/null || true
 START=$(sfdisk -l -o Device,Start "$DISK" 2>/dev/null | awk -v d="$EXP" '$1==d {print $2}')
 umount "$EXP" 2>/dev/null || true

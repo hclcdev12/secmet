@@ -12,7 +12,8 @@
 # 3. vérification depuis l'image : journal de secmet-first-boot (clé de
 #    signature créée, partition d'export agrandie), attestation-key.hex en
 #    0600 pour l'opérateur sur la partition de données, partition d'export
-#    qui va jusqu'au bout de la clé ; si l'image porte un magasin
+#    qui va jusqu'au bout de la clé, attributs GPT (système et données
+#    cachés à Windows) intacts ; si l'image porte un magasin
 #    app/<version>/ (image reprise d'une release précédente,
 #    refresh_live.sh), cette version doit avoir été déployée au démarrage.
 #
@@ -41,6 +42,15 @@ IMG="$WORK/key.img"
 xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 truncate -s "$KEY_SIZE" "$IMG"
 read -r exp_start exp_before < <(qemu_part "$IMG" SECMET-EXPORT)
+# Attributs GPT (Annexe M §M.3) : système et données cachés à Windows,
+# export visible ; identiques après le premier démarrage (agrandissement de
+# l'export par sfdisk -N).
+attrs_of() { sfdisk -J "$IMG" | python3 -c '
+import json, sys
+p = json.load(sys.stdin)["partitiontable"]["partitions"]
+print(" ".join(x.get("attrs", "-").replace(" ", "+") for x in p))'; }
+attrs_before="$(attrs_of)"
+[[ "$attrs_before" == "GUID:60,62,63 GUID:62,63 - -" ]] || fail "attributs GPT inattendus dans l'image : $attrs_before"
 disk_sectors=$(( $(stat -c %s "$IMG") / 512 ))
 echo "  export : $((exp_before / 2048)) Mio dans l'image, clé de $((disk_sectors / 2048)) Mio"
 
@@ -61,6 +71,7 @@ grep -q "secmet-first-boot\[.*partition d'export agrandie" "$QEMU_JOURNAL" || fa
 read -r exp_start2 exp_after < <(qemu_part "$IMG" SECMET-EXPORT)
 [[ "$exp_start2" == "$exp_start" ]] || fail "la partition d'export a bougé ($exp_start → $exp_start2)"
 [[ "$exp_after" -gt "$exp_before" ]] || fail "export : $exp_before → $exp_after secteurs"
+[[ "$(attrs_of)" == "$attrs_before" ]] || fail "attributs GPT modifiés au premier démarrage : $attrs_before → $(attrs_of)"
 tail_gap=$(( disk_sectors - exp_start - exp_after ))
 [[ "$tail_gap" -lt 131072 ]] || fail "l'export s'arrête à $((tail_gap / 2048)) Mio du bout de la clé"
 # Magasin app/<version>/ dans l'image (reprise d'une release précédente) :

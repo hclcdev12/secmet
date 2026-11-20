@@ -100,10 +100,16 @@ mkfs.exfat -L SECMET-EXP "$W/p3.img" >/dev/null
 
 echo "== assemblage GPT"
 rm -f "$IMG"; truncate -s "${TOTAL_MIB}M" "$IMG"
+# Attributs GPT (Annexe M §M.3) : système en lecture seule, masqué et sans
+# lettre de lecteur (bits 60, 62, 63), données masquées et sans lettre (62,
+# 63) : Windows ne les monte pas et ne propose plus de « formater » la
+# partition Linux. Bits propres au type, ignorés par le firmware et par
+# Linux (montage par étiquette). Export sans attribut : visible sous
+# Windows. Jamais le bit 1 (« No Block IO Protocol ») : clé non démarrable.
 sfdisk -q "$IMG" <<PART
 label: gpt
-start=${SYS_START}MiB, size=${SYS_MIB}MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS"
-start=${DATA_START}MiB, size=${DATA_MIB}MiB, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA"
+start=${SYS_START}MiB, size=${SYS_MIB}MiB, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="SECMET-SYS", attrs="GUID:60,62,63"
+start=${DATA_START}MiB, size=${DATA_MIB}MiB, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="SECMET-DATA", attrs="GUID:62,63"
 start=${EXP_START}MiB, size=${EXP_MIB}MiB, type=EBD0A0A2-B9E5-4433-87C0-68B6B72699C7, name="SECMET-EXPORT"
 start=1MiB, size=1MiB, type=21686148-6449-6E6F-744E-656564454649, name="BIOS boot"
 PART

@@ -47,7 +47,7 @@ L'outil peut aussi être ouvert directement sur un fichier `.img.xz` (glisser le
 xz -dc secmet-key_<version>_x86_64.img.xz | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-**Sous Windows, après l'écriture** : Windows affiche une ou plusieurs fois « Vous devez formater le disque du lecteur … avant de pouvoir l'utiliser ». Répondre **Annuler** à chaque fois. C'est la partition de données Linux de la clé, que Windows ne sait pas lire ; la formater détruirait la clé. Il est normal que l'explorateur ne montre que deux lecteurs (`SECMET-SYS` et `SECMET-EXP`). Ne rien modifier ni ajouter sur `SECMET-SYS` : c'est le système de la clé, et son contenu n'est pas contrôlé au démarrage.
+**Sous Windows, après l'écriture** : depuis la 0.5.0, l'explorateur ne montre qu'un lecteur, `SECMET-EXP` (les livrables). Le système (`SECMET-SYS`) et les données (`SECMET-DATA`) sont cachés à Windows par des attributs de la table de partitions. Si Windows affiche malgré tout « Vous devez formater le disque du lecteur … avant de pouvoir l'utiliser » (image plus ancienne écrite avec Rufus, Imager ou `dd`), répondre **Annuler** à chaque fois : c'est la partition de données Linux de la clé, que Windows ne sait pas lire ; la formater détruirait la clé. Ne rien modifier ni ajouter sur `SECMET-SYS` s'il apparaît : c'est le système de la clé.
 
 Retirer la clé proprement (éjection) avant de la débrancher.
 

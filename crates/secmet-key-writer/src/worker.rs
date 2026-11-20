@@ -290,8 +290,9 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
         buf[n..padded].fill(0);
         if written == 0 {
             // GPT complétée au bout du disque (voir `gpt`) : la copie de
-            // secours part avant le premier bloc, puis les secteurs 0 et 1
-            // corrigés partent avec lui.
+            // secours part avant le premier bloc, puis le début corrigé
+            // (secteurs 0 et 1, entrées avec les attributs Windows) part
+            // avec lui.
             match crate::gpt::plan(&chunk, size) {
                 Ok(Some(p)) => {
                     if let Err(e) = write_tail(&mut dev, &p) {
@@ -362,8 +363,8 @@ fn work(device: &str, image: &Path, cancel: &AtomicBool) -> Result<(String, u64)
         }
         if read == 0 {
             if let Some(p) = &gpt_plan {
-                // Secteurs 0 et 1 complétés : comparés tels quels, puis
-                // remplacés par ceux de l'image pour l'empreinte.
+                // Début complété (secteurs 0 et 1, entrées) : comparé tel
+                // quel, puis remplacé par celui de l'image pour l'empreinte.
                 if buf[..p.head.len()] != p.head[..] {
                     return Err(
                         "la relecture de la table de partitions ne correspond pas à ce qui a été écrit"
