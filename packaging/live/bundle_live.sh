@@ -33,7 +33,7 @@ if [[ "$image_version" != "$VERSION" ]]; then
     STORE="$LIVE/app"
 fi
 [[ -x "$RELEASE_BIN" ]] || die "secmet-release introuvable : $RELEASE_BIN (produit par make live)"
-for f in vmlinuz initrd.img efi/shimx64.efi efi/grubx64.efi; do
+for f in vmlinuz initrd.img efi/shimx64.efi efi/grubx64.efi efi/mmx64.efi; do
     [[ -f "$LIVE/$f" ]] || die "$LIVE/$f absent"
 done
 

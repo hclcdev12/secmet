@@ -67,15 +67,17 @@ fi
 echo "== partition système (FAT32, mtools)"
 mkfs.vfat -F32 -n SECMET-SYS -C "$W/p1.img" $((SYS_MIB*1024)) >/dev/null
 export MTOOLS_SKIP_CHECK=1
-mmd -i "$W/p1.img" ::live ::EFI ::EFI/BOOT ::EFI/ubuntu ::boot ::boot/grub ::boot/grub/i386-pc ::boot/grub/fonts
+mmd -i "$W/p1.img" ::live ::EFI ::EFI/BOOT ::EFI/debian ::boot ::boot/grub ::boot/grub/i386-pc ::boot/grub/fonts
 mcopy -i "$W/p1.img" "$OUT/vmlinuz" "$OUT/initrd.img" "$OUT/filesystem.squashfs" ::live/
 mcopy -i "$W/p1.img" "$OUT/efi/shimx64.efi" ::EFI/BOOT/BOOTX64.EFI
 mcopy -i "$W/p1.img" "$OUT/efi/grubx64.efi" ::EFI/BOOT/grubx64.efi
-[ -f "$OUT/efi/mmx64.efi" ] && mcopy -i "$W/p1.img" "$OUT/efi/mmx64.efi" ::EFI/BOOT/mmx64.efi
+mcopy -i "$W/p1.img" "$OUT/efi/mmx64.efi" ::EFI/BOOT/mmx64.efi
+# grub.cfg aux trois endroits où un GRUB le cherche, tous identiques : le GRUB
+# signé de Debian lit $prefix/grub.cfg avec prefix=/EFI/debian (compilé dans
+# le binaire signé), sinon le grub.cfg posé à côté de lui (EFI/BOOT) ; GRUB
+# BIOS lit boot/grub/grub.cfg.
 sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA:-}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
-mcopy -i "$W/p1.img" "$W/grub.cfg" ::EFI/BOOT/grub.cfg
-mcopy -i "$W/p1.img" "$W/grub.cfg" ::EFI/ubuntu/grub.cfg
-mcopy -i "$W/p1.img" "$W/grub.cfg" ::boot/grub/grub.cfg
+for d in EFI/BOOT EFI/debian boot/grub; do mcopy -i "$W/p1.img" "$W/grub.cfg" "::$d/grub.cfg"; done
 # GRUB BIOS : modules et police dans boot/grub, comme grub-install les y met.
 mcopy -i "$W/p1.img" "$OUT"/bios/*.mod "$OUT"/bios/*.lst ::boot/grub/i386-pc/
 mcopy -i "$W/p1.img" /usr/share/grub/unicode.pf2 ::boot/grub/fonts/

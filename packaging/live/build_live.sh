@@ -10,6 +10,8 @@
 #         SECMET_DEBIAN_MIRROR      miroir apt (défaut : http://deb.debian.org/debian)
 #         SECMET_DEBIAN_SECURITY_MIRROR  mises à jour de sécurité
 #                                   (défaut : http://security.debian.org/debian-security)
+#         SECMET_EFI_UPDATE=1       chaîne UEFI à la version courante de trixie au lieu
+#                                   de packaging/live/efi-pin.sha256 (fetch_efi.sh)
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,4 +36,5 @@ exec "$ENGINE" run --rm --privileged \
     -e SECMET_OPERATOR_PASSWORD="${SECMET_OPERATOR_PASSWORD:-secmet}" \
     -e SECMET_DEBIAN_MIRROR="${SECMET_DEBIAN_MIRROR:-http://deb.debian.org/debian}" \
     -e SECMET_DEBIAN_SECURITY_MIRROR="${SECMET_DEBIAN_SECURITY_MIRROR:-http://security.debian.org/debian-security}" \
+    -e SECMET_EFI_UPDATE="${SECMET_EFI_UPDATE:-0}" \
     "$IMAGE" /src/packaging/live/build_rootfs.sh

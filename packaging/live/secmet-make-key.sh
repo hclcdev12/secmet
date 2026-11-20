@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fabrique une clé USB SecMet (Annexe M) à partir de l'image produite par
 # build_live.sh : trois partitions GPT (système, données, export), GRUB
-# UEFI (chaîne signée Ubuntu, Secure Boot) et BIOS, données initialisées
+# UEFI (chaîne signée Debian, Secure Boot) et BIOS, données initialisées
 # avec le schéma de propriétés attendu par SecMet et son helper, clé de
 # signature des certificats créée tout de suite (son key_id est affiché :
 # à enregistrer chez le client).
@@ -123,16 +123,17 @@ rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot"
 mkdir -p "$MNT/sys/live" "$MNT/sys/EFI/BOOT" "$MNT/sys/boot/grub"
 cp "$LIVE_DIR/vmlinuz" "$LIVE_DIR/initrd.img" "$LIVE_DIR/filesystem.squashfs" "$MNT/sys/live/"
 cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/boot/grub/grub.cfg"
-# UEFI : chaîne signée Ubuntu (shim + grub signé) copiée telle quelle, lisible
-# avec Secure Boot ; grub signé cherche /EFI/BOOT/grub.cfg puis /boot/grub.
+# UEFI : chaîne signée Debian (shim + grub signé + MokManager) copiée telle
+# quelle, lisible avec Secure Boot. grub.cfg aux trois endroits, identiques
+# (comme make_key_image.sh) : le grub signé de Debian lit $prefix/grub.cfg
+# avec prefix=/EFI/debian, sinon celui de EFI/BOOT ; GRUB BIOS, boot/grub.
 if [[ -d "$LIVE_DIR/efi" ]]; then
     cp "$LIVE_DIR/efi/shimx64.efi" "$MNT/sys/EFI/BOOT/BOOTX64.EFI"
     cp "$LIVE_DIR/efi/grubx64.efi" "$MNT/sys/EFI/BOOT/grubx64.efi"
-    cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/BOOT/grub.cfg"
-    # Le grub signé d'Ubuntu lit $prefix/grub.cfg avec prefix=/EFI/ubuntu.
-    mkdir -p "$MNT/sys/EFI/ubuntu"
-    cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/ubuntu/grub.cfg"
     [[ -f "$LIVE_DIR/efi/mmx64.efi" ]] && cp "$LIVE_DIR/efi/mmx64.efi" "$MNT/sys/EFI/BOOT/"
+    mkdir -p "$MNT/sys/EFI/debian"
+    cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/BOOT/grub.cfg"
+    cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/debian/grub.cfg"
 fi
 # BIOS : GRUB i386-pc dans le secteur d'amorçage et la partition d'amorçage
 # BIOS (postes anciens sans UEFI). Une clé plus ancienne sans cette

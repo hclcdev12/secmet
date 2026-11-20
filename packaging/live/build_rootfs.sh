@@ -8,7 +8,9 @@
 #      NetworkManager, lecteur PDF, SecMet, opérateur
 #      « secmet » (uid 1000, groupe secmet), locale et clavier français,
 #      fichiers de packaging/live/overlay/
-#   4. initramfs live-boot, squashfs, noyau, initrd, EFI signé, GRUB BIOS → /out
+#   4. initramfs live-boot, squashfs, noyau, initrd, GRUB BIOS → /out ;
+#      chaîne UEFI signée (shim, MokManager, GRUB) épinglée : versions et
+#      empreintes de packaging/live/efi-pin.sha256 (fetch_efi.sh)
 set -euo pipefail
 
 SRC=/src
@@ -356,10 +358,19 @@ echo "initrd : ${initrd_mb} Mo"
 # processeurs lents (session XFCE, base dpkg, services) : mesuré le 2026-11-05.
 mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
     -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
-cp /usr/lib/shim/shimx64.efi.signed "$OUT/efi/shimx64.efi"
-# MokManager : paquet shim-helpers-amd64-signed chez Debian.
-cp /usr/lib/shim/mmx64.efi.signed "$OUT/efi/mmx64.efi"
-cp /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed "$OUT/efi/grubx64.efi"
+# Chaîne UEFI : jamais « la version du jour » ; fetch_efi.sh échoue si une
+# version, une empreinte ou un émetteur diffère de efi-pin.sha256.
+step "Chaîne UEFI épinglée (shim, MokManager, GRUB)"
+EFI_PKG=/tmp/efi-pkg
+"$SRC/packaging/live/fetch_efi.sh" "$EFI_PKG"
+rm -f "$OUT"/efi/*
+cp "$EFI_PKG/shim-signed/usr/lib/shim/shimx64.efi.signed" "$OUT/efi/shimx64.efi"
+# MokManager : paquet shim-helpers-amd64-signed chez Debian. Sur la FAT, il
+# permet à l'utilisateur d'enrôler sa propre clé (MOK).
+cp "$EFI_PKG/shim-helpers-amd64-signed/usr/lib/shim/mmx64.efi.signed" "$OUT/efi/mmx64.efi"
+cp "$EFI_PKG/grub-efi-amd64-signed/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed" "$OUT/efi/grubx64.efi"
+cp "$EFI_PKG/versions.tsv" "$OUT/efi/versions.tsv"
+[[ -f "$EFI_PKG/efi-pin.sha256.new" ]] && cp "$EFI_PKG/efi-pin.sha256.new" "$OUT/efi/"
 cp -a /usr/lib/grub/i386-pc/. "$OUT/bios/"
 chmod 0644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs "$OUT"/efi/*
 echo "secmet $(dpkg-deb -f "$DEB" Version) ; noyau $(basename "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)")" > "$OUT/VERSION"

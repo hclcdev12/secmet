@@ -82,7 +82,8 @@ Le menu de la clé est caché : maintenir **Échap** au démarrage pour l'affich
 | Symptôme | Cause probable | Que faire |
 |----------|----------------|-----------|
 | Le PC ignore la clé | Démarrage USB désactivé, BIOS protégé | Activer le démarrage USB ; sinon, démonter le disque et le traiter au banc ([Annexe M §M.9](Annexes/Annexe_M_cle_live_lots.md)) |
-| « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage est signée par Canonical et passe le Secure Boot d'origine |
+| « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage (celle de Debian 13) est signée par Microsoft avec les autorités de 2011 et de 2023 : elle passe le Secure Boot d'origine des anciens PC comme des nouveaux |
+| « Secure Boot violation » sur un PC « Secured-core » récent | Le PC refuse tout chargeur qui n'est pas de Microsoft | Dans le BIOS, activer l'option « Autoriser l'autorité de certification tierce Microsoft UEFI » (« Allow Microsoft 3rd party UEFI CA ») |
 | Écran noir après le logo pendant plus d'une minute | Carte graphique récalcitrante | Redémarrer, maintenir Échap au démarrage, choisir « mode sans échec graphique » |
 | Windows propose de formater | Partition de données Linux | **Annuler** |
 | La partition d'export reste à 1 Go | Elle n'était pas vide au premier démarrage, ou la clé n'a presque pas de place au-delà de l'image (moins de 64 Mio) | Vider `SECMET-EXP` et redémarrer la clé ; le journal `logs/system/` dit pourquoi (`secmet-first-boot`) |
