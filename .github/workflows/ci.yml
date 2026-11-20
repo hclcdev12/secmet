@@ -26,7 +26,7 @@ jobs:
     name: fmt + clippy + tests (Ubuntu 24.04, GTK 4.14)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Dépendances système
         run: |
@@ -37,12 +37,12 @@ jobs:
             policykit-1 testdisk
 
       - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           components: rustfmt, clippy
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
 
       - name: cargo fmt
         run: cargo fmt --all -- --check
@@ -68,7 +68,7 @@ jobs:
     name: Scripts shell (syntaxe + shellcheck)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Bits d'exécution (un script ou un crochet non exécutable est ignoré en silence)
         run: |
           for f in scripts/*.sh packaging/*.sh packaging/live/*.sh packaging/live/tests/*.sh \
@@ -92,9 +92,9 @@ jobs:
     name: cargo audit (RustSec)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-audit
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: taiki-e/install-action@cdd500fcb345d29dabc5617aab1edf24d5211116 # cargo-audit
       - name: cargo audit
         run: cargo audit
 
@@ -102,9 +102,9 @@ jobs:
     name: Cibles de fuzz compilables
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: fuzz
       - name: cargo check des cibles de fuzz (stable, sans instrumentation)

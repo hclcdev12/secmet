@@ -23,8 +23,12 @@ name: Package
 #     démarrage (packaging/live/refresh_live.sh, quelques minutes).
 #   full_live (à la main) impose la reconstruction (base Ubuntu rafraîchie).
 #
-# Secret du dépôt : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex). Les
-# journaux sont publics : aucune étape n'affiche le secret.
+# Secret : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex), rangé dans
+# l'environnement GitHub « release » : seul le travail « publish », qui
+# déclare cet environnement, peut le lire. Les autres travaux n'ont que la
+# lecture du dépôt. Les journaux sont publics : aucune étape n'affiche le
+# secret. Actions épinglées par empreinte de commit (étiquette en
+# commentaire), pour qu'une étiquette déplacée ne change rien en silence.
 
 on:
   push:
@@ -60,7 +64,7 @@ env:
   SECMET_TRUST: bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   deb:
@@ -86,15 +90,15 @@ jobs:
             libgtk-4-dev libglib2.0-dev policykit-1 testdisk \
             dpkg-dev fakeroot
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: ${{ matrix.distro }}
 
@@ -116,7 +120,7 @@ jobs:
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: deb-${{ matrix.distro }}
           path: dist/*.deb
@@ -139,15 +143,15 @@ jobs:
             gtk4-devel glib2-devel polkit testdisk \
             rpm-build rpmdevtools
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: fedora${{ matrix.version }}
 
@@ -166,7 +170,7 @@ jobs:
           test -x /usr/lib/secmet/bin/testdisk
           test -f /usr/share/polkit-1/actions/secmet.policy
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rpm-fedora${{ matrix.version }}
           path: dist/*.rpm
@@ -176,7 +180,7 @@ jobs:
     name: AppImage (conteneur Ubuntu 24.04)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -195,7 +199,7 @@ jobs:
           echo "glibc max requise par libgtk-4 : $max"
           test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: appimage
           path: dist/*.AppImage
@@ -205,7 +209,7 @@ jobs:
     name: SecMet Clé USB (AppImage, conteneur Ubuntu 24.04)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -224,7 +228,7 @@ jobs:
           test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
           squashfs-root/usr/bin/secmet-key-writer --version
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: key-writer
           path: dist/secmet-key-writer_*.AppImage
@@ -234,15 +238,15 @@ jobs:
     name: SecMet Clé USB (.exe Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: key-writer-windows
 
@@ -264,7 +268,7 @@ jobs:
           grep -q "^secmet-key-writer " version.txt
           ./dist/secmet-key-writer_*.exe --list-disks
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: key-writer-windows
           path: dist/secmet-key-writer_*.exe
@@ -278,7 +282,7 @@ jobs:
       mode: ${{ steps.mode.outputs.mode }}
       previous: ${{ steps.mode.outputs.previous }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
@@ -306,7 +310,7 @@ jobs:
       - name: Place disque (outils inutiles du runner)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
@@ -334,7 +338,7 @@ jobs:
           ls -la dist/secmet-key_*_x86_64.img.xz
           xz -l dist/secmet-key_*_x86_64.img.xz
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: live
           path: |
@@ -350,23 +354,27 @@ jobs:
     if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && !contains(inputs.tag || github.ref_name, '-rc') && needs.deb.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
     needs: [deb, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
     runs-on: ubuntu-latest
+    # Seul travail qui lit la clé de version et écrit la release.
+    environment: release
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Toolchain Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: publish
 
       - name: Outil de signature
         run: cargo build --release -q -p secmet-attest --bin secmet-release
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
 
