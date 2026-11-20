@@ -99,12 +99,12 @@ impl Lines {
         Lines { text, lines }
     }
 
-    fn show(&self, ui: &mut egui::Ui, id: &str) {
+    fn show(&self, ui: &mut egui::Ui, id: &str, max_height: f32) {
         let style = egui::TextStyle::Monospace;
         let row_height = ui.text_style_height(&style);
         egui::ScrollArea::both()
             .id_salt(id)
-            .max_height(220.0)
+            .max_height(max_height)
             .auto_shrink([false, true])
             .show_rows(ui, row_height, self.lines.len(), |ui, rows| {
                 for r in rows {
@@ -135,9 +135,22 @@ impl About {
     /// Affiche la fenêtre modale ; `false` quand elle est fermée.
     pub fn show(&mut self, ctx: &egui::Context) -> bool {
         let mut close = false;
+        // La fenêtre de l'outil est petite (540 × 440 au minimum) : tout le
+        // corps défile, et chaque texte de licence a une hauteur bornée par
+        // l'écran, pour que le haut de la fenêtre ne sorte jamais du cadre
+        // quand on déplie les sections.
+        let screen_h = ctx.content_rect().height();
+        let body_max = (screen_h - 140.0).max(160.0);
+        let text_max = (screen_h * 0.4).clamp(100.0, 260.0);
+        let width = (ctx.content_rect().width() - 80.0).clamp(320.0, 560.0);
         let modal = egui::Modal::new(egui::Id::unique("secmet-key-writer-about")).show(ctx, |ui| {
-            ui.set_width(560.0);
+            ui.set_width(width);
             ui.heading("À propos de SecMet Clé USB");
+            egui::ScrollArea::vertical()
+                .id_salt("about-body")
+                .max_height(body_max)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
             ui.label(format!("Version {VERSION}"));
             ui.label("Écrit l'image publiée de la clé SecMet sur une clé USB, après vérification de la signature de la release.");
             ui.add_space(6.0);
@@ -151,13 +164,13 @@ impl About {
             ui.add_space(6.0);
             egui::CollapsingHeader::new("Licence (texte intégral, en anglais)")
                 .id_salt("about-license")
-                .show(ui, |ui| self.license.show(ui, "license-text"));
+                .show(ui, |ui| self.license.show(ui, "license-text", text_max));
             egui::CollapsingHeader::new("Licences tierces")
                 .id_salt("about-third-party")
                 .show(ui, |ui| match &self.third_party {
                     Ok(lines) => {
                         ui.label("Bibliothèques Rust, polices et runtime intégrés à l'outil, sous leurs propres licences :");
-                        lines.show(ui, "third-party-text");
+                        lines.show(ui, "third-party-text", text_max);
                         if ui.button("Enregistrer…").clicked() {
                             self.saved = save(&lines.text);
                         }
@@ -174,6 +187,7 @@ impl About {
                     Err(e) => {
                         ui.colored_label(ui.visuals().error_fg_color, format!("✖ {e}"));
                     }
+                });
                 });
             ui.separator();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
