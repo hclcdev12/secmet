@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check
+.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-sb-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -83,6 +83,9 @@ live-dist: ## Image publiable de la clé dist/secmet-key_<version>_x86_64.img.xz
 
 live-dist-check: ## Contrôle QEMU (BIOS) du premier démarrage de l'image publiable : clé de signature créée, export agrandi (4 min)
 	@./packaging/live/image-check.sh
+
+live-sb-check: ## Matrice Secure Boot (QEMU, clés Microsoft 2011/2023 enrôlées) : make live-sb-check [IMG=dist/secmet-key_<v>_x86_64.img.xz] (virt-fw-vars requis, 2 min)
+	@./packaging/live/sb-matrix.sh $(IMG)
 
 live-test: ## Démarre la clé virtuelle dans QEMU (UEFI OVMF)
 	@./packaging/live/qemu-test.sh
