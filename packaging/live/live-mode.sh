@@ -34,6 +34,7 @@ INPUTS=(
     packaging/live/live.Containerfile
     packaging/live/grub.cfg
     packaging/live/make_key_image.sh
+    packaging/live/system-sums.sh
     packaging/live/overlay
     packaging/build_deb.sh
     packaging/stage-tree.sh

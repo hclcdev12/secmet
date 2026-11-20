@@ -5,18 +5,18 @@
 //! `secmet-release verify`.
 //!
 //! Message signé = [`DOMAIN`] ‖ étiquette ‖ `\n` ‖ contenu : l'étiquette
-//! (`sums`, `latest`) sépare les deux documents, le domaine sépare ce
+//! (`sums`, `latest`, et `system` pour les empreintes du système de la clé
+//! USB, [`crate::system_image`]) sépare les documents, le domaine sépare ce
 //! protocole de celui des attestations même si une clé était réutilisée.
 
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::sign::{self, SigningIdentity, Verified, ALGORITHM};
-use crate::{canonical, hex, sha256_hex, AttestError, Result};
+use crate::{canonical, hex, sha256_file_hex, sha256_hex, AttestError, Result};
 
 /// Séparateur de domaine.
 pub const DOMAIN: &[u8] = b"secmet-release-v1\n";
@@ -27,7 +27,7 @@ pub const SUMS_SIGNATURE_FILE: &str = "SHA256SUMS.sig";
 /// Description signée de la dernière version ([`SignedLatest`]).
 pub const LATEST_FILE: &str = "latest.json";
 
-fn message(label: &str, content: &[u8]) -> Vec<u8> {
+pub(crate) fn message(label: &str, content: &[u8]) -> Vec<u8> {
     let mut m = DOMAIN.to_vec();
     m.extend_from_slice(label.as_bytes());
     m.push(b'\n');
@@ -82,14 +82,15 @@ pub fn format_sums(entries: &[SumEntry]) -> String {
         .collect()
 }
 
-/// Empreintes des fichiers `names` de `dir`.
+/// Empreintes des fichiers `names` de `dir` (lus par blocs).
 pub fn sums_of(dir: &Path, names: &[String]) -> Result<Vec<SumEntry>> {
     names
         .iter()
         .map(|name| {
-            let bytes = fs::read(dir.join(name)).map_err(|e| AttestError::io(name.clone(), e))?;
+            let sha256 =
+                sha256_file_hex(&dir.join(name)).map_err(|e| AttestError::io(name.clone(), e))?;
             Ok(SumEntry {
-                sha256: sha256_hex(&bytes),
+                sha256,
                 name: name.clone(),
             })
         })
@@ -100,9 +101,9 @@ pub fn sums_of(dir: &Path, names: &[String]) -> Result<Vec<SumEntry>> {
 /// annoncée.
 pub fn check_sums(dir: &Path, entries: &[SumEntry]) -> Result<()> {
     for e in entries {
-        let bytes =
-            fs::read(dir.join(&e.name)).map_err(|err| AttestError::io(e.name.clone(), err))?;
-        if sha256_hex(&bytes) != e.sha256 {
+        let sum = sha256_file_hex(&dir.join(&e.name))
+            .map_err(|err| AttestError::io(e.name.clone(), err))?;
+        if sum != e.sha256 {
             return Err(AttestError::Invalid(format!(
                 "{} : empreinte différente de {SUMS_FILE}",
                 e.name
@@ -307,6 +308,7 @@ pub fn verify_latest(signed: &SignedLatest, trusted_keys: &[String]) -> Result<V
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
+    use std::fs;
 
     fn identity() -> SigningIdentity {
         SigningIdentity::from_seed(&[9u8; 32])

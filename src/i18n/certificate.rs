@@ -68,6 +68,22 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "date and time entered by the operator: unreliable system clock",
         "Datum und Uhrzeit vom Bediener eingegeben: Systemuhr unzuverlässig",
     ),
+    // ── Intégrité du système de la clé USB (src/system_integrity.rs) ──
+    (
+        "système de la clé USB altéré : empreintes ou signature différentes de l'image publiée (contrôle au démarrage)",
+        "USB key system altered: checksums or signature differ from the published image (boot-time check)",
+        "System des USB-Sticks verändert: Prüfsummen oder Signatur weichen vom veröffentlichten Abbild ab (Prüfung beim Start)",
+    ),
+    (
+        "intégrité du système de la clé USB non vérifiée : image sans empreintes signées",
+        "USB key system integrity not verified: image without signed checksums",
+        "Integrität des USB-Stick-Systems nicht geprüft: Abbild ohne signierte Prüfsummen",
+    ),
+    (
+        "intégrité du système de la clé USB non vérifiée : contrôle au démarrage non terminé ou impossible",
+        "USB key system integrity not verified: boot-time check not finished or not possible",
+        "Integrität des USB-Stick-Systems nicht geprüft: Prüfung beim Start nicht abgeschlossen oder nicht möglich",
+    ),
     ("Non disponible", "Not available", "Nicht verfügbar"),
     ("INCONNU", "UNKNOWN", "UNBEKANNT"),
     ("non effectuée", "not performed", "nicht durchgeführt"),

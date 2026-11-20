@@ -72,13 +72,35 @@ mcopy -i "$W/p1.img" "$OUT/vmlinuz" "$OUT/initrd.img" "$OUT/filesystem.squashfs"
 mcopy -i "$W/p1.img" "$OUT/efi/shimx64.efi" ::EFI/BOOT/BOOTX64.EFI
 mcopy -i "$W/p1.img" "$OUT/efi/grubx64.efi" ::EFI/BOOT/grubx64.efi
 [ -f "$OUT/efi/mmx64.efi" ] && mcopy -i "$W/p1.img" "$OUT/efi/mmx64.efi" ::EFI/BOOT/mmx64.efi
-sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA:-}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
+# Sans paramètre d essai, grub.cfg est copié tel quel : mêmes octets que
+# sur une clé fabriquée par secmet-make-key.sh (SYSTEM.sums commun).
+if [ -n "${SECMET_KERNEL_EXTRA:-}" ]; then
+    sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
+else
+    cp "$SRC/packaging/live/grub.cfg" "$W/grub.cfg"
+fi
 mcopy -i "$W/p1.img" "$W/grub.cfg" ::EFI/BOOT/grub.cfg
 mcopy -i "$W/p1.img" "$W/grub.cfg" ::EFI/ubuntu/grub.cfg
 mcopy -i "$W/p1.img" "$W/grub.cfg" ::boot/grub/grub.cfg
 # GRUB BIOS : modules et police dans boot/grub, comme grub-install les y met.
 mcopy -i "$W/p1.img" "$OUT"/bios/*.mod "$OUT"/bios/*.lst ::boot/grub/i386-pc/
 mcopy -i "$W/p1.img" /usr/share/grub/unicode.pf2 ::boot/grub/fonts/
+
+echo "== empreintes du système (SYSTEM.sums ; signature posée à la publication)"
+# Calculées sur les fichiers tels que la partition les contient (relus par
+# mcopy), vérifiées à chaque démarrage par secmet-image-check (Annexe M
+# §M.3). Image publiable : aussi dans dist/live/ pour le livrable .tar
+# (secmet-make-key.sh les copie) ; SYSTEM.sums.sig est ajouté aux deux par
+# seal_system.sh dans le travail « publish » (clé de version).
+mkdir -p "$W/sysx"
+mcopy -s -n -i "$W/p1.img" ::live ::EFI ::boot "$W/sysx/"
+bash "$SRC/packaging/live/system-sums.sh" "$W/sysx" "$(cat "$OUT/VERSION" 2>/dev/null || echo secmet)" > "$W/SYSTEM.sums"
+rm -rf "$W/sysx"
+mcopy -i "$W/p1.img" "$W/SYSTEM.sums" ::SYSTEM.sums
+if [ "$SECMET_KEY_DIST" = 1 ]; then
+    cp "$W/SYSTEM.sums" "$OUT/SYSTEM.sums"; rm -f "$OUT/SYSTEM.sums.sig"
+fi
+echo "  $(grep -vc "^#" "$W/SYSTEM.sums") fichiers"
 
 echo "== partition de données (ext4, mke2fs -d)"
 D="$W/data"

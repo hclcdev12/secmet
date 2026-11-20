@@ -7,6 +7,8 @@
 //!                     --sums-url <https://…/SHA256SUMS> [--notes-fr|-en|-de <texte>]
 //!                     [--moved-to <https://…>] [fichier...]
 //! secmet-release verify <dossier> [--trust <clé ou key_id hex>]...
+//! secmet-release sign-system <partition système> --key <clé.hex>
+//! secmet-release verify-system <partition système> [--trust <clé>]... [--json <fichier>]
 //! ```
 //! `sign` écrit `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` dans le
 //! dossier ; sans liste de fichiers, il prend les `.deb`, `.rpm`,
@@ -17,12 +19,21 @@
 //! l'empreinte de chaque fichier et la cohérence de la version ; code 0 si
 //! tout est valide **et** signé par une clé de confiance (`--trust` ou
 //! `$SECMET_RELEASE_TRUSTED_KEYS`, séparateur `:`), 1 sinon, 2 sur usage.
+//!
+//! `sign-system` et `verify-system` portent sur le système de la clé USB
+//! (`secmet_attest::system_image`) : le premier contrôle que `SYSTEM.sums`
+//! décrit bien l'arborescence (partition `SECMET-SYS` extraite) puis écrit
+//! `SYSTEM.sums.sig` (CI, au moment de publier) ; le second est appelé au
+//! démarrage de la clé par `secmet-image-check` : code 0 si l'image est
+//! intacte et signée par une clé de confiance, 1 sinon ; `--json` écrit le
+//! rapport lu par l'application.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use secmet_attest::release::{self, LatestRelease, SignedLatest, SumsSignature};
+use secmet_attest::system_image::{self, IntegrityStatus};
 use secmet_attest::{keystore, AttestError};
 
 const USAGE: &str = "usage: secmet-release keygen <clé.hex>
@@ -30,7 +41,10 @@ const USAGE: &str = "usage: secmet-release keygen <clé.hex>
 --sums-url <https://…/SHA256SUMS> [--notes-fr|--notes-en|--notes-de <texte>] \
 [--moved-to <https://…>] [fichier...]
        secmet-release verify <dossier> [--trust <clé ou key_id hex>]... [--file <nom>]
-         (--file : ne contrôle que ce fichier parmi ceux listés par SHA256SUMS)";
+         (--file : ne contrôle que ce fichier parmi ceux listés par SHA256SUMS)
+       secmet-release sign-system <partition système> --key <clé.hex>
+       secmet-release verify-system <partition système> [--trust <clé ou key_id hex>]... \
+[--json <fichier>]";
 
 fn usage() -> i32 {
     eprintln!("{USAGE}");
@@ -52,6 +66,8 @@ fn run() -> i32 {
         Some("keygen") => keygen(&args[1..]),
         Some("sign") => sign(&args[1..]),
         Some("verify") => verify(&args[1..]),
+        Some("sign-system") => sign_system(&args[1..]),
+        Some("verify-system") => verify_system(&args[1..]),
         Some("-h" | "--help") => {
             println!("{USAGE}");
             0
@@ -353,6 +369,109 @@ fn verify(args: &[String]) -> i32 {
         0
     } else {
         eprintln!("clé non vérifiée : ajoutez-la avec --trust");
+        1
+    }
+}
+
+fn sign_system(args: &[String]) -> i32 {
+    let [dir, flag, key] = args else {
+        return usage();
+    };
+    if flag != "--key" {
+        return usage();
+    }
+    let dir = PathBuf::from(dir);
+    let identity = match keystore::load(Path::new(key)) {
+        Ok(identity) => identity,
+        Err(e) => return fail(e),
+    };
+    let sums_path = dir.join(system_image::SYSTEM_SUMS_FILE);
+    let sums_text = match fs::read_to_string(&sums_path) {
+        Ok(text) => text,
+        Err(e) => return fail(format!("{} : {e}", sums_path.display())),
+    };
+    let entries = match system_image::parse_system_sums(&sums_text) {
+        Ok(entries) => entries,
+        Err(e) => return fail(e),
+    };
+    // On ne signe que ce qui décrit exactement l'arborescence fournie.
+    let problems = system_image::check_files(&dir, &entries);
+    if !problems.is_empty() {
+        for p in &problems {
+            eprintln!("  {p}");
+        }
+        return fail(format!(
+            "{} ne décrit pas {} : rien n'est signé",
+            system_image::SYSTEM_SUMS_FILE,
+            dir.display()
+        ));
+    }
+    let sig = system_image::sign_system(&identity, &sums_text);
+    let out = dir.join(system_image::SYSTEM_SIGNATURE_FILE);
+    let text = serde_json::to_string_pretty(&sig).unwrap_or_default() + "\n";
+    if let Err(e) = fs::write(&out, text) {
+        return fail(format!("{} : {e}", out.display()));
+    }
+    println!(
+        "{} signé ({} fichiers, {}) avec la clé {}",
+        system_image::SYSTEM_SUMS_FILE,
+        entries.len(),
+        system_image::system_label(&sums_text),
+        identity.key_id()
+    );
+    0
+}
+
+fn verify_system(args: &[String]) -> i32 {
+    let Some(dir) = args.first() else {
+        return usage();
+    };
+    let mut rest: Vec<String> = Vec::new();
+    let mut json: Option<PathBuf> = None;
+    let mut iter = args[1..].iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--json" {
+            match iter.next() {
+                Some(path) => json = Some(PathBuf::from(path)),
+                None => return usage(),
+            }
+        } else {
+            rest.push(arg.clone());
+        }
+    }
+    let Some(trusted) = trusted_keys(&rest) else {
+        return usage();
+    };
+    let report = system_image::check_tree(Path::new(dir), &trusted);
+    if let Some(path) = json {
+        // Écriture puis renommage : l'application ne lit jamais un rapport
+        // à moitié écrit.
+        let tmp = path.with_extension("tmp");
+        let text = serde_json::to_string_pretty(&report).unwrap_or_default() + "\n";
+        if let Err(e) = fs::write(&tmp, text).and_then(|()| fs::rename(&tmp, &path)) {
+            return fail(format!("{} : {e}", path.display()));
+        }
+    }
+    let status = match report.status {
+        IntegrityStatus::Ok => "intact",
+        IntegrityStatus::Altered => "ALTÉRÉ",
+        IntegrityStatus::Unsigned => "non signé",
+        IntegrityStatus::Unavailable => "indisponible",
+        IntegrityStatus::Error => "erreur",
+        IntegrityStatus::Pending => "en cours",
+    };
+    println!("système      : {}", report.system);
+    println!("fichiers     : {}", report.files);
+    if let Some(key_id) = &report.key_id {
+        println!("clé          : {key_id} (de confiance)");
+    }
+    println!("état         : {status}");
+    for p in &report.problems {
+        println!("  {p}");
+    }
+    if report.status == IntegrityStatus::Ok {
+        0
+    } else {
         1
     }
 }

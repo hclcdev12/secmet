@@ -27,6 +27,12 @@ name: Package
 #     avec le nouveau .deb dans app/<version>/ signé : la clé le déploie au
 #     démarrage (packaging/live/refresh_live.sh, quelques minutes).
 #   full_live (à la main) impose la reconstruction (base Ubuntu rafraîchie).
+# Image reconstruite : « publish » scelle aussi son système (seal_system.sh) :
+# SYSTEM.sums, écrit par make_key_image.sh à la racine de la partition
+# système, est signé avec la clé de version et SYSTEM.sums.sig ajouté à
+# l'image et au livrable ; la clé le vérifie à chaque démarrage
+# (secmet-image-check, Annexe M §M.3). Image reprise : sa partition système
+# et sa signature sont reprises telles quelles, vérifiées par refresh_live.sh.
 #
 # Secret : SECMET_RELEASE_KEY (clé de version Ed25519, 64 hex), rangé dans
 # l'environnement GitHub « release » : seul le travail « publish », qui
@@ -376,14 +382,8 @@ jobs:
           cat dist/live/VERSION
           ls -la dist/live/
 
-      - name: Livrable de la clé USB
-        run: |
-          ./packaging/live/bundle_live.sh
-          tar -tf dist/secmet-live_*_x86_64.tar | grep -E 'filesystem.squashfs|secmet-make-key.sh|secmet-release$'
-
-      - name: Script de mise à jour au démarrage (doublures)
-        run: ./packaging/live/tests/app-update.sh
-
+      # Avant le livrable : make_key_image.sh --dist écrit dist/live/SYSTEM.sums
+      # (empreintes du système), que bundle_live.sh met dans le .tar.
       - name: Image publiable de la clé (.img.xz, Imager / Rufus / dd)
         env:
           SECMET_ENGINE: docker
@@ -391,6 +391,16 @@ jobs:
           ./packaging/live/make_key_image.sh --dist
           ls -la dist/secmet-key_*_x86_64.img.xz
           xz -l dist/secmet-key_*_x86_64.img.xz
+
+      - name: Livrable de la clé USB
+        run: |
+          ./packaging/live/bundle_live.sh
+          tar -tf dist/secmet-live_*_x86_64.tar | grep -E 'filesystem.squashfs|secmet-make-key.sh|secmet-release$|SYSTEM.sums$'
+
+      - name: Scripts de la clé au démarrage (doublures)
+        run: |
+          ./packaging/live/tests/app-update.sh
+          ./packaging/live/tests/image-check.sh
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -427,6 +437,9 @@ jobs:
 
       - name: Outil de signature
         run: cargo build --release -q -p secmet-attest --bin secmet-release
+
+      - name: mtools (partition système de l'image, sans montage)
+        run: sudo apt-get install -y -q mtools >/dev/null
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -476,6 +489,20 @@ jobs:
             --key "$keyfile" --trust "$SECMET_TRUST" --version "$VERSION" --out release
           rm -f "$keyfile"
           rm -rf previous
+          ls -la release/
+
+      - name: Système de la clé scellé (SYSTEM.sums.sig, clé de version)
+        if: needs.live-mode.outputs.mode == 'full'
+        env:
+          SECMET_RELEASE_KEY: ${{ secrets.SECMET_RELEASE_KEY }}
+          SECMET_RELEASE_BIN: ./target/release/secmet-release
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          umask 077
+          keyfile="$(mktemp)"
+          printf '%s\n' "$SECMET_RELEASE_KEY" > "$keyfile"
+          ./packaging/live/seal_system.sh --dir release --version "$VERSION" --key "$keyfile" --trust "$SECMET_TRUST"
+          rm -f "$keyfile"
           ls -la release/
 
       - name: Signature (SHA256SUMS, latest.json) et vérification

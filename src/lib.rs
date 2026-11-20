@@ -19,6 +19,7 @@ pub mod pdf_logo;
 pub mod pkexec_gate;
 pub mod settings;
 pub mod system_install;
+pub mod system_integrity;
 pub mod trace_log;
 pub mod ui;
 pub mod update;

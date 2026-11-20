@@ -808,6 +808,15 @@ checkbutton.disk-checkbox check:disabled {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
+/* Système de la clé USB altéré (contrôle au démarrage, annexe M §M.3) */
+.integrity-alert {
+  border-radius: 6px;
+  padding: 8px 12px;
+  background-color: alpha(#dc2626, 0.16);
+  border: 1px solid #dc2626;
+  font-weight: bold;
+}
+
 /* Bandeau du lot actif (clé USB, annexe M) */
 .lot-banner {
   border-radius: 6px;

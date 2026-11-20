@@ -7,7 +7,10 @@
 # secmet-app-update le vérifie et le déploie (Annexe N, §N.6), comme après
 # « Installer la mise à jour ». Sans montage ni privilège : la partition est
 # produite en fichier (mke2fs -d, propriétaires posés par debugfs) et écrite
-# dans l'image à son offset.
+# dans l'image à son offset. La partition système n'est pas touchée : ses
+# empreintes SYSTEM.sums et leur signature par la clé de version (posées à
+# la publication de l'image, seal_system.sh) restent valides et sont
+# vérifiées ici avant toute reprise (Annexe M §M.3).
 #
 # Produit :
 #   <sortie>/secmet-key_<version>_x86_64.img.xz   image prête à écrire
@@ -27,7 +30,7 @@
 #                              défaut https://github.com/hclcdev12/secmet/releases/download)
 #         SECMET_XZ_LEVEL      niveau xz (défaut 1 : le contenu est déjà compressé,
 #                              seuls les zéros disparaissent, le niveau ne change pas la taille)
-# Requis : xz, sfdisk, e2fsprogs (mke2fs, dumpe2fs, debugfs, e2fsck), tar, python3.
+# Requis : xz, sfdisk, e2fsprogs (mke2fs, dumpe2fs, debugfs, e2fsck), tar, python3, mtools.
 set -euo pipefail
 umask 022   # modes de la partition de données et des sorties indépendants de l'appelant
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -36,7 +39,7 @@ BASE_URL="${SECMET_RELEASES_URL:-https://github.com/hclcdev12/secmet/releases/do
 die() { echo "ERREUR : $*" >&2; exit 1; }
 fail() { die "$@"; }
 # shellcheck source=packaging/live/qemu-lib.sh
-source "$LIVE/qemu-lib.sh"   # qemu_part
+source "$LIVE/qemu-lib.sh"   # qemu_part, system_extract
 
 PREV="" DEB="" KEY="" TRUST="" VERSION="" OUT="$ROOT_DIR/dist"
 while [[ $# -gt 0 ]]; do
@@ -54,7 +57,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$VERSION" ]] || VERSION="$(grep -m1 '^version' "$ROOT_DIR/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')"
 [[ -d "$PREV" && -f "$DEB" && -f "$KEY" && -n "$TRUST" ]] || die "options --previous, --deb, --key et --trust requises (voir --help)"
-for t in xz sfdisk mke2fs dumpe2fs debugfs e2fsck tar python3 cmp; do command -v "$t" >/dev/null || die "$t introuvable"; done
+for t in xz sfdisk mke2fs dumpe2fs debugfs e2fsck tar python3 cmp mcopy; do command -v "$t" >/dev/null || die "$t introuvable"; done
 IMGXZ="$(ls "$PREV"/secmet-key_*_x86_64.img.xz 2>/dev/null | head -1 || true)"
 TAR="$(ls "$PREV"/secmet-live_*_x86_64.tar 2>/dev/null | head -1 || true)"
 [[ -n "$IMGXZ" && -n "$TAR" && -f "$PREV/SHA256SUMS" && -f "$PREV/SHA256SUMS.sig" && -f "$PREV/latest.json" ]] \
@@ -103,6 +106,29 @@ IMG="$WORK/key.img"
 # fullblock : sans lui, dd traite les lectures partielles du tube comme
 # des blocs (des milliers de petites écritures : 5 min sur GitHub au lieu de 20 s).
 xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
+
+echo "== système repris : empreintes signées (SYSTEM.sums)"
+# Le système de la clé est publié tel quel : il doit être intact et scellé
+# par la clé de version. Une image d'avant la 0.5.0 n'a pas d'empreintes :
+# reprise permise, les clés se déclareront « non signées ».
+system_extract "$IMG" "$WORK/sys" >/dev/null
+if "$RELEASE_BIN" verify-system "$WORK/sys" --trust "$TRUST" > "$WORK/system.log" 2>&1; then
+    sed -n 's/^\(système\|fichiers\|état\) *:/  \1 :/p' "$WORK/system.log"
+    for f in SYSTEM.sums SYSTEM.sums.sig; do
+        # Le livrable .tar doit porter les mêmes, que secmet-make-key.sh copie.
+        if [[ -f "$PREV_DIR/dist/live/$f" ]]; then
+            cmp -s "$PREV_DIR/dist/live/$f" "$WORK/sys/$f" || die "$f du livrable différent de celui de l'image"
+        else
+            cp "$WORK/sys/$f" "$PREV_DIR/dist/live/$f"
+        fi
+    done
+elif [[ ! -f "$WORK/sys/SYSTEM.sums" ]]; then
+    echo "  avertissement : système de $PREV_VERSION sans empreintes (antérieur à la 0.5.0) : les clés se déclareront « non signées »"
+else
+    cat "$WORK/system.log" >&2
+    die "système de l'image reprise altéré ou non scellé : construction complète nécessaire (full_live)"
+fi
+rm -rf "$WORK/sys"
 read -r start size < <(qemu_part "$IMG" SECMET-DATA)
 # Options ext4 de la partition d origine (celles du mke2fs d Ubuntu 24.04
 # dans le conteneur de construction), reprises à l identique : le format ne

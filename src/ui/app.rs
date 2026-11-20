@@ -166,6 +166,8 @@ pub(super) fn build_ui(app: &Application) {
     main_box.append(&host_notice);
     // Bandeau du lot actif (clé USB, annexe M).
     main_box.append(&super::lot_ui::banner(&window));
+    // Système de la clé altéré (contrôle au démarrage, annexe M §M.3).
+    main_box.append(&super::integrity_ui::notice());
 
     // ── Ligne sélection globale ─────────────────────────────────────────────
     let select_all_button = CheckButton::with_label(&tr("Tout sélectionner"));

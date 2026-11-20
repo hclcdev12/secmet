@@ -167,7 +167,7 @@ in_chroot chown -R secmet:secmet /home/secmet
 # NetworkManager gère les interfaces (pas de netplan).
 mkdir -p "$ROOTFS/etc/NetworkManager/conf.d"
 printf '[keyfile]\nunmanaged-devices=none\n' > "$ROOTFS/etc/NetworkManager/conf.d/10-globally-managed-devices.conf"
-in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journal-sync.timer secmet-journal-final secmet-first-boot secmet-app-update >/dev/null 2>&1 || true
+in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journal-sync.timer secmet-journal-final secmet-first-boot secmet-app-update secmet-image-check >/dev/null 2>&1 || true
 in_chroot systemctl set-default graphical.target >/dev/null 2>&1 || true
 # Police de la console texte : 9 s au démarrage (setfont échoue cinq fois
 # avec ce noyau) pour un poste graphique ; la disposition clavier des
@@ -256,7 +256,7 @@ trap - EXIT
 
 step "Sortie : noyau, initrd, squashfs, EFI, BIOS"
 mkdir -p "$OUT/efi" "$OUT/bios"
-rm -f "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs
+rm -f "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs "$OUT"/SYSTEM.sums "$OUT"/SYSTEM.sums.sig
 cp "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)" "$OUT/vmlinuz"
 cp "$(ls -1 "$ROOTFS"/boot/initrd.img-* | sort -V | tail -1)" "$OUT/initrd.img"
 # L'initrd est lu par GRUB depuis la clé avant tout affichage : au-delà de

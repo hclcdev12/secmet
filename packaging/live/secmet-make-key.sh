@@ -137,7 +137,7 @@ mkdir -p "$MNT/sys" "$MNT/data"
 # --- Partition système ---------------------------------------------------------
 echo "Système : noyau, initrd, squashfs, GRUB…"
 mount "$SYS" "$MNT/sys"
-rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot"
+rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot" "$MNT/sys/SYSTEM.sums" "$MNT/sys/SYSTEM.sums.sig"
 mkdir -p "$MNT/sys/live" "$MNT/sys/EFI/BOOT" "$MNT/sys/boot/grub"
 cp "$LIVE_DIR/vmlinuz" "$LIVE_DIR/initrd.img" "$LIVE_DIR/filesystem.squashfs" "$MNT/sys/live/"
 cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/boot/grub/grub.cfg"
@@ -152,6 +152,12 @@ if [[ -d "$LIVE_DIR/efi" ]]; then
     cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/EFI/ubuntu/grub.cfg"
     [[ -f "$LIVE_DIR/efi/mmx64.efi" ]] && cp "$LIVE_DIR/efi/mmx64.efi" "$MNT/sys/EFI/BOOT/"
 fi
+# Modules de GRUB BIOS copiés comme dans l'image publiée (make_key_image.sh),
+# même sans grub-install : ils sont listés dans SYSTEM.sums.
+if [[ -d "$LIVE_DIR/bios" ]]; then
+    mkdir -p "$MNT/sys/boot/grub/i386-pc"
+    cp "$LIVE_DIR"/bios/*.mod "$LIVE_DIR"/bios/*.lst "$MNT/sys/boot/grub/i386-pc/"
+fi
 # BIOS : GRUB i386-pc dans le secteur d'amorçage et la partition d'amorçage
 # BIOS (postes anciens sans UEFI). Une clé plus ancienne sans cette
 # partition reste UEFI seule.
@@ -159,6 +165,19 @@ if [[ -d "$LIVE_DIR/bios" ]] && command -v grub-install >/dev/null 2>&1; then
     if ! grub-install --target=i386-pc --boot-directory="$MNT/sys/boot" \
         --directory="$LIVE_DIR/bios" "$DEV" >/tmp/secmet-grub-bios.log 2>&1; then
         echo "avertissement : GRUB BIOS non installé (UEFI seul) : $(tail -1 /tmp/secmet-grub-bios.log)" >&2
+    fi
+fi
+# Empreintes du système et leur signature par la clé de version (livrable
+# d'une release : dist/live/SYSTEM.sums et SYSTEM.sums.sig, Annexe M §M.3),
+# vérifiées à chaque démarrage par secmet-image-check. Les fichiers copiés
+# ci-dessus sont ceux de l'image publiée, octet pour octet. Sans elles
+# (construction locale), la clé se déclare « non signée ».
+if [[ -f "$LIVE_DIR/SYSTEM.sums" ]]; then
+    cp "$LIVE_DIR/SYSTEM.sums" "$MNT/sys/"
+    [[ -f "$LIVE_DIR/SYSTEM.sums.sig" ]] && cp "$LIVE_DIR/SYSTEM.sums.sig" "$MNT/sys/"
+    if command -v sha256sum >/dev/null 2>&1 \
+        && ! (cd "$MNT/sys" && grep -v '^#' SYSTEM.sums | sha256sum -c --quiet --strict >/dev/null 2>&1); then
+        echo "avertissement : la partition système ne correspond pas à $LIVE_DIR/SYSTEM.sums (la clé se déclarera altérée)" >&2
     fi
 fi
 sync

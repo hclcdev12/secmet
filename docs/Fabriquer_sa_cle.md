@@ -64,6 +64,8 @@ Ce premier démarrage fait deux choses de plus, une seule fois, en quelques seco
 
 Les démarrages suivants sont ordinaires : la clé garde ses lots, ses certificats et sa clé de signature d'un poste à l'autre.
 
+**À chaque démarrage, la clé contrôle son propre système** (depuis la 0.5.0), en quelques secondes, en tâche de fond : les fichiers de démarrage et le système doivent être ceux de l'image publiée, dont les empreintes sont signées par la clé de version. S'ils ont été modifiés (par exemple par un programme sous Windows) ou se sont corrompus, un bandeau rouge l'indique dans SecMet et chaque certificat porte une **réserve** ; l'effacement reste possible. Réécrire alors la clé avec une image vérifiée. Une clé écrite avec une image d'avant la 0.5.0 n'a pas ces empreintes : ses certificats portent la réserve « intégrité … non vérifiée ». Ce contrôle détecte la corruption et la modification maladroite, pas un attaquant qui modifierait aussi le contrôle lui-même.
+
 ## Mettre à jour
 
 - **SecMet** : quand une version plus récente est publiée, un point jaune apparaît sur l'icône des Réglages ; bouton **Installer la mise à jour** (téléchargement, vérification de la signature, installation après le mot de passe du compte `secmet`, puis **Relancer SecMet**). La version est conservée sur la clé et réinstallée à chaque démarrage. Rien à réécrire. Le bouton n'est pas proposé pendant une opération ni tant qu'un lot est ouvert : la raison s'affiche, avec un bouton **Clôturer le lot…** ; une fois le lot clôturé, la mise à jour s'installe. Un lot n'est ainsi traité que par une seule version.
@@ -84,5 +86,6 @@ Le menu de la clé est caché : maintenir **Échap** au démarrage pour l'affich
 | Le PC ignore la clé | Démarrage USB désactivé, BIOS protégé | Activer le démarrage USB ; sinon, démonter le disque et le traiter au banc ([Annexe M §M.9](Annexes/Annexe_M_cle_live_lots.md)) |
 | « Secure Boot violation » | Clé mal écrite (fichier tronqué) | Vérifier l'empreinte, réécrire ; la chaîne de démarrage est signée par Canonical et passe le Secure Boot d'origine |
 | Écran noir après le logo pendant plus d'une minute | Carte graphique récalcitrante | Redémarrer, maintenir Échap au démarrage, choisir « mode sans échec graphique » |
-| Windows propose de formater | Partition de données Linux | **Annuler** |
+| Windows propose de formater | Partition de données Linux (image d'avant la 0.5.0) | **Annuler** |
+| Bandeau rouge « Le système de cette clé USB ne correspond pas à l'image publiée » | Fichier de démarrage modifié ou corrompu sur `SECMET-SYS` (le détail est dans `logs/system/image-check.json`) | Clôturer le lot, réécrire la clé avec une image vérifiée (SecMet Clé USB) ; les certificats déjà produits portent la réserve |
 | La partition d'export reste à 1 Go | Elle n'était pas vide au premier démarrage, ou la clé n'a presque pas de place au-delà de l'image (moins de 64 Mio) | Vider `SECMET-EXP` et redémarrer la clé ; le journal `logs/system/` dit pourquoi (`secmet-first-boot`) |

@@ -14,6 +14,7 @@
 //! | [`export`]    | Du contenu au PDF + JSON signé sur disque, et vérification hors ligne |
 //! | [`release`]   | Versions publiées : `SHA256SUMS` et `latest.json` signés (clé de version) |
 //! | [`manifest`]  | Manifeste de lot signé : liste des certificats et empreintes (Annexe M) |
+//! | [`system_image`] | Auto-contrôle du système de la clé USB : `SYSTEM.sums` signé (clé de version) |
 //!
 //! Chaîne de confiance : la charge utile ([`model::Attestation`]) est
 //! sérialisée en JSON canonique, préfixée d'un séparateur de domaine, puis
@@ -34,6 +35,7 @@ pub mod pdf;
 pub mod qr;
 pub mod release;
 pub mod sign;
+pub mod system_image;
 
 /// Erreurs de la crate.
 #[derive(Debug, thiserror::Error)]
@@ -97,4 +99,42 @@ pub fn unhex(text: &str) -> Option<Vec<u8>> {
 pub fn sha256_hex(data: &[u8]) -> String {
     use sha2::Digest;
     hex(&sha2::Sha256::digest(data))
+}
+
+/// SHA-256 hexadécimal d'un fichier, lu par blocs (squashfs de la clé,
+/// image de plusieurs centaines de Mo : jamais en mémoire d'un coup).
+pub fn sha256_file_hex(path: &std::path::Path) -> std::io::Result<String> {
+    use sha2::Digest;
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = sha2::Sha256::new();
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex(&hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn streamed_file_digest_matches_sha256sum() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("abc");
+        std::fs::write(&path, b"abc").unwrap();
+        // sha256sum de « abc » (FIPS 180-2, exemple B.1).
+        let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert_eq!(sha256_file_hex(&path).unwrap(), expected);
+        // Plus grand qu'un bloc de lecture : même résultat qu'en mémoire.
+        let big: Vec<u8> = (0..(3 << 20) + 17).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&path, &big).unwrap();
+        assert_eq!(sha256_file_hex(&path).unwrap(), sha256_hex(&big));
+    }
 }

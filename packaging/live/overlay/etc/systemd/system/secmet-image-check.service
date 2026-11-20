@@ -1,0 +1,18 @@
+# Clé SecMet : auto-contrôle du système de la clé (empreintes signées par la
+# clé de version, voir /usr/local/bin/secmet-image-check). En tâche de fond
+# (priorité minimale, E/S en classe idle) : le bureau et SecMet n'attendent
+# pas (Type=simple) ; SecMet lit le rapport quand il est prêt. Après
+# secmet-app-update, qui peut remplacer secmet-release.
+[Unit]
+Description=SecMet : controle d'integrite du systeme de la cle
+After=local-fs.target secmet-app-update.service
+ConditionPathIsDirectory=/run/live
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/secmet-image-check
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
