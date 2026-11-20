@@ -16,8 +16,6 @@ use sha2::Digest;
 
 use secmet_attest::release::{self, LatestRelease, SumsSignature};
 
-use crate::update::RELEASE_PUBLIC_KEYS;
-
 /// Taille maximale d'un paquet téléchargé.
 const MAX_PACKAGE: u64 = 256 * 1024 * 1024;
 /// Délai réseau par requête.
@@ -33,17 +31,29 @@ pub enum PackageKind {
         /// Suffixe de distribution du nom de fichier.
         distro: &'static str,
     },
-    /// `.rpm` Fedora.
-    Rpm,
+    /// `.rpm` Fedora ; le paquet `fcN` est choisi parmi ceux de
+    /// `SHA256SUMS` selon la version de Fedora du poste ([`rpm_asset`]).
+    Rpm {
+        /// `VERSION_ID` de `/etc/os-release` sur une Fedora, sinon `None`.
+        fedora: Option<u32>,
+    },
 }
 
 impl PackageKind {
-    /// Nom de fichier publié pour `version`.
-    pub fn asset_name(self, version: &str) -> String {
+    /// Nom de fichier publié pour `version`, choisi parmi les noms listés
+    /// par `SHA256SUMS` (`published`) ; `None` si aucun ne convient.
+    pub fn asset_name<'a>(
+        self,
+        version: &str,
+        published: impl IntoIterator<Item = &'a str>,
+    ) -> Option<String> {
         match self {
             // Nom publié : convention GitHub, qui remplace « ~ » par « . ».
-            PackageKind::Deb { distro } => format!("secmet_{version}.{distro}_amd64.deb"),
-            PackageKind::Rpm => format!("secmet-{version}-1.fc42.x86_64.rpm"),
+            PackageKind::Deb { distro } => {
+                let name = format!("secmet_{version}.{distro}_amd64.deb");
+                published.into_iter().any(|n| n == name).then_some(name)
+            }
+            PackageKind::Rpm { fedora } => rpm_asset(version, published, fedora),
         }
     }
 
@@ -56,12 +66,77 @@ impl PackageKind {
                     .iter()
                     .map(|s| s.to_string()),
             ),
-            PackageKind::Rpm => {
+            PackageKind::Rpm { .. } => {
                 cmd.extend(["dnf", "install", "-y", path].iter().map(|s| s.to_string()))
             }
         }
         cmd
     }
+}
+
+/// Numéro `N` d'un nom `secmet-{version}-1.fcN.x86_64.rpm`.
+fn rpm_fedora_of(version: &str, name: &str) -> Option<u32> {
+    let digits = name
+        .strip_prefix(&format!("secmet-{version}-1.fc"))?
+        .strip_suffix(".x86_64.rpm")?;
+    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// Choix du `.rpm` parmi les noms publiés (`SHA256SUMS`) : celui de la
+/// Fedora du poste (`fcN` = `local`), sinon le plus récent qui ne la
+/// dépasse pas, sinon le plus ancien publié (Fedora inconnue ou plus
+/// ancienne que tous les paquets). `None` si la version n'a aucun `.rpm`.
+pub fn rpm_asset<'a>(
+    version: &str,
+    published: impl IntoIterator<Item = &'a str>,
+    local: Option<u32>,
+) -> Option<String> {
+    let mut builds: Vec<(u32, &str)> = published
+        .into_iter()
+        .filter_map(|name| rpm_fedora_of(version, name).map(|n| (n, name)))
+        .collect();
+    builds.sort_unstable();
+    let chosen = local
+        .and_then(|l| builds.iter().rev().find(|(n, _)| *n <= l))
+        .or_else(|| builds.first())?;
+    Some(chosen.1.to_string())
+}
+
+/// Version de Fedora d'après le texte de `/etc/os-release` : `VERSION_ID`
+/// entier quand `ID` vaut `fedora`, sinon `None` (dérivées comprises : leur
+/// numéro n'est pas celui de Fedora).
+pub fn fedora_version_from_os_release(text: &str) -> Option<u32> {
+    let mut id = String::new();
+    let mut version_id = String::new();
+    for line in text.lines() {
+        let Some((key, value)) = line.trim().split_once('=') else {
+            continue;
+        };
+        let value = value
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .to_string();
+        match key.trim() {
+            "ID" => id = value,
+            "VERSION_ID" => version_id = value,
+            _ => {}
+        }
+    }
+    if id != "fedora" {
+        return None;
+    }
+    version_id.parse().ok()
+}
+
+/// Version de Fedora du poste (`/etc/os-release`), `None` hors Fedora.
+fn local_fedora_version() -> Option<u32> {
+    fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|text| fedora_version_from_os_release(&text))
 }
 
 /// Version de la glibc du poste (`"2.39"`), `None` hors glibc.
@@ -93,18 +168,57 @@ fn has_tool(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Paquet installable sur ce poste, `None` si aucun gestionnaire connu
-/// (AppImage sur une autre distribution : lien de téléchargement seulement).
-pub fn package_kind() -> Option<PackageKind> {
-    if has_tool("apt-get") && has_tool("dpkg") {
+/// L'application tourne-t-elle depuis une AppImage ? Variable `APPIMAGE`
+/// posée par le runtime et fichier présent.
+pub fn running_from_appimage() -> bool {
+    std::env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .is_some_and(|p| p.is_file())
+}
+
+/// Choix pur du paquet installable. Une AppImage ne s'installe jamais par
+/// le gestionnaire de paquets, même sur un poste qui a apt ou dnf : le
+/// paquet écraserait le composant système posé par l'AppImage
+/// (`/usr/bin/secmet-helper`), qui alternerait ensuite entre deux
+/// versions, et l'AppImage resterait à l'ancienne. Elle se remplace par
+/// la nouvelle AppImage (lien de téléchargement seulement).
+pub fn package_kind_for(
+    appimage: bool,
+    has_apt: bool,
+    has_dnf: bool,
+    glibc: Option<(u32, u32)>,
+    fedora: Option<u32>,
+) -> Option<PackageKind> {
+    if appimage {
+        None
+    } else if has_apt {
         Some(PackageKind::Deb {
-            distro: deb_distro_for(glibc_version()),
+            distro: deb_distro_for(glibc),
         })
-    } else if has_tool("dnf") && has_tool("rpm") {
-        Some(PackageKind::Rpm)
+    } else if has_dnf {
+        Some(PackageKind::Rpm { fedora })
     } else {
         None
     }
+}
+
+/// Paquet installable sur ce poste, `None` si aucun gestionnaire connu ou
+/// si l'application tourne depuis une AppImage (lien de téléchargement
+/// seulement).
+pub fn package_kind() -> Option<PackageKind> {
+    let has_apt = has_tool("apt-get") && has_tool("dpkg");
+    let has_dnf = has_tool("dnf") && has_tool("rpm");
+    package_kind_for(
+        running_from_appimage(),
+        has_apt,
+        has_dnf,
+        glibc_version(),
+        if has_dnf {
+            local_fedora_version()
+        } else {
+            None
+        },
+    )
 }
 
 fn agent() -> ureq::Agent {
@@ -157,14 +271,25 @@ pub fn download_and_verify(latest: &LatestRelease, kind: PackageKind) -> Result<
     let sig_text = get_text(&format!("{base}/{}", release::SUMS_SIGNATURE_FILE))?;
     let sig: SumsSignature =
         serde_json::from_str(&sig_text).map_err(|_| "SHA256SUMS.sig illisible".to_string())?;
-    let trusted: Vec<String> = RELEASE_PUBLIC_KEYS.iter().map(|k| k.to_string()).collect();
-    let verified = release::verify_sums(&sig, &sums_text, &trusted).map_err(|e| e.to_string())?;
+    let verified = release::verify_sums(&sig, &sums_text, &crate::update::trusted_release_keys())
+        .map_err(|e| e.to_string())?;
     if !verified.trusted {
         return Err("SHA256SUMS signé par une clé inconnue".to_string());
     }
-    let name = kind.asset_name(&latest.version);
-    let expected = release::parse_sums(&sums_text)
-        .map_err(|e| e.to_string())?
+    let entries = release::parse_sums(&sums_text).map_err(|e| e.to_string())?;
+    let name = kind
+        .asset_name(&latest.version, entries.iter().map(|e| e.name.as_str()))
+        .ok_or_else(|| match kind {
+            PackageKind::Deb { distro } => format!(
+                "aucun paquet .deb {distro} de la version {} dans SHA256SUMS",
+                latest.version
+            ),
+            PackageKind::Rpm { .. } => format!(
+                "aucun paquet .rpm de la version {} dans SHA256SUMS",
+                latest.version
+            ),
+        })?;
+    let expected = entries
         .into_iter()
         .find(|e| e.name == name)
         .map(|e| e.sha256)
@@ -325,18 +450,137 @@ pub fn install(kind: PackageKind, path: &std::path::Path) -> Result<String, Stri
 mod tests {
     use super::*;
 
+    /// Noms d'une release de transition (0.4.1 : `fc42` et `fc44`).
+    const PUBLISHED: [&str; 6] = [
+        "secmet_0.4.1.ubuntu24.04_amd64.deb",
+        "secmet_0.4.1.ubuntu22.04_amd64.deb",
+        "secmet-0.4.1-1.fc42.x86_64.rpm",
+        "secmet-0.4.1-1.fc44.x86_64.rpm",
+        "SecMet_0.4.1_x86_64.AppImage",
+        "secmet-key_0.4.1_x86_64.img.xz",
+    ];
+
     #[test]
     fn asset_names_follow_the_release_layout() {
+        let deb = PackageKind::Deb {
+            distro: "ubuntu24.04",
+        };
         assert_eq!(
-            PackageKind::Deb {
-                distro: "ubuntu24.04"
-            }
-            .asset_name("0.3.2"),
-            "secmet_0.3.2.ubuntu24.04_amd64.deb"
+            deb.asset_name("0.4.1", PUBLISHED).as_deref(),
+            Some("secmet_0.4.1.ubuntu24.04_amd64.deb")
+        );
+        assert_eq!(deb.asset_name("0.4.2", PUBLISHED), None);
+        assert_eq!(
+            PackageKind::Rpm { fedora: Some(44) }
+                .asset_name("0.4.1", PUBLISHED)
+                .as_deref(),
+            Some("secmet-0.4.1-1.fc44.x86_64.rpm")
+        );
+    }
+
+    #[test]
+    fn rpm_follows_the_local_fedora() {
+        let pick = |local| rpm_asset("0.4.1", PUBLISHED, local);
+        // Version exacte.
+        assert_eq!(
+            pick(Some(42)).as_deref(),
+            Some("secmet-0.4.1-1.fc42.x86_64.rpm")
         );
         assert_eq!(
-            PackageKind::Rpm.asset_name("0.3.2"),
-            "secmet-0.3.2-1.fc42.x86_64.rpm"
+            pick(Some(44)).as_deref(),
+            Some("secmet-0.4.1-1.fc44.x86_64.rpm")
+        );
+        // Sinon le plus récent qui ne dépasse pas la version locale.
+        assert_eq!(
+            pick(Some(45)).as_deref(),
+            Some("secmet-0.4.1-1.fc44.x86_64.rpm")
+        );
+        assert_eq!(
+            pick(Some(43)).as_deref(),
+            Some("secmet-0.4.1-1.fc42.x86_64.rpm")
+        );
+        // Plus ancienne que tous, ou inconnue : le plus ancien publié.
+        assert_eq!(
+            pick(Some(41)).as_deref(),
+            Some("secmet-0.4.1-1.fc42.x86_64.rpm")
+        );
+        assert_eq!(
+            pick(None).as_deref(),
+            Some("secmet-0.4.1-1.fc42.x86_64.rpm")
+        );
+        // fc100 se trie comme un nombre, pas comme du texte.
+        let names = [
+            "secmet-0.5.0-1.fc44.x86_64.rpm",
+            "secmet-0.5.0-1.fc100.x86_64.rpm",
+        ];
+        assert_eq!(
+            rpm_asset("0.5.0", names, Some(100)).as_deref(),
+            Some("secmet-0.5.0-1.fc100.x86_64.rpm")
+        );
+        assert_eq!(
+            rpm_asset("0.5.0", names, Some(99)).as_deref(),
+            Some("secmet-0.5.0-1.fc44.x86_64.rpm")
+        );
+    }
+
+    #[test]
+    fn rpm_ignores_other_versions_and_malformed_names() {
+        let names = [
+            "secmet-0.4.0-1.fc42.x86_64.rpm",
+            "secmet-0.4.1-1.fc.x86_64.rpm",
+            "secmet-0.4.1-1.fc44.aarch64.rpm",
+            "secmet-0.4.1-2.fc44.x86_64.rpm",
+            "secmet-0.4.1-1.fc4x.x86_64.rpm",
+            "secmet-0.4.1-1.fc+44.x86_64.rpm",
+        ];
+        assert_eq!(rpm_asset("0.4.1", names, Some(44)), None);
+        assert_eq!(rpm_asset("0.4.1", [], Some(44)), None);
+        // Release à un seul paquet (0.4.0, fc42) : pris pour toute Fedora.
+        assert_eq!(
+            rpm_asset("0.4.0", names, Some(44)).as_deref(),
+            Some("secmet-0.4.0-1.fc42.x86_64.rpm")
+        );
+    }
+
+    #[test]
+    fn fedora_version_is_read_from_os_release() {
+        let fedora = "NAME=\"Fedora Linux\"\nVERSION=\"44 (Workstation Edition)\"\n\
+                      ID=fedora\nVERSION_ID=44\n";
+        assert_eq!(fedora_version_from_os_release(fedora), Some(44));
+        let quoted = "ID=\"fedora\"\nVERSION_ID=\"45\"\n";
+        assert_eq!(fedora_version_from_os_release(quoted), Some(45));
+        let ubuntu = "ID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\n";
+        assert_eq!(fedora_version_from_os_release(ubuntu), None);
+        let rocky = "ID=\"rocky\"\nID_LIKE=\"rhel centos fedora\"\nVERSION_ID=\"9.4\"\n";
+        assert_eq!(fedora_version_from_os_release(rocky), None);
+        let rawhide = "ID=fedora\nVERSION_ID=rawhide\n";
+        assert_eq!(fedora_version_from_os_release(rawhide), None);
+        assert_eq!(fedora_version_from_os_release(""), None);
+    }
+
+    #[test]
+    fn appimage_never_gets_the_install_button() {
+        let g = Some((2, 39));
+        assert_eq!(package_kind_for(true, true, false, g, None), None);
+        assert_eq!(package_kind_for(true, false, true, g, Some(44)), None);
+        assert_eq!(package_kind_for(true, false, false, g, None), None);
+        assert_eq!(
+            package_kind_for(false, true, false, g, None),
+            Some(PackageKind::Deb {
+                distro: "ubuntu24.04"
+            })
+        );
+        assert_eq!(
+            package_kind_for(false, false, true, g, Some(44)),
+            Some(PackageKind::Rpm { fedora: Some(44) })
+        );
+        assert_eq!(package_kind_for(false, false, false, g, None), None);
+        // apt prime sur dnf (dnf présent sur une Debian).
+        assert_eq!(
+            package_kind_for(false, true, true, Some((2, 35)), Some(44)),
+            Some(PackageKind::Deb {
+                distro: "ubuntu22.04"
+            })
         );
     }
 
@@ -371,6 +615,9 @@ mod tests {
         assert_eq!(cmd[0], "pkexec");
         assert_eq!(cmd[1], "apt-get");
         assert!(cmd.contains(&"/tmp/x.deb".to_string()));
-        assert_eq!(PackageKind::Rpm.install_command("/tmp/x.rpm")[1], "dnf");
+        assert_eq!(
+            PackageKind::Rpm { fedora: None }.install_command("/tmp/x.rpm")[1],
+            "dnf"
+        );
     }
 }

@@ -212,4 +212,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Record and close",
         "Erfassen und abschließen",
     ),
+    (
+        "Clé publique de signature illisible.",
+        "Unreadable signing public key.",
+        "Öffentlicher Signaturschlüssel unlesbar.",
+    ),
 ];

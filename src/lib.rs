@@ -1,6 +1,7 @@
 //! Bibliothèque SecMet — modules partagés par l'application et les outils de démo.
 
 pub mod app_identity;
+pub mod busy;
 pub mod certificate;
 pub mod clock;
 pub mod disk;

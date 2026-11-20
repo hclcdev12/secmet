@@ -108,7 +108,9 @@ pub(super) fn show_defrozen_dialog(
         let parent = parent_for_err.clone();
         let dialog = dialog_for_suspend.clone();
         let btn = btn.clone();
+        let busy = crate::busy::begin(crate::busy::BusyKind::Defrozen);
         glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
+            let _busy = &busy;
             match rx.try_recv() {
                 Ok(Ok(outcome)) => {
                     dialog.close();
@@ -249,7 +251,9 @@ pub(super) fn show_unlock_dialog<F>(
         let feedback = feedback_for_unlock.clone();
         let entry = entry_for_unlock.clone();
         let on_done = on_done.clone();
+        let busy = crate::busy::begin(crate::busy::BusyKind::Unlock);
         glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
+            let _busy = &busy;
             match rx.try_recv() {
                 Ok(Ok(outcome)) => {
                     entry.set_text("");

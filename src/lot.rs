@@ -114,7 +114,81 @@ pub fn deliverables(lot: &Lot) -> Result<Vec<PathBuf>, String> {
         )));
     }
     files.push(lot.manifest_path());
+    files.extend(public_key_files(lot.dir()));
     Ok(files)
+}
+
+/// Préfixe du fichier de clé publique joint aux livrables d'un lot.
+pub const PUBLIC_KEY_FILE_PREFIX: &str = "cle-publique-secmet-";
+
+/// Nom du fichier de clé publique joint aux livrables d'un lot :
+/// `cle-publique-secmet-<key_id>.pub`.
+pub fn public_key_file_name(key_id: &str) -> String {
+    format!("{PUBLIC_KEY_FILE_PREFIX}{key_id}.pub")
+}
+
+/// Clé publique de signature des certificats, telle que le client
+/// l'inscrit dans sa liste de confiance (`trusted-keys`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicKeyInfo {
+    /// Identifiant court imprimé sur les certificats (16 hex).
+    pub key_id: String,
+    /// Clé publique Ed25519 (64 hex, minuscules).
+    pub public_key: String,
+}
+
+impl PublicKeyInfo {
+    /// Depuis la clé publique en hexadécimal ; `None` si elle n'a pas
+    /// 32 octets.
+    pub fn from_hex(text: &str) -> Option<Self> {
+        let bytes: [u8; 32] = secmet_attest::unhex(text.trim())?.try_into().ok()?;
+        Some(Self {
+            key_id: secmet_attest::sign::key_id_of(&bytes),
+            public_key: secmet_attest::hex(&bytes),
+        })
+    }
+}
+
+/// Lit la clé publique de `path` (`attestation-key.pub`) sans rien créer :
+/// `Ok(None)` si le fichier n'existe pas encore.
+pub fn read_public_key(path: &Path) -> Result<Option<PublicKeyInfo>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => PublicKeyInfo::from_hex(&text)
+            .map(Some)
+            .ok_or_else(|| format!("{} : clé publique illisible", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("{} : {e}", path.display())),
+    }
+}
+
+/// Écrit dans `dir` le fichier de clé publique des livrables d'un lot,
+/// au même contenu que `attestation-key.pub` (la clé en hexadécimal et un
+/// saut de ligne). Rend son chemin.
+pub fn write_public_key_file(dir: &Path, key: &PublicKeyInfo) -> Result<PathBuf, String> {
+    let path = dir.join(public_key_file_name(&key.key_id));
+    write_atomic_sync(&path, format!("{}\n", key.public_key).as_bytes())?;
+    Ok(path)
+}
+
+/// Fichiers de clé publique présents dans `dir` (lots clôturés depuis la
+/// 0.4.1 ; aucun pour les plus anciens).
+pub fn public_key_files(dir: &Path) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.is_file())
+                .filter(|p| {
+                    p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                        n.starts_with(PUBLIC_KEY_FILE_PREFIX) && n.ends_with(".pub")
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    files
 }
 
 /// Bilan d'une recopie des lots archivés sur la partition d'export.
@@ -1068,6 +1142,8 @@ mod tests {
         lot.finish_machine(entry, EntryStatus::Finished, vec![r])
             .unwrap();
         fs::write(lot.manifest_path(), b"{}").unwrap();
+        let key = PublicKeyInfo::from_hex(&identity.public_key_hex()).unwrap();
+        write_public_key_file(lot.dir(), &key).unwrap();
         lot.close("00").unwrap();
         let id = lot.id().to_string();
         lot.archive(&archive).unwrap();
@@ -1087,6 +1163,7 @@ mod tests {
             format!("{id}-manifest.json"),
             cert_file.clone(),
             session_pdf.clone(),
+            public_key_file_name(&identity.key_id()),
         ] {
             assert!(out.join(&f).is_file(), "{f} attendu dans l'export");
         }
@@ -1098,6 +1175,44 @@ mod tests {
         assert!(again.copied.is_empty());
         let forced = export_archived(&archive, &mount, Some(&id));
         assert_eq!(forced.copied, vec![id]);
+    }
+
+    #[test]
+    fn public_key_file_matches_attestation_key_pub() {
+        let tmp = tempfile::tempdir().unwrap();
+        let key_path = tmp.path().join(secmet_attest::keystore::KEY_FILE);
+        let pub_path = secmet_attest::keystore::public_key_path(&key_path);
+        // Pas encore de clé : rien n'est créé.
+        assert_eq!(read_public_key(&pub_path).unwrap(), None);
+        assert!(!key_path.exists() && !pub_path.exists());
+
+        let identity = secmet_attest::keystore::load_or_create(&key_path).unwrap();
+        let info = read_public_key(&pub_path).unwrap().unwrap();
+        assert_eq!(info.key_id, identity.key_id());
+        assert_eq!(info.public_key, identity.public_key_hex());
+
+        let lot_dir = tmp.path().join("lot");
+        fs::create_dir_all(&lot_dir).unwrap();
+        let written = write_public_key_file(&lot_dir, &info).unwrap();
+        assert_eq!(
+            written.file_name().unwrap().to_str().unwrap(),
+            format!("cle-publique-secmet-{}.pub", identity.key_id())
+        );
+        assert_eq!(
+            fs::read(&written).unwrap(),
+            fs::read(&pub_path).unwrap(),
+            "même contenu que attestation-key.pub"
+        );
+        fs::write(lot_dir.join("autre.pub"), b"x").unwrap();
+        assert_eq!(public_key_files(&lot_dir), vec![written]);
+
+        fs::write(&pub_path, "pas une clé\n").unwrap();
+        assert!(read_public_key(&pub_path).is_err());
+        assert_eq!(PublicKeyInfo::from_hex(&"ab".repeat(31)), None);
+        assert_eq!(
+            PublicKeyInfo::from_hex(&identity.public_key_hex().to_uppercase()),
+            Some(info)
+        );
     }
 
     #[test]

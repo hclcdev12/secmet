@@ -6,7 +6,7 @@ Index des annexes de la documentation SecMet, issues du cahier des charges du pr
 |--------|-------|-------------|
 | [A](Annexe_A_besoins_fonctionnels.md) | Besoins fonctionnels | Tables BF-01 à BF-46 (disques, effacement, traçabilité, TestDisk, sort du support, clé USB et lots, mises à jour) |
 | [B](Annexe_B_besoins_non_fonctionnels.md) | Besoins non fonctionnels | Tables BNF-01 à BNF-16 (sécurité, fiabilité, autonomie) |
-| [C](Annexe_C_plan_de_recette.md) | Plan de recette | Scénarios R-01 à R-44 (dont clé et lots R-24 à R-40, mises à jour R-41 à R-44), contrôles automatisés et règles de non-conformité |
+| [C](Annexe_C_plan_de_recette.md) | Plan de recette | Scénarios R-01 à R-46 (dont clé et lots R-24 à R-40, mises à jour R-41 à R-46), contrôles automatisés et règles de non-conformité |
 | [D](Annexe_D_glossaire.md) | Glossaire | Définitions métier : effacement, lots, clé USB, signatures, releases |
 | [E](Annexe_E_normes_conformite.md) | Normes et conformité | Alignement sur NIST SP 800-88 (Rev. 2, 2025, qui remplace la Rev. 1 ; politique par défaut du code : Rev. 1), IEEE 2883, etc. ; aucune certification |
 | [F](Annexe_F_specification_technique.md) | Spécification technique | Architecture et modules |

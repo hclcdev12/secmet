@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use secmet_attest::release::{self, LatestRelease, SignedLatest};
 
-/// Clés publiques de version acceptées (hex), comme dans SecMet.
+/// Clés publiques de version acceptées (hex), une par ligne, comme dans
+/// SecMet (`src/update.rs`) : ajouter une clé, c'est ajouter une ligne.
 pub const RELEASE_PUBLIC_KEYS: &[&str] =
     &["bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5"];
 /// `latest.json` de la dernière release du dépôt public.
@@ -68,9 +69,15 @@ pub fn fetch_text(url: &str) -> Result<String, String> {
 pub fn fetch_latest() -> Result<LatestRelease, String> {
     let url = std::env::var(URL_ENV).unwrap_or_else(|_| LATEST_URL.to_string());
     let text = fetch_text(&url)?;
+    parse_latest(&text, &trusted_keys())
+}
+
+/// Analyse `latest.json` et vérifie sa signature par l'une des clés de
+/// version `trusted`.
+pub fn parse_latest(text: &str, trusted: &[String]) -> Result<LatestRelease, String> {
     let signed: SignedLatest =
-        serde_json::from_str(&text).map_err(|e| format!("latest.json illisible : {e}"))?;
-    let v = release::verify_latest(&signed, &trusted_keys()).map_err(|e| e.to_string())?;
+        serde_json::from_str(text).map_err(|e| format!("latest.json illisible : {e}"))?;
+    let v = release::verify_latest(&signed, trusted).map_err(|e| e.to_string())?;
     if !v.trusted {
         return Err(format!(
             "latest.json signé par une clé inconnue ({})",
@@ -161,4 +168,62 @@ pub fn download(
     }
     std::fs::rename(&part, dest).map_err(|e| format!("{} : {e}", dest.display()))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use secmet_attest::sign::SigningIdentity;
+    use std::collections::BTreeMap;
+
+    fn signed_by(id: &SigningIdentity) -> String {
+        let payload = LatestRelease {
+            version: "9.9.9".into(),
+            published_at: "2026-11-20".into(),
+            notes: BTreeMap::new(),
+            sha256sums_url:
+                "https://github.com/hclcdev12/secmet/releases/download/v9.9.9/SHA256SUMS".into(),
+            moved_to: None,
+        };
+        serde_json::to_string(&release::sign_latest(id, &payload).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn any_listed_release_key_is_accepted() {
+        let old = SigningIdentity::from_seed(&[5u8; 32]);
+        let new = SigningIdentity::from_seed(&[6u8; 32]);
+        let both = vec![old.public_key_hex(), new.public_key_hex()];
+        assert_eq!(
+            parse_latest(&signed_by(&old), &both).unwrap().version,
+            "9.9.9"
+        );
+        assert_eq!(
+            parse_latest(&signed_by(&new), &both).unwrap().version,
+            "9.9.9"
+        );
+        let only_old = vec![old.public_key_hex()];
+        assert!(parse_latest(&signed_by(&new), &only_old)
+            .unwrap_err()
+            .contains("clé inconnue"));
+    }
+
+    #[test]
+    fn release_keys_match_the_application() {
+        let keys = trusted_keys();
+        assert!(!keys.is_empty());
+        for k in &keys {
+            assert_eq!(k.len(), 64, "{k}");
+            assert!(k.chars().all(|c| c.is_ascii_hexdigit()));
+        }
+        // Même liste que l'application : lue dans son source, sans dépendre
+        // de la crate GTK.
+        let app = include_str!("../../../src/update.rs");
+        for k in &keys {
+            assert!(
+                app.contains(k.as_str()),
+                "clé absente de src/update.rs : {k}"
+            );
+        }
+    }
 }

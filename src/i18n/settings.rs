@@ -120,4 +120,39 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Name pre-filled in the PDF certificate generation dialog (can be changed for each generation). Leave empty to enter it every time.",
         "Im Dialog zur Erstellung der PDF-Zertifikate vorausgefüllter Name (bei jeder Erstellung änderbar). Leer lassen, um ihn jedes Mal einzugeben.",
     ),
+    (
+        "Clé de signature des certificats",
+        "Certificate signing key",
+        "Signaturschlüssel der Zertifikate",
+    ),
+    (
+        "Chaque certificat est signé par cette clé, propre à ce poste (ou à cette clé USB). Le client inscrit la clé publique ci-dessous dans sa liste de confiance (trusted-keys) pour vérifier les certificats, et l'en retire si le support est perdu. Elle est aussi copiée avec les livrables de chaque lot clôturé.",
+        "Every certificate is signed with this key, specific to this workstation (or to this USB key). The customer adds the public key below to their trust list (trusted-keys) to verify the certificates, and removes it if the medium is lost. It is also copied with the deliverables of every closed batch.",
+        "Jedes Zertifikat wird mit diesem Schlüssel signiert, der zu diesem Arbeitsplatz (oder diesem USB-Stick) gehört. Der Kunde trägt den öffentlichen Schlüssel unten in seine Vertrauensliste (trusted-keys) ein, um die Zertifikate zu prüfen, und entfernt ihn, wenn der Datenträger verloren geht. Er wird außerdem mit den Ergebnissen jeder abgeschlossenen Charge kopiert.",
+    ),
+    (
+        "Identifiant (key_id) : {key_id}",
+        "Identifier (key_id): {key_id}",
+        "Kennung (key_id): {key_id}",
+    ),
+    (
+        "Clé publique Ed25519 (hexadécimal)",
+        "Ed25519 public key (hexadecimal)",
+        "Öffentlicher Ed25519-Schlüssel (hexadezimal)",
+    ),
+    (
+        "Copier",
+        "Copy",
+        "Kopieren",
+    ),
+    (
+        "Clé publique copiée dans le presse-papiers.",
+        "Public key copied to the clipboard.",
+        "Öffentlicher Schlüssel in die Zwischenablage kopiert.",
+    ),
+    (
+        "Aucune clé de signature pour l'instant ({file} absent) : elle est créée à la première signature d'un certificat.",
+        "No signing key yet ({file} missing): it is created when the first certificate is signed.",
+        "Noch kein Signaturschlüssel ({file} fehlt): Er wird bei der ersten Signatur eines Zertifikats erstellt.",
+    ),
 ];

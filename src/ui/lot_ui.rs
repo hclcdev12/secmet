@@ -183,6 +183,11 @@ pub(super) fn is_active() -> bool {
     ACTIVE.with(|a| a.borrow().is_some())
 }
 
+/// Identifiant du lot actif (ouvert), s'il y en a un.
+pub(super) fn active_id() -> Option<String> {
+    ACTIVE.with(|a| a.borrow().as_ref().map(|lot| lot.id().to_string()))
+}
+
 fn set_active(lot: Option<Lot>) {
     lot::set_active_dir(lot.as_ref().map(|l| l.dir().to_path_buf()));
     ACTIVE.with(|a| *a.borrow_mut() = lot);
@@ -345,7 +350,9 @@ fn once(done: &Done) {
 /// `on_done` (chargement de l'inventaire). Sans dossier dédié : `on_done`
 /// tout de suite.
 pub(super) fn startup(window: &ApplicationWindow, on_done: Box<dyn FnOnce()>) {
-    if !enabled() {
+    // Une mise à jour vient d'être installée : pas de lot sous l'ancien
+    // binaire, il s'ouvrira à la relance.
+    if !enabled() || crate::busy::restart_pending() {
         on_done();
         return;
     }
@@ -678,6 +685,7 @@ pub(super) fn register_end(window: &ApplicationWindow, status: &Label) {
         return;
     }
     status.set_text(&tr("Certificats du lot en cours de génération…"));
+    let pdf_guard = crate::busy::begin(crate::busy::BusyKind::Pdf);
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(certificate::render_pdf_bundle_in(
@@ -691,6 +699,8 @@ pub(super) fn register_end(window: &ApplicationWindow, status: &Label) {
     let window = window.clone();
     let status = status.clone();
     glib::timeout_add_local(Duration::from_millis(150), move || {
+        // Garde libérée avec le minuteur (fin de la génération).
+        let _pdf = &pdf_guard;
         let result = match rx.try_recv() {
             Ok(r) => r,
             Err(mpsc::TryRecvError::Empty) => return glib::ControlFlow::Continue,
@@ -811,6 +821,11 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
             serde_json::to_string_pretty(&signed_manifest).map_err(|e| e.to_string())?;
         let manifest_path = lot.dir().join(format!("{lot_id}-manifest.json"));
         lot::write_atomic_sync(&manifest_path, manifest_json.as_bytes())?;
+        // Clé publique qui a signé le lot, à inscrire chez le client
+        // (`trusted-keys`) : même contenu que `attestation-key.pub`.
+        let key = lot::PublicKeyInfo::from_hex(&identity.public_key_hex())
+            .ok_or_else(|| tr("Clé publique de signature illisible."))?;
+        let key_file = lot::write_public_key_file(lot.dir(), &key)?;
         lot.close(&sha256_hex(manifest_json.as_bytes()))?;
 
         // Livrables : PDF groupé, JSON du lot, et pour chaque certificat du
@@ -835,6 +850,7 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
             Some(mount) => {
                 let mut files = deliverables;
                 files.push(manifest_path.clone());
+                files.push(key_file);
                 match lot::copy_to_export(&mount, &lot_id, &files) {
                     Ok(target) => (Some(target), None),
                     Err(e) => (None, Some(e)),
@@ -1099,6 +1115,7 @@ fn stale_dialog(window: &ApplicationWindow, stale: Vec<StaleCertificate>, after:
 }
 
 fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
+    let close_guard = crate::busy::begin(crate::busy::BusyKind::LotClose);
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let _ = tx.send(close_lot_work(lot));
@@ -1111,17 +1128,22 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
         &tr("Clôture en cours : certificat groupé, manifeste signé, copie des livrables…"),
     );
     let window = window.clone();
+    let mut close_guard = Some(close_guard);
     glib::timeout_add_local(Duration::from_millis(150), move || {
         let result = match rx.try_recv() {
             Ok(r) => r,
             Err(mpsc::TryRecvError::Empty) => return glib::ControlFlow::Continue,
             Err(mpsc::TryRecvError::Disconnected) => {
+                close_guard.take();
                 busy.close();
                 once(&after);
                 return glib::ControlFlow::Break;
             }
         };
         busy.close();
+        // Clôture terminée (lot archivé ou rendu actif) avant `after` :
+        // les Réglages qui attendent la clôture voient l'état final.
+        close_guard.take();
         match result {
             Ok(report) => {
                 set_active(None);

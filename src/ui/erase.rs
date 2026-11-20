@@ -373,6 +373,9 @@ pub(super) fn launch_erase_operations_with_passes(
     smart_auth_ok.set(true);
 
     operations_active.set(true);
+    // Installation d'une mise à jour bloquée jusqu'à la fin des effacements
+    // (garde rendue avec `operations_active`, ou avec le minuteur de suivi).
+    let mut erase_guard = Some(crate::busy::begin(crate::busy::BusyKind::Erase));
     defrozen_button.set_sensitive(false);
     refresh_button.set_sensitive(false);
     select_all_button.set_sensitive(false);
@@ -810,6 +813,7 @@ pub(super) fn launch_erase_operations_with_passes(
             start_button_clone.set_sensitive(true);
             defrozen_button_clone.set_sensitive(true);
             operations_active_clone.set(false);
+            erase_guard.take();
             refresh_button_clone3.set_sensitive(true);
             select_all_clone3.set_sensitive(true);
             update_retry_button_state(&job_states_clone, &retry_failed_button_clone);
