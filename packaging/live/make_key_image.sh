@@ -76,7 +76,13 @@ mcopy -i "$W/p1.img" "$OUT/efi/mmx64.efi" ::EFI/BOOT/mmx64.efi
 # signé de Debian lit $prefix/grub.cfg avec prefix=/EFI/debian (compilé dans
 # le binaire signé), sinon le grub.cfg posé à côté de lui (EFI/BOOT) ; GRUB
 # BIOS lit boot/grub/grub.cfg.
-sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA:-}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
+# Sans SECMET_KERNEL_EXTRA, grub.cfg tel quel : mêmes octets que ceux de
+# secmet-make-key.sh.
+if [ -n "${SECMET_KERNEL_EXTRA:-}" ]; then
+    sed "s|net.ifnames=0|net.ifnames=0 ${SECMET_KERNEL_EXTRA}|" "$SRC/packaging/live/grub.cfg" > "$W/grub.cfg"
+else
+    cp "$SRC/packaging/live/grub.cfg" "$W/grub.cfg"
+fi
 for d in EFI/BOOT EFI/debian boot/grub; do mcopy -i "$W/p1.img" "$W/grub.cfg" "::$d/grub.cfg"; done
 # Licences et offre de sources (licences.sh), lisibles depuis tout poste.
 mcopy -s -i "$W/p1.img" "$OUT"/licenses/* ::LICENCES/

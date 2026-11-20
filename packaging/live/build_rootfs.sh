@@ -277,8 +277,10 @@ la loi.
 
 $DEBIAN_NOTICE
 MOTD_EOF
-# Logo Debian de Plymouth (thèmes bgrt et two-step non configurés) : retiré.
-rm -f "$ROOTFS/usr/share/plymouth/debian-logo.png"
+# Logo Debian de Plymouth : le crochet initramfs de Plymouth le copie
+# toujours (il échoue sans lui) et les thèmes qui affichent un logo de
+# distribution le prennent ; remplacé par l'image SecMet du thème.
+cp "$PT/secmet/watermark.png" "$ROOTFS/usr/share/plymouth/debian-logo.png"
 # desktop-base apporte logos, fonds et thèmes Debian : jamais dans l'image.
 if in_chroot dpkg-query -W -f '${Status}' desktop-base 2>/dev/null | grep -q 'ok installed'; then
     echo "desktop-base installé (logos et thèmes Debian) : à exclure" >&2; exit 1
@@ -340,8 +342,19 @@ rm -f "$ROOTFS/usr/lib/modules/$KVER"/kernel/kernel/kheaders.ko*
 # Cohérence : un module qui dépendait d'un sous-système retiré (ksmbd et
 # RDMA sans InfiniBand, capteurs ADC sans iio…) est retiré à son tour,
 # jusqu'à ce que depmod -e ne signale plus aucun symbole non résolu.
+# Le System.map de Debian est vide (le vrai est dans le paquet -dbg) : les
+# symboles exportés par le noyau lui-même viennent du Module.symvers de
+# linux-headers-$KVER, téléchargé et lu sans être installé ; seules les
+# lignes « vmlinux » sont gardées, celles des modules viennent des modules
+# encore présents.
+( cd "$ROOTFS/tmp" && in_chroot sh -c "cd /tmp && apt-get download -qq linux-headers-$KVER" ) >/dev/null 2>&1 \
+    || { echo "linux-headers-$KVER : téléchargement impossible" >&2; exit 1; }
+dpkg-deb --fsys-tarfile "$ROOTFS"/tmp/linux-headers-"$KVER"_*.deb | tar -xO --wildcards '*/Module.symvers' \
+    | awk -F'\t' '$3 == "vmlinux"' > "$ROOTFS/tmp/vmlinux.symvers"
+rm -f "$ROOTFS"/tmp/linux-headers-*.deb
+[[ "$(wc -l < "$ROOTFS/tmp/vmlinux.symvers")" -gt 5000 ]] || { echo "Module.symvers du noyau illisible" >&2; exit 1; }
 for pass in 1 2 3 4 5; do
-    in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
+    in_chroot depmod -e -E /tmp/vmlinux.symvers "$KVER" >/tmp/depmod.log 2>&1 || true
     bad="$(grep -i 'needs unknown symbol' /tmp/depmod.log | awk '{print $3}' | sort -u || true)"
     [[ -n "$bad" ]] || break
     echo "modules dépendants retirés (passe $pass) : $(echo "$bad" | xargs -n1 basename | sed -E 's/\.ko(\.(zst|xz|gz))?$//' | tr '\n' ' ')"
@@ -371,7 +384,17 @@ grep -q 'plymouth message' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || {
 sed -i 's|size=$( expr $(ls -la ${MODULETORAMFILE} \| awk .{print $5}.) / 1024 + 5000 )|size=$(( $(stat -c %s "${MODULETORAMFILE}") / 1024 + 5000 ))|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
 grep -q 'stat -c %s' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch taille toram non appliqué" >&2; exit 1; }
 step "initramfs live-boot"
+# Pilote nouveau et firmware NVIDIA (64 Mo, incompressibles) hors de
+# l'initrd : chez Debian, initramfs-tools copie modules et firmware après
+# les crochets (dracut-install), si bien que zz-secmet-trim ne les trouve
+# pas encore. Ils sont mis de côté le temps de update-initramfs ; le système
+# complet (squashfs) les garde et les charge au démarrage réel.
+HOLD=/tmp/initrd-hold; rm -rf "$HOLD"; mkdir -p "$HOLD"
+mv "$ROOTFS/usr/lib/firmware/nvidia" "$HOLD/firmware-nvidia"
+mv "$ROOTFS/usr/lib/modules/$KVER/kernel/drivers/gpu/drm/nouveau" "$HOLD/nouveau"
 in_chroot update-initramfs -u -k all >/tmp/initramfs.log 2>&1 || { tail -20 /tmp/initramfs.log; exit 1; }
+mv "$HOLD/firmware-nvidia" "$ROOTFS/usr/lib/firmware/nvidia"
+mv "$HOLD/nouveau" "$ROOTFS/usr/lib/modules/$KVER/kernel/drivers/gpu/drm/nouveau"
 # Manifeste des paquets (B3) : chaque paquet installé du système, avec son
 # paquet source et les sources intégrées à sa construction (Built-Using,
 # Static-Built-Using des paquets Rust et Go). Complété plus bas par la
