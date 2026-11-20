@@ -21,7 +21,7 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENGINE="${SECMET_ENGINE:-$(command -v podman >/dev/null 2>&1 && echo podman || echo docker)}"
-IMAGE="secmet-live-builder:ubuntu24.04"
+IMAGE="secmet-live-builder:debian13"
 DIST=0
 [[ "${1:-}" == "--dist" ]] && DIST=1
 [[ -f "$ROOT_DIR/dist/live/filesystem.squashfs" ]] || { echo "dist/live absent : make live" >&2; exit 1; }

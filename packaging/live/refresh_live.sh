@@ -104,8 +104,8 @@ IMG="$WORK/key.img"
 # des blocs (des milliers de petites écritures : 5 min sur GitHub au lieu de 20 s).
 xz -T0 -dc "$IMGXZ" | dd of="$IMG" bs=4M iflag=fullblock conv=sparse status=none
 read -r start size < <(qemu_part "$IMG" SECMET-DATA)
-# Options ext4 de la partition d origine (celles du mke2fs d Ubuntu 24.04
-# dans le conteneur de construction), reprises à l identique : le format ne
+# Options ext4 de la partition d origine (celles du mke2fs du conteneur de
+# construction, Debian 13), reprises à l identique : le format ne
 # dépend pas de la machine qui refait la partition.
 dd if="$IMG" of="$WORK/sb.img" bs=512 skip="$start" count=64 status=none
 # dumpe2fs se plaint du fichier tronqué (code 1) mais lit le superbloc.

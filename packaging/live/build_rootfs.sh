@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dans le conteneur (build_live.sh) : fabrique le système de la clé SecMet.
 #   1. .deb SecMet construit depuis /src
-#   2. debootstrap Ubuntu 24.04 (noble) minimal
-#   3. dans le chroot : noyau HWE, live-boot, XFCE dépouillé, LightDM en
+#   2. debootstrap Debian 13 (trixie) minimal, sections main et
+#      non-free-firmware (micrologiciels, liste relue plus bas)
+#   3. dans le chroot : noyau Debian signé, live-boot, XFCE dépouillé, LightDM en
 #      connexion automatique, agent PolicyKit (mot de passe du helper),
 #      NetworkManager, lecteur PDF, SecMet, opérateur
 #      « secmet » (uid 1000, groupe secmet), locale et clavier français,
@@ -13,38 +14,66 @@ set -euo pipefail
 SRC=/src
 OUT=/out
 ROOTFS=/rootfs
-MIRROR="${SECMET_UBUNTU_MIRROR:-http://archive.ubuntu.com/ubuntu}"
+MIRROR="${SECMET_DEBIAN_MIRROR:-http://deb.debian.org/debian}"
+SECURITY_MIRROR="${SECMET_DEBIAN_SECURITY_MIRROR:-http://security.debian.org/debian-security}"
 PASSWORD="${SECMET_OPERATOR_PASSWORD:-secmet}"
 export DEBIAN_FRONTEND=noninteractive
 
 step() { printf '\n\033[1;33m== %s\033[0m (%s)\n' "$1" "$(date +%T)"; }
 
 # --- 1. Paquet SecMet ---------------------------------------------------------
-step "Paquet SecMet (.deb ubuntu24.04)"
+# Le .deb de l'image est construit ici, sur Debian 13 (bibliothèques GTK de
+# trixie) : secmet_<version>~debian13_amd64.deb. Les mises à jour déployées
+# ensuite sur la clé (bouton « Installer la mise à jour », magasin app/ de la
+# reprise d'image) sont les .deb Ubuntu 24.04 publiés, choisis par la glibc
+# (2.41 sur la clé, 2.39 requise) : ils s'installent sur Debian 13.
+step "Paquet SecMet (.deb debian13)"
 rm -rf /build && mkdir /build
 tar -C "$SRC" --exclude=./target --exclude='./target-*' --exclude=./dist --exclude=./.git -cf - . \
     | tar -C /build -xf -
 cd /build
 export CARGO_TARGET_DIR=/target
-SECMET_FORCE_BUILD=1 SECMET_DEB_DISTRO=ubuntu24.04 ./packaging/build_deb.sh >/tmp/deb.log 2>&1 \
+SECMET_FORCE_BUILD=1 SECMET_DEB_DISTRO=debian13 ./packaging/build_deb.sh >/tmp/deb.log 2>&1 \
     || { tail -30 /tmp/deb.log; exit 1; }
 VERSION="$(grep -m1 '^version' /build/Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
-DEB="/build/dist/secmet_${VERSION}~ubuntu24.04_amd64.deb"
+DEB="/build/dist/secmet_${VERSION}~debian13_amd64.deb"
 [[ -f "$DEB" ]] || { echo "paquet attendu absent : $DEB"; ls /build/dist; exit 1; }
 echo "$DEB"
 # Le .deb de l'image est aussi livré dans dist/live/ (même binaire que la clé).
+rm -f /out/secmet_*_amd64.deb
 cp "$DEB" /out/
+# secmet-release du livrable .tar (secmet-make-key.sh, sur la machine qui
+# fabrique la clé : Ubuntu 22.04, Mint 21, Debian 12…) : lié en statique,
+# pour ne pas dépendre de la glibc 2.41 du conteneur Debian 13. Ce binaire
+# n'utilise ni NSS ni chargement dynamique.
+step "secmet-release statique (livrable .tar)"
+RUSTFLAGS="-C target-feature=+crt-static" cargo build -q --release -p secmet-attest --bin secmet-release \
+    --target x86_64-unknown-linux-gnu >/tmp/static.log 2>&1 || { tail -20 /tmp/static.log; exit 1; }
+STATIC_RELEASE=/target/x86_64-unknown-linux-gnu/release/secmet-release
+if readelf -d "$STATIC_RELEASE" | grep -q NEEDED; then echo "secmet-release n'est pas statique" >&2; exit 1; fi
+"$STATIC_RELEASE" --help | head -1
 
 # --- 2. Système de base -------------------------------------------------------
-step "debootstrap noble (minbase)"
+step "debootstrap trixie (minbase)"
 rm -rf "$ROOTFS"
-debootstrap --variant=minbase --components=main,universe --include=gpgv,ubuntu-keyring,ca-certificates noble "$ROOTFS" "$MIRROR" >/tmp/debootstrap.log 2>&1 \
+debootstrap --variant=minbase --components=main,non-free-firmware \
+    --include=gpgv,debian-archive-keyring,ca-certificates trixie "$ROOTFS" "$MIRROR" >/tmp/debootstrap.log 2>&1 \
     || { tail -20 /tmp/debootstrap.log; exit 1; }
 
-cat > "$ROOTFS/etc/apt/sources.list" <<SRC_EOF
-deb $MIRROR noble main universe
-deb $MIRROR noble-updates main universe
-deb http://security.ubuntu.com/ubuntu noble-security main universe
+# Sections main et non-free-firmware seulement (ni contrib ni non-free).
+rm -f "$ROOTFS/etc/apt/sources.list"
+cat > "$ROOTFS/etc/apt/sources.list.d/debian.sources" <<SRC_EOF
+Types: deb
+URIs: $MIRROR
+Suites: trixie trixie-updates
+Components: main non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: $SECURITY_MIRROR
+Suites: trixie-security
+Components: main non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 SRC_EOF
 echo "secmet-live" > "$ROOTFS/etc/hostname"
 printf '127.0.0.1 localhost\n127.0.1.1 secmet-live\n' > "$ROOTFS/etc/hosts"
@@ -74,22 +103,67 @@ printf '#!/bin/sh\nexit 101\n' > "$ROOTFS/usr/sbin/policy-rc.d"; chmod +x "$ROOT
 in_chroot() { chroot "$ROOTFS" /usr/bin/env DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 "$@"; }
 
 # --- 3. Paquets ---------------------------------------------------------------
+# Micrologiciels (section non-free-firmware), relus paquet par paquet ; tous
+# viennent de la source firmware-nonfree (un même fichier copyright, licences
+# « binary-redist » des fabricants : redistribution en binaire non modifié,
+# aucune clause d'usage non commercial), sauf firmware-linux-free et
+# firmware-ath9k-htc et firmware-carl9170 (main) et les microcodes (licences
+# Intel et AMD : redistribution en binaire non modifié, avis reproduit).
+# Retenus (postes x86 : affichage, Wi-Fi, Bluetooth, réseau, microcode) :
+#   firmware-linux-free, firmware-misc-nonfree, firmware-amd-graphics,
+#   firmware-intel-graphics, firmware-intel-misc, firmware-nvidia-graphics
+#   (nouveau, GSP compris), firmware-iwlwifi, firmware-realtek,
+#   firmware-atheros, firmware-mediatek, firmware-brcm80211, firmware-libertas
+#   (Wi-Fi Marvell), firmware-ath9k-htc et firmware-carl9170 (clés Wi-Fi USB),
+#   intel-microcode, amd64-microcode.
+# Exclus :
+#   firmware-ivtv, firmware-ipw2x00 : licence à accepter par debconf
+#     (*/license/accepted) ; ipw2x00 ne sert qu'aux Intel PRO/Wireless
+#     2100 à 2915 (2003-2005) ;
+#   firmware-intel-sound, firmware-sof-signed, firmware-cirrus : DSP audio
+#     (déjà retirés de l'image Ubuntu : sans objet pour effacer un disque) ;
+#   firmware-bnx2, firmware-bnx2x, firmware-cavium, firmware-myricom,
+#     firmware-netronome, firmware-netxen, firmware-qlogic,
+#     firmware-marvell-prestera, firmware-ast, firmware-ti-connectivity :
+#     cartes et commutateurs de serveurs (déjà retirés de l'image Ubuntu) ;
+#   firmware-qcom-soc, firmware-qcom-media, firmware-samsung : SoC ARM ;
+#   firmware-siano : tuners TV ; firmware-zd1211 : clés Wi-Fi de 2005 ;
+#   firmware-nvidia-gsp, firmware-nvidia-tesla-*-gsp : pilote propriétaire
+#     NVIDIA, absent de l'image (nouveau a son GSP dans nvidia-graphics).
+# La construction échoue si un paquet installé demande d'accepter une
+# licence, ou vient de contrib ou de non-free (contrôles après SecMet).
+FIRMWARE=(
+    firmware-linux-free firmware-misc-nonfree firmware-amd-graphics
+    firmware-intel-graphics firmware-intel-misc firmware-nvidia-graphics
+    firmware-iwlwifi firmware-realtek firmware-atheros firmware-mediatek
+    firmware-brcm80211 firmware-libertas firmware-ath9k-htc firmware-carl9170
+    intel-microcode amd64-microcode
+)
 step "Paquets : noyau, live-boot, bureau, outils"
 in_chroot apt-get update -qq
+# Équivalents Debian de la liste Ubuntu 24.04 : linux-image-amd64 (signé
+# Debian) pour linux-image-generic-hwe-24.04 ; les firmware-* ci-dessus pour
+# linux-firmware ; polkitd et pkexec pour policykit-1 ; mate-polkit (fork de
+# polkit-gnome, GTK 3) pour policykit-1-gnome, absent de trixie ;
+# network-manager-applet et nm-connection-editor pour network-manager-gnome ;
+# plymouth-themes pour plymouth-theme-spinner ; fonts-cantarell (police du
+# bureau, déjà celle de l'écran de démarrage) pour fonts-ubuntu, dans
+# non-free chez Debian. language-pack-fr et language-pack-gnome-fr n'ont pas
+# d'équivalent : chez Debian, les traductions sont dans chaque paquet.
 in_chroot apt-get install -y -qq --no-install-recommends \
-    linux-image-generic-hwe-24.04 linux-firmware \
+    linux-image-amd64 "${FIRMWARE[@]}" \
     live-boot live-boot-initramfs-tools initramfs-tools \
     systemd systemd-sysv systemd-timesyncd dbus dbus-user-session udev kmod \
     locales console-setup keyboard-configuration kbd tzdata \
-    sudo policykit-1 udisks2 gvfs \
-    network-manager network-manager-gnome wpasupplicant iproute2 iputils-ping ca-certificates \
+    sudo polkitd pkexec udisks2 gvfs \
+    network-manager network-manager-applet nm-connection-editor wpasupplicant iproute2 iputils-ping ca-certificates \
     xserver-xorg xserver-xorg-video-all xserver-xorg-input-all xinit x11-xserver-utils \
     lightdm lightdm-gtk-greeter \
     xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings xfce4-power-manager \
     xterm thunar thunar-volman tumbler zathura zathura-pdf-poppler zenity xdg-utils \
-    policykit-1-gnome language-pack-fr language-pack-gnome-fr \
-    xfce4-whiskermenu-plugin arc-theme elementary-xfce-icon-theme fonts-ubuntu \
-    plymouth plymouth-theme-spinner librsvg2-common \
+    mate-polkit \
+    xfce4-whiskermenu-plugin arc-theme elementary-xfce-icon-theme fonts-cantarell \
+    plymouth plymouth-themes librsvg2-common \
     fonts-dejavu fonts-noto-color-emoji adwaita-icon-theme gnome-themes-extra \
     libgtk-4-1 exfatprogs dosfstools e2fsprogs fdisk parted \
     less nano time >/tmp/apt.log 2>&1 || { tail -40 /tmp/apt.log; exit 1; }
@@ -99,6 +173,13 @@ cp "$DEB" "$ROOTFS/tmp/secmet.deb"
 in_chroot apt-get install -y -qq /tmp/secmet.deb >>/tmp/apt.log 2>&1 || { tail -40 /tmp/apt.log; exit 1; }
 rm -f "$ROOTFS/tmp/secmet.deb"
 in_chroot dpkg -s secmet | grep -E '^(Version|Depends)'
+# Aucun paquet installé ne doit demander d'accepter une licence (debconf
+# */license/accepted, comme firmware-ivtv et firmware-ipw2x00).
+lic="$(grep -l '^Template: .*/license/accepted' "$ROOTFS"/var/lib/dpkg/info/*.templates 2>/dev/null || true)"
+[[ -z "$lic" ]] || { echo "paquets à licence à accepter installés : $lic" >&2; exit 1; }
+# Ni contrib ni non-free : seuls main et non-free-firmware sont permis.
+nonfree="$(in_chroot dpkg-query -W -f '${binary:Package} ${Section}\n' | awk '$2 ~ /^(contrib|non-free)\// {print $1}')"
+[[ -z "$nonfree" ]] || { echo "paquets contrib ou non-free installés : $nonfree" >&2; exit 1; }
 
 # --- 4. Configuration -------------------------------------------------------
 step "Locale, clavier, opérateur, overlay"
@@ -203,9 +284,10 @@ KVER="$(ls -1 "$ROOTFS/usr/lib/modules" | sort -V | tail -1)"
 for m in kernel/drivers/media/usb kernel/drivers/media/pci kernel/drivers/media/dvb-frontends \
          kernel/drivers/media/tuners kernel/drivers/infiniband kernel/drivers/comedi \
          kernel/drivers/iio kernel/drivers/usb/gadget kernel/drivers/net/can kernel/drivers/net/dsa \
-         kernel/fs/ocfs2 kernel/fs/smb/server kernel/kernel/kheaders.ko.zst ubuntu/dkms/zfs; do
+         kernel/fs/ocfs2 kernel/fs/smb/server; do
     rm -rf "$ROOTFS/usr/lib/modules/$KVER/$m"
 done
+rm -f "$ROOTFS/usr/lib/modules/$KVER"/kernel/kernel/kheaders.ko*
 # Cohérence : un module qui dépendait d'un sous-système retiré (ksmbd et
 # RDMA sans InfiniBand, capteurs ADC sans iio…) est retiré à son tour,
 # jusqu'à ce que depmod -e ne signale plus aucun symbole non résolu.
@@ -213,25 +295,26 @@ for pass in 1 2 3 4 5; do
     in_chroot depmod -e -F "/boot/System.map-$KVER" "$KVER" >/tmp/depmod.log 2>&1 || true
     bad="$(grep -i 'needs unknown symbol' /tmp/depmod.log | awk '{print $3}' | sort -u || true)"
     [[ -n "$bad" ]] || break
-    echo "modules dépendants retirés (passe $pass) : $(echo "$bad" | xargs -n1 basename | sed 's/\.ko\.zst$//' | tr '\n' ' ')"
+    echo "modules dépendants retirés (passe $pass) : $(echo "$bad" | xargs -n1 basename | sed -E 's/\.ko(\.(zst|xz|gz))?$//' | tr '\n' ' ')"
     for f in $bad; do rm -f "$ROOTFS$f"; done
 done
 [[ -z "$bad" ]] || { echo "modules noyau : dépendances toujours non résolues" >&2; echo "$bad" >&2; exit 1; }
 # Les pilotes qui comptent doivent être là (affichage, stockage USB, Wi-Fi).
-for must in kernel/drivers/gpu/drm/radeon/radeon.ko.zst kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko.zst \
-            kernel/drivers/gpu/drm/i915/i915.ko.zst kernel/drivers/gpu/drm/nouveau/nouveau.ko.zst \
-            kernel/drivers/gpu/drm/display/drm_display_helper.ko.zst kernel/drivers/media/cec/core/cec.ko.zst \
-            kernel/drivers/usb/storage/uas.ko.zst kernel/drivers/net/wireless/intel/iwlwifi/iwlwifi.ko.zst \
-            kernel/drivers/net/wireless/realtek/rtw89/rtw89_core.ko.zst kernel/drivers/net/wireless/ath/ath11k/ath11k.ko.zst; do
-    [[ -f "$ROOTFS/usr/lib/modules/$KVER/$must" ]] || { echo "module requis absent après élagage : $must" >&2; exit 1; }
+# Extension selon la compression des modules du noyau (.ko.xz chez Debian).
+for must in kernel/drivers/gpu/drm/radeon/radeon kernel/drivers/gpu/drm/amd/amdgpu/amdgpu \
+            kernel/drivers/gpu/drm/i915/i915 kernel/drivers/gpu/drm/nouveau/nouveau \
+            kernel/drivers/gpu/drm/display/drm_display_helper kernel/drivers/media/cec/core/cec \
+            kernel/drivers/usb/storage/uas kernel/drivers/net/wireless/intel/iwlwifi/iwlwifi \
+            kernel/drivers/net/wireless/realtek/rtw89/rtw89_core kernel/drivers/net/wireless/ath/ath11k/ath11k; do
+    compgen -G "$ROOTFS/usr/lib/modules/$KVER/$must.ko*" >/dev/null || { echo "module requis absent après élagage : $must" >&2; exit 1; }
 done
-# live-boot (toram) monte son tmpfs avec « /dev/shm » pour nom de source :
-# systemd y voit un périphérique bloc et journalise trente fois « Failed to
-# open /dev/shm device » à chaque démarrage. Nom de source neutre.
-sed -i 's|dev="/dev/shm"|dev="tmpfs"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
+# live-boot (toram) : le tmpfs a pour nom de source « tmpfs » chez Debian (le
+# « /dev/shm » d'Ubuntu faisait journaliser à systemd trente fois « Failed
+# to open /dev/shm device » à chaque démarrage).
+grep -q 'dev="tmpfs"' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "live-boot : tmpfs toram inattendu" >&2; exit 1; }
 # Pendant la copie en mémoire (30 à 40 s sur une clé à 25 Mo/s), l'écran de
 # démarrage ne montrait rien : message sous le logo, retiré à la fin.
-sed -i 's|^\t\t\t\tcp ${MODULETORAMFILE} ${copyto}|\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth message --text="Copie du système en mémoire (environ 30 s)…"\n\t\t\t\tcp ${MODULETORAMFILE} ${copyto}\n\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth hide-message --text="Copie du système en mémoire (environ 30 s)…"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
+sed -i 's|^\t\t\t\tcp ${MODULETORAMFILE} ${copyto}.*$|\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth message --text="Copie du système en mémoire (environ 30 s)…"\n\t\t\t\tcp ${MODULETORAMFILE} ${copyto}\n\t\t\t\t[ -x /bin/plymouth ] \&\& plymouth --ping \&\& plymouth hide-message --text="Copie du système en mémoire (environ 30 s)…"|' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh"
 grep -q 'plymouth message' "$ROOTFS/usr/lib/live/boot/9990-toram-todisk.sh" || { echo "patch toram-todisk.sh non appliqué" >&2; exit 1; }
 # Taille du module à copier : live-boot lit le 5e champ de « ls -la », mais
 # le busybox de l'initramfs n'affiche ni propriétaire ni date (4 champs) :
@@ -274,10 +357,8 @@ echo "initrd : ${initrd_mb} Mo"
 mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
     -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
 cp /usr/lib/shim/shimx64.efi.signed "$OUT/efi/shimx64.efi"
-# MokManager : selon la version de shim-signed, signé ou non, ou absent.
-for mm in /usr/lib/shim/mmx64.efi.signed /usr/lib/shim/mmx64.efi; do
-    [[ -f "$mm" ]] && { cp "$mm" "$OUT/efi/mmx64.efi"; break; }
-done
+# MokManager : paquet shim-helpers-amd64-signed chez Debian.
+cp /usr/lib/shim/mmx64.efi.signed "$OUT/efi/mmx64.efi"
 cp /usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed "$OUT/efi/grubx64.efi"
 cp -a /usr/lib/grub/i386-pc/. "$OUT/bios/"
 chmod 0644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs "$OUT"/efi/*

@@ -4,7 +4,7 @@
 # magasin app/, la vérifie et la déploie. Sans écran, sans privilège.
 #
 # 1. magasin de deux versions factices, 9.9.8 et 9.9.9 (le même .deb de
-#    dist/ renommé), signé avec la clé de version si elle est disponible
+#    dist/live/ renommé), signé avec la clé de version si elle est disponible
 #    (SECMET_RELEASE_KEY, défaut ~/.config/secmet/release-key.hex) ;
 # 2. clé virtuelle fabriquée avec ce magasin (make_key_image.sh) ;
 # 3. démarrage dans QEMU (qemu-test.sh --headless), attente de la copie du
@@ -17,7 +17,8 @@
 #      sans la clé : 9.9.9 refusée (« signature ou empreinte invalide,
 #        ignorée ») avant 9.9.8, rien de déployé.
 #
-# Prérequis : dist/live (make live), un .deb dans dist/ (make deb), podman ou
+# Prérequis : dist/live (make live, avec le .deb Debian 13 de l'image ; à défaut
+# un .deb Ubuntu 24.04 de dist/, make deb), podman ou
 # docker, qemu-system-x86_64 avec KVM, OVMF, e2fsprogs (e2fsck, debugfs).
 # Durée : 4 à 5 minutes. usage : make live-check
 set -euo pipefail
@@ -35,8 +36,9 @@ source "$LIVE/qemu-lib.sh"
 
 [[ -f "$ROOT_DIR/dist/live/filesystem.squashfs" ]] || fail "dist/live absent : make live"
 qemu_tools_check
-deb=$(ls "$ROOT_DIR"/dist/secmet_*~ubuntu24.04_amd64.deb 2>/dev/null | sort -V | tail -1 || true)
-[[ -n "$deb" ]] || fail "aucun dist/secmet_*~ubuntu24.04_amd64.deb : make deb"
+deb=$(ls "$ROOT_DIR"/dist/live/secmet_*~debian13_amd64.deb 2>/dev/null | sort -V | tail -1 || true)
+[[ -n "$deb" ]] || deb=$(ls "$ROOT_DIR"/dist/secmet_*~ubuntu24.04_amd64.deb 2>/dev/null | sort -V | tail -1 || true)
+[[ -n "$deb" ]] || fail "aucun dist/live/secmet_*~debian13_amd64.deb (make live) ni dist/secmet_*~ubuntu24.04_amd64.deb (make deb)"
 
 rm -rf "$WORK"
 mkdir -p "$WORK/store/$OLD" "$WORK/store/$NEW"

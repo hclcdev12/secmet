@@ -5,7 +5,8 @@
 # machine sans le dépôt (packaging/live/README.md, « Fabrication d'une clé ») :
 #   dist/live/           noyau, initrd, squashfs, efi/, bios/, VERSION
 #   packaging/live/      secmet-make-key.sh, grub.cfg
-#   target/release/      secmet-release compilé pour Ubuntu 24.04 (target-live/)
+#   target/release/      secmet-release lié en statique (target-live/, make live) :
+#                        tourne sur toute distribution x86_64
 #   LISEZMOI.txt         la commande de fabrication
 # Refuse une image qui n'est pas de la version de Cargo.toml (make live d'abord),
 # sauf si dist/live/app/<version>/ porte le paquet de cette version signé
@@ -17,7 +18,7 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LIVE="${SECMET_LIVE_DIR:-$ROOT_DIR/dist/live}"
-RELEASE_BIN="${SECMET_RELEASE_BIN:-$ROOT_DIR/target-live/release/secmet-release}"
+RELEASE_BIN="${SECMET_RELEASE_BIN:-$ROOT_DIR/target-live/x86_64-unknown-linux-gnu/release/secmet-release}"
 die() { echo "ERREUR : $*" >&2; exit 1; }
 
 VERSION="${SECMET_LIVE_VERSION:-$(grep -m1 '^version' "$ROOT_DIR/Cargo.toml" | sed -E 's/version = "([^"]+)"/\1/')}"

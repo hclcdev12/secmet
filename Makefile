@@ -69,7 +69,7 @@ key-writer-exe: ## .exe Windows de SecMet Clé USB dist/secmet-key-writer_<versi
 rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)
 	@./packaging/build_rpm.sh
 
-live: ## Construit l'image de la clé USB SecMet (conteneur Ubuntu 24.04 privilégié) → dist/live/
+live: ## Construit l'image de la clé USB SecMet (conteneur Debian 13 privilégié) → dist/live/
 	@./packaging/live/build_live.sh
 
 live-bundle: ## Livrable de la clé USB dist/secmet-live_<version>_x86_64.tar (après make live)
