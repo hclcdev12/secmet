@@ -148,7 +148,9 @@ in_chroot apt-get update -qq
 # linux-firmware ; polkitd et pkexec pour policykit-1 ; mate-polkit (fork de
 # polkit-gnome, GTK 3) pour policykit-1-gnome, absent de trixie ;
 # network-manager-applet et nm-connection-editor pour network-manager-gnome ;
-# plymouth-themes pour plymouth-theme-spinner ; fonts-cantarell (police du
+# plymouth-themes pour plymouth-theme-spinner ; xfce4-power-manager-plugins
+# (greffon de la barre, inclus dans xfce4-power-manager chez Ubuntu) ;
+# wireless-regdb (base réglementaire Wi-Fi, tirée d'office chez Ubuntu) ; fonts-cantarell (police du
 # bureau, déjà celle de l'écran de démarrage) pour fonts-ubuntu, dans
 # non-free chez Debian. language-pack-fr et language-pack-gnome-fr n'ont pas
 # d'équivalent : chez Debian, les traductions sont dans chaque paquet.
@@ -158,10 +160,10 @@ in_chroot apt-get install -y -qq --no-install-recommends \
     systemd systemd-sysv systemd-timesyncd dbus dbus-user-session udev kmod \
     locales console-setup keyboard-configuration kbd tzdata \
     sudo polkitd pkexec udisks2 gvfs \
-    network-manager network-manager-applet nm-connection-editor wpasupplicant iproute2 iputils-ping ca-certificates \
+    network-manager network-manager-applet nm-connection-editor wpasupplicant wireless-regdb iproute2 iputils-ping ca-certificates \
     xserver-xorg xserver-xorg-video-all xserver-xorg-input-all xinit x11-xserver-utils \
     lightdm lightdm-gtk-greeter \
-    xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings xfce4-power-manager \
+    xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-settings xfce4-power-manager xfce4-power-manager-plugins \
     xterm thunar thunar-volman tumbler zathura zathura-pdf-poppler zenity xdg-utils \
     mate-polkit \
     xfce4-whiskermenu-plugin arc-theme elementary-xfce-icon-theme fonts-cantarell \
