@@ -218,7 +218,7 @@ pub(super) fn build_ui(app: &Application) {
         let window = window.clone();
         let operations_active = operations_active.clone();
         settings_button_for_wiring
-            .connect_clicked(move |_| show_settings_dialog(&window, operations_active.get()));
+            .connect_clicked(move |_| show_settings_dialog(&window, operations_active.clone()));
     }
     super::update_ui::start_background();
 
@@ -692,6 +692,11 @@ pub(super) fn build_ui(app: &Application) {
     // laisse de toute façon le job courant aller à son terme.
     let operations_active_for_close = operations_active.clone();
     window.connect_close_request(move |window| {
+        // Mise à jour en cours d'installation (apt ou dnf remplace secmet
+        // et secmet-helper) : fermeture refusée jusqu'à la fin.
+        if crate::busy::installing() {
+            return gtk4::glib::Propagation::Stop;
+        }
         if !operations_active_for_close.get() {
             return gtk4::glib::Propagation::Proceed;
         }

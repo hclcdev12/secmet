@@ -10,10 +10,11 @@ use gtk4::{
     ApplicationWindow, Box as GtkBox, Button, CheckButton, ComboBoxText, Dialog, Entry,
     FileChooserAction, FileChooserDialog, FileFilter, Label, Orientation, Picture, ResponseType,
 };
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use crate::busy::{self, Blocker, BusyKind};
 use crate::i18n::{self, tr, trf, Lang};
 use crate::update::{self, UpdateState};
 use crate::{key_cleanup, pdf_logo, settings};
@@ -312,8 +313,135 @@ fn describe_update(state: &UpdateState) -> (String, Option<String>, Option<Strin
     (lines.join("\n"), page, notes)
 }
 
-pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active: bool) {
+/// Opérations en cours, effacement compris même si sa garde manquait
+/// (`operations_active` de la fenêtre principale fait foi aussi).
+fn busy_now(operations_active: &Cell<bool>) -> Vec<BusyKind> {
+    let mut kinds = busy::current();
+    if operations_active.get() && !kinds.contains(&BusyKind::Erase) {
+        kinds.insert(0, BusyKind::Erase);
+    }
+    kinds
+}
+
+/// Blocage courant de l'installation d'une mise à jour (D14) : opérations
+/// en cours, lot ouvert, installation en cours, relance attendue.
+fn install_blocker_now(operations_active: &Cell<bool>) -> Option<Blocker> {
+    busy::install_blocker(
+        &busy_now(operations_active),
+        super::lot_ui::active_id().as_deref(),
+        busy::installing(),
+        busy::restart_pending(),
+    )
+}
+
+/// Raison affichée sous le bouton d'installation masqué ; `None` quand
+/// l'état parle de lui-même (installation en cours, relance attendue).
+fn blocker_text(blocker: &Blocker) -> Option<String> {
+    let busy = |what: &str| {
+        Some(trf(
+            "Installation impossible pour l'instant : {what}.",
+            &[("what", &tr(what))],
+        ))
+    };
+    match blocker {
+        Blocker::Installing | Blocker::RestartPending => None,
+        Blocker::Busy(BusyKind::Erase) => busy("effacement en cours"),
+        Blocker::Busy(BusyKind::Smart) => busy("analyse des disques en cours"),
+        Blocker::Busy(BusyKind::TestDisk) => busy("TestDisk en cours"),
+        Blocker::Busy(BusyKind::Inventory) => busy("chargement de la liste des disques en cours"),
+        Blocker::Busy(BusyKind::Pdf) => busy("génération d'un certificat PDF en cours"),
+        Blocker::Busy(BusyKind::LotClose) => busy("clôture du lot en cours"),
+        Blocker::Busy(BusyKind::Unlock) => busy("déverrouillage d'un disque en cours"),
+        Blocker::Busy(BusyKind::Defrozen) => busy("sortie de l'état gelé d'un disque en cours"),
+        Blocker::OpenLot(id) => Some(trf(
+            "Lot {id} ouvert : clôturez-le avant d'installer la mise à jour (un lot n'est \
+             traité que par une seule version de SecMet).",
+            &[("id", id)],
+        )),
+    }
+}
+
+/// Section « Clé de signature des certificats » : `key_id` et clé publique
+/// du poste (ou de la clé USB), à inscrire dans la liste de confiance du
+/// client. Lecture seule : rien n'est créé si la clé n'existe pas encore.
+fn signing_key_section(content: &GtkBox) {
+    let title = Label::new(None);
+    title.set_markup(&format!(
+        "<b>{}</b>",
+        tr("Clé de signature des certificats")
+    ));
+    title.set_xalign(0.0);
+    title.set_margin_top(6);
+    content.append(&title);
+    let note = Label::new(Some(&tr(
+        "Chaque certificat est signé par cette clé, propre à ce poste (ou à cette clé USB). \
+         Le client inscrit la clé publique ci-dessous dans sa liste de confiance \
+         (trusted-keys) pour vérifier les certificats, et l'en retire si le support est \
+         perdu. Elle est aussi copiée avec les livrables de chaque lot clôturé.",
+    )));
+    note.set_wrap(true);
+    note.set_xalign(0.0);
+    note.add_css_class("dim-label");
+    content.append(&note);
+    let pub_path = secmet_attest::keystore::public_key_path(&crate::paths::config_file(
+        secmet_attest::keystore::KEY_FILE,
+    ));
+    match crate::lot::read_public_key(&pub_path) {
+        Ok(Some(key)) => {
+            let id = Label::new(Some(&trf(
+                "Identifiant (key_id) : {key_id}",
+                &[("key_id", &key.key_id)],
+            )));
+            id.set_xalign(0.0);
+            id.set_selectable(true);
+            content.append(&id);
+            let row = GtkBox::new(Orientation::Horizontal, 8);
+            let entry = Entry::new();
+            entry.set_text(&key.public_key);
+            entry.set_editable(false);
+            entry.set_hexpand(true);
+            entry.set_tooltip_text(Some(&tr("Clé publique Ed25519 (hexadécimal)")));
+            row.append(&entry);
+            let copy = Button::with_label(&tr("Copier"));
+            row.append(&copy);
+            content.append(&row);
+            let status = Label::new(None);
+            status.set_xalign(0.0);
+            status.add_css_class("dim-label");
+            content.append(&status);
+            let text = key.public_key.clone();
+            copy.connect_clicked(move |btn| {
+                btn.clipboard().set_text(&text);
+                status.set_text(&tr("Clé publique copiée dans le presse-papiers."));
+            });
+        }
+        Ok(None) => {
+            let missing = Label::new(Some(&trf(
+                "Aucune clé de signature pour l'instant ({file} absent) : elle est créée à la \
+                 première signature d'un certificat.",
+                &[("file", &pub_path.display().to_string())],
+            )));
+            missing.set_wrap(true);
+            missing.set_xalign(0.0);
+            content.append(&missing);
+        }
+        Err(e) => {
+            let error = Label::new(Some(&e));
+            error.set_wrap(true);
+            error.set_xalign(0.0);
+            content.append(&error);
+        }
+    }
+}
+
+pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active: Rc<Cell<bool>>) {
     let current = settings::load();
+    // Changer de langue reconstruit la fenêtre principale : impossible tant
+    // qu'une opération y est suivie (relu en continu, et au clic).
+    let lang_locked = {
+        let operations_active = operations_active.clone();
+        move || !busy_now(&operations_active).is_empty() || busy::installing()
+    };
     let dialog = Dialog::builder()
         .title(tr("Réglages"))
         .modal(true)
@@ -337,14 +465,22 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
         lang_combo.append(Some(lang.code()), lang.label());
     }
     lang_combo.set_active_id(Some(Lang::from_code(&current.language).code()));
-    // Changer de langue reconstruit la fenêtre : impossible pendant un
-    // effacement, dont le suivi vit dans la fenêtre courante.
-    lang_combo.set_sensitive(!operations_active);
-    if operations_active {
-        lang_combo.set_tooltip_text(Some(&tr(
-            "Langue verrouillée pendant une opération en cours",
-        )));
-    }
+    // Changer de langue reconstruit la fenêtre : impossible pendant une
+    // opération, dont le suivi vit dans la fenêtre courante.
+    let apply_lang_lock = {
+        let lang_combo = lang_combo.clone();
+        let lang_locked = lang_locked.clone();
+        move || {
+            let locked = lang_locked();
+            lang_combo.set_sensitive(!locked);
+            lang_combo.set_tooltip_text(
+                locked
+                    .then(|| tr("Langue verrouillée pendant une opération en cours"))
+                    .as_deref(),
+            );
+        }
+    };
+    apply_lang_lock();
     content.append(&lang_combo);
     let lang_note = Label::new(Some(&tr(
         "Le changement de langue s'applique immédiatement à la fenêtre principale \
@@ -472,6 +608,9 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
         cleanup_section(parent, &content);
     }
 
+    // ── Clé de signature des certificats (D11) ──
+    signing_key_section(&content);
+
     // ── Lots (poste installé ; sur la clé live les lots sont toujours actifs) ──
     let lots_check = CheckButton::with_label(&tr("Mode lot : regrouper les effacements en lots"));
     lots_check.set_active(current.lots_enabled);
@@ -534,13 +673,66 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
     update_buttons.append(&relaunch_btn);
     update_buttons.append(&open_page_btn);
     content.append(&update_buttons);
-    // Installation possible : paquet connu pour ce poste et version plus récente.
+    // Raison du blocage, sous le bouton masqué, et clôture du lot ouvert
+    // depuis les Réglages (D14).
+    let install_reason = Label::new(None);
+    install_reason.set_xalign(0.0);
+    install_reason.set_wrap(true);
+    install_reason.add_css_class("dim-label");
+    install_reason.set_visible(false);
+    content.append(&install_reason);
+    let close_lot_btn = Button::with_label(&tr("Clôturer le lot…"));
+    close_lot_btn.set_halign(gtk4::Align::Start);
+    close_lot_btn.set_visible(false);
+    content.append(&close_lot_btn);
+    // AppImage (D15) : pas d'installation par le gestionnaire de paquets.
+    let appimage = crate::update_install::running_from_appimage();
+    let appimage_note = Label::new(Some(&tr(
+        "AppImage : téléchargez la nouvelle AppImage et remplacez le fichier ; le composant \
+         système sera mis à jour au lancement suivant.",
+    )));
+    appimage_note.set_xalign(0.0);
+    appimage_note.set_wrap(true);
+    appimage_note.add_css_class("dim-label");
+    appimage_note.set_visible(false);
+    content.append(&appimage_note);
+    // Installation possible : paquet connu pour ce poste, version plus
+    // récente, et rien qui la bloque (relu en continu, voir plus bas).
     let package_kind = crate::update_install::package_kind();
+    let last_state: Rc<RefCell<UpdateState>> = Rc::new(RefCell::new(update::load_state()));
+    let refresh_install = {
+        let install_btn = install_btn.clone();
+        let relaunch_btn = relaunch_btn.clone();
+        let reason = install_reason.clone();
+        let close_lot_btn = close_lot_btn.clone();
+        let appimage_note = appimage_note.clone();
+        let last_state = last_state.clone();
+        let operations_active = operations_active.clone();
+        Rc::new(move || {
+            let available = last_state.borrow().available().is_some();
+            let installable = package_kind.is_some() && available;
+            let blocker = install_blocker_now(&operations_active);
+            // Le bouton garde sa place pendant l'installation (insensible).
+            install_btn.set_visible(
+                installable && (blocker.is_none() || blocker == Some(Blocker::Installing)),
+            );
+            let text = blocker
+                .as_ref()
+                .filter(|_| installable)
+                .and_then(blocker_text);
+            reason.set_text(text.as_deref().unwrap_or_default());
+            reason.set_visible(text.is_some());
+            close_lot_btn.set_visible(installable && matches!(blocker, Some(Blocker::OpenLot(_))));
+            relaunch_btn.set_visible(busy::restart_pending());
+            appimage_note.set_visible(appimage && available);
+        })
+    };
     let render_update = {
         let status = update_status.clone();
         let notes = update_notes.clone();
         let open_btn = open_page_btn.clone();
-        let install_btn = install_btn.clone();
+        let last_state = last_state.clone();
+        let refresh_install = refresh_install.clone();
         Rc::new(move |state: &UpdateState| {
             let (markup, page, note) = describe_update(state);
             status.set_markup(&markup);
@@ -548,24 +740,39 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
             notes.set_visible(note.is_some());
             open_btn.set_visible(page.is_some());
             open_btn.set_tooltip_text(page.as_deref());
-            install_btn.set_visible(
-                package_kind.is_some() && state.available().is_some() && !operations_active,
-            );
+            *last_state.borrow_mut() = state.clone();
+            refresh_install();
         })
     };
     render_update(&update::load_state());
     {
+        let parent = parent.clone();
+        let refresh_install = refresh_install.clone();
+        close_lot_btn.connect_clicked(move |_| {
+            let refresh_install = refresh_install.clone();
+            super::lot_ui::close_dialog(&parent, Some(Box::new(move || refresh_install())));
+        });
+    }
+    {
         // Téléchargement, vérification (SHA256SUMS signé) puis installation
         // sous pkexec, hors du fil GTK ; l'état est affiché au fil de l'eau.
         let status = update_status.clone();
-        let relaunch = relaunch_btn.clone();
         let check_btn = check_now_btn.clone();
+        let operations_active = operations_active.clone();
+        let refresh_install = refresh_install.clone();
         install_btn.connect_clicked(move |btn| {
             let (Some(kind), Some(latest)) =
                 (package_kind, update::load_state().available().cloned())
             else {
                 return;
             };
+            // Revérifié au clic : une opération a pu démarrer, ou un lot
+            // s'ouvrir, depuis le dernier affichage.
+            if install_blocker_now(&operations_active).is_some() {
+                refresh_install();
+                return;
+            }
+            let install_guard = busy::begin_install();
             btn.set_sensitive(false);
             check_btn.set_sensitive(false);
             status.set_text(&trf(
@@ -581,8 +788,9 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
             });
             let btn = btn.clone();
             let status = status.clone();
-            let relaunch = relaunch.clone();
             let check_btn = check_btn.clone();
+            let refresh_install = refresh_install.clone();
+            let mut install_guard = Some(install_guard);
             glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
                 let outcome = match rx.try_recv() {
                     Ok(o) => o,
@@ -593,21 +801,24 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
                         Err("installation interrompue".to_string())
                     }
                 };
+                install_guard.take();
                 check_btn.set_sensitive(true);
+                btn.set_sensitive(true);
                 match outcome {
                     Ok(_) => {
+                        // L'ancien binaire tourne encore : plus d'installation
+                        // ni d'ouverture de lot avant la relance.
+                        busy::set_restart_pending();
                         status.set_text(&trf(
                             "Version {version} installée. Relancez SecMet pour l'utiliser.",
                             &[("version", &version)],
                         ));
-                        btn.set_visible(false);
-                        relaunch.set_visible(true);
                     }
                     Err(e) => {
                         status.set_text(&trf("Mise à jour impossible : {error}", &[("error", &e)]));
-                        btn.set_sensitive(true);
                     }
                 }
+                refresh_install();
                 glib::ControlFlow::Break
             });
         });
@@ -791,6 +1002,9 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
         let dialog = dialog.clone();
         let parent = parent.clone();
         let status = logo_status.clone();
+        let lang_combo = lang_combo.clone();
+        let lang_locked = lang_locked.clone();
+        let operations_active = operations_active.clone();
         apply_btn.connect_clicked(move |btn| {
             btn.set_sensitive(false);
             let logo_outcome = match std::mem::take(&mut *pending.borrow_mut()) {
@@ -815,8 +1029,12 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
                 .unwrap_or_default();
             let mut saved = settings::load();
             let lots_just_enabled = lots_check.is_active() && !saved.lots_enabled;
-            let language_changed = !operations_active && Lang::from_code(&saved.language) != chosen;
-            saved.language = chosen.code().to_string();
+            // Revérifié au clic : une opération a pu démarrer depuis.
+            let locked = lang_locked();
+            let language_changed = !locked && Lang::from_code(&saved.language) != chosen;
+            if !locked {
+                saved.language = chosen.code().to_string();
+            }
             saved.operator_name = operator_entry.text().trim().to_string();
             saved.check_updates = update_check.is_active();
             saved.lots_enabled = lots_check.is_active();
@@ -829,11 +1047,49 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
                     parent.destroy();
                     build_ui(&app);
                 }
-            } else if lots_just_enabled && !super::lot_ui::is_active() && !operations_active {
+            } else if lots_just_enabled
+                && !super::lot_ui::is_active()
+                && !operations_active.get()
+                && !busy::restart_pending()
+            {
                 // Mode lot coché à l'instant : dialogue de lot tout de suite,
-                // sans relancer l'application.
+                // sans relancer l'application (sauf mise à jour installée en
+                // attente de relance : le lot s'ouvrira sous la nouvelle
+                // version).
                 super::lot_ui::startup(&parent, Box::new(|| {}));
             }
+        });
+    }
+
+    // Pendant l'installation, la fenêtre ne se ferme pas : sinon un
+    // effacement pourrait démarrer pendant qu'apt ou dnf remplace secmet et
+    // secmet-helper.
+    dialog.connect_close_request(|_| {
+        if busy::installing() {
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    // État relu en continu tant que la fenêtre vit : opérations qui
+    // démarrent ou finissent, lot ouvert ou clôturé, installation.
+    let alive = Rc::new(Cell::new(true));
+    {
+        let alive = alive.clone();
+        dialog.connect_destroy(move |_| alive.set(false));
+    }
+    {
+        let weak = dialog.downgrade();
+        glib::timeout_add_local(std::time::Duration::from_millis(500), move || {
+            if !alive.get() || weak.upgrade().is_none() {
+                return glib::ControlFlow::Break;
+            }
+            refresh_install();
+            apply_lang_lock();
+            let installing = busy::installing();
+            cancel_btn.set_sensitive(!installing);
+            apply_btn.set_sensitive(!installing);
+            glib::ControlFlow::Continue
         });
     }
 

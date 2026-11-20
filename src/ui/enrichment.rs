@@ -181,8 +181,12 @@ pub(super) fn spawn_disk_enrichment(
     });
 
     let received = Rc::new(RefCell::new(HashSet::<usize>::new()));
+    // Analyse en cours tant que le minuteur vit (Done, Failed ou passage
+    // rendu caduc) : pas d'installation de mise à jour pendant ce temps.
+    let busy = crate::busy::begin(crate::busy::BusyKind::Smart);
 
     glib::timeout_add_local(Duration::from_millis(50), move || {
+        let _busy = &busy;
         if ENRICH_GENERATION.with(|g| g.get()) != generation {
             return glib::ControlFlow::Break;
         }

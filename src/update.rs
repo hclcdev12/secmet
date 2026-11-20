@@ -17,10 +17,19 @@ use chrono::{DateTime, Utc};
 use secmet_attest::release::{self, LatestRelease, SignedLatest};
 use serde::{Deserialize, Serialize};
 
-/// Clés publiques de version acceptées (hex). Une nouvelle clé est livrée
-/// par une version signée avec l'ancienne, qui reste listée.
+/// Clés publiques de version acceptées (hex), une par ligne : `latest.json`
+/// et `SHA256SUMS` sont reçus s'ils sont signés par l'une d'elles. Ajouter
+/// une clé, c'est ajouter une ligne ; une nouvelle clé est livrée par une
+/// version signée avec l'ancienne, qui reste listée le temps de la
+/// transition (Annexe N, §N.4). Même liste dans SecMet Clé USB
+/// (`crates/secmet-key-writer/src/release.rs`).
 pub const RELEASE_PUBLIC_KEYS: &[&str] =
     &["bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5"];
+
+/// [`RELEASE_PUBLIC_KEYS`] sous la forme attendue par `secmet-attest`.
+pub fn trusted_release_keys() -> Vec<String> {
+    RELEASE_PUBLIC_KEYS.iter().map(|k| k.to_string()).collect()
+}
 /// Adresse par défaut de `latest.json` : dernière release du dépôt du code
 /// (depuis 0.3.5 ; l'ancien canal `secmet-releases` y renvoie par `moved_to`).
 pub const DEFAULT_URL: &str =
@@ -138,10 +147,14 @@ pub fn save_state(state: &UpdateState) {
 /// Analyse et vérifie un `latest.json` : signature valide **et** clé de
 /// version connue. Les messages sont des clés de traduction.
 pub fn parse_and_verify(text: &str) -> Result<SignedLatest, String> {
+    parse_and_verify_with(text, &trusted_release_keys())
+}
+
+/// [`parse_and_verify`] avec une liste de clés de version donnée.
+fn parse_and_verify_with(text: &str, trusted: &[String]) -> Result<SignedLatest, String> {
     let signed: SignedLatest =
         serde_json::from_str(text).map_err(|_| "latest.json illisible".to_string())?;
-    let trusted: Vec<String> = RELEASE_PUBLIC_KEYS.iter().map(|k| k.to_string()).collect();
-    let verified = release::verify_latest(&signed, &trusted).map_err(|e| e.to_string())?;
+    let verified = release::verify_latest(&signed, trusted).map_err(|e| e.to_string())?;
     if !verified.trusted {
         return Err("latest.json signé par une clé inconnue".to_string());
     }
@@ -278,6 +291,44 @@ mod tests {
         let mut tampered = signed;
         tampered.payload.version = "9.9.8".into();
         assert!(parse_and_verify(&serde_json::to_string(&tampered).unwrap()).is_err());
+    }
+
+    #[test]
+    fn any_listed_release_key_is_accepted() {
+        let old = SigningIdentity::from_seed(&[5u8; 32]);
+        let new = SigningIdentity::from_seed(&[6u8; 32]);
+        let keys = vec![old.public_key_hex(), new.public_key_hex()];
+        for id in [&old, &new] {
+            let signed = release::sign_latest(id, &latest("9.9.9")).unwrap();
+            let text = serde_json::to_string(&signed).unwrap();
+            assert!(parse_and_verify_with(&text, &keys).is_ok());
+            // Retirée de la liste : refusée.
+            let others: Vec<String> = keys
+                .iter()
+                .filter(|k| **k != id.public_key_hex())
+                .cloned()
+                .collect();
+            assert_eq!(
+                parse_and_verify_with(&text, &others).unwrap_err(),
+                "latest.json signé par une clé inconnue"
+            );
+        }
+    }
+
+    #[test]
+    fn release_keys_are_well_formed() {
+        let keys = trusted_release_keys();
+        assert!(!keys.is_empty());
+        for k in &keys {
+            assert_eq!(k.len(), 64, "{k}");
+            assert!(k
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        }
+        let mut unique = keys.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), keys.len(), "clé de version en double");
     }
 
     #[test]

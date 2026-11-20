@@ -57,7 +57,7 @@ Sur un poste installé, la case **Mode lot** des Réglages active le même regro
 
 ## Réglages et mises à jour
 
-Icône engrenage : langue, logo des certificats, nom de l’opérateur, mode lot, mises à jour. Un **point jaune** sur l’engrenage signale une nouvelle version : **Installer la mise à jour** (poste avec `apt` ou `dnf`, aucune opération en cours) puis **Relancer SecMet**.
+Icône engrenage : langue, logo des certificats, nom de l’opérateur, mode lot, mises à jour. Un **point jaune** sur l’engrenage signale une nouvelle version : **Installer la mise à jour** (poste avec `apt` ou `dnf`, hors AppImage, aucune opération en cours et aucun lot ouvert : sinon la raison s’affiche, avec **Clôturer le lot…**) puis **Relancer SecMet**. Section **Clé de signature des certificats** : identifiant (`key_id`) et clé publique du poste, à copier pour la liste de confiance du client.
 
 ## Bouton « i » (couleur)
 

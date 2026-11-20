@@ -490,7 +490,11 @@ pub(super) fn load_disks_into_list(
     let operations_active = operations_active.clone();
     let condemn = condemn.clone();
     let mut on_done = Some(on_done);
+    // Chargement en cours tant que le minuteur vit : pas d'installation de
+    // mise à jour pendant ce temps.
+    let busy = crate::busy::begin(crate::busy::BusyKind::Inventory);
     glib::timeout_add_local(Duration::from_millis(100), move || {
+        let _busy = &busy;
         let result = match rx.try_recv() {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return glib::ControlFlow::Continue,

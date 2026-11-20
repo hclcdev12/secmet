@@ -248,7 +248,11 @@ pub(super) fn show_pdf_generation_dialog(
 
         let parent_for_poll = parent_clone.clone();
         let global_status_for_poll = global_status_clone.clone();
+        // Pas d'installation de mise à jour pendant la génération : garde
+        // libérée avec le minuteur.
+        let pdf_guard = crate::busy::begin(crate::busy::BusyKind::Pdf);
         glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
+            let _pdf = &pdf_guard;
             match rx.try_recv() {
                 Ok((Ok((path, export)), disk_count, mode)) => {
                     global_status_for_poll.set_text("");

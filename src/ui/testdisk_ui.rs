@@ -311,6 +311,8 @@ pub(super) struct TestDiskController {
     cancelled: Cell<bool>,
     handle: RefCell<Option<crate::verification::testdisk::TestDiskHandle>>,
     queue: RefCell<Vec<(String, String)>>,
+    /// Garde « TestDisk en cours » (installation d'une mise à jour bloquée).
+    busy: RefCell<Option<crate::busy::BusyGuard>>,
 }
 
 impl TestDiskController {
@@ -320,6 +322,7 @@ impl TestDiskController {
             cancelled: Cell::new(false),
             handle: RefCell::new(None),
             queue: RefCell::new(Vec::new()),
+            busy: RefCell::new(None),
         })
     }
 
@@ -483,6 +486,7 @@ fn start_testdisk_background(
 
     controller.cancelled.set(false);
     controller.running.set(true);
+    *controller.busy.borrow_mut() = Some(crate::busy::begin(crate::busy::BusyKind::TestDisk));
     for (name, _) in &selected {
         mark_testdisk_pending(&job_states, name);
     }
@@ -494,6 +498,7 @@ fn start_testdisk_background(
 fn finish_testdisk_queue(controller: &TestDiskController) {
     *controller.handle.borrow_mut() = None;
     controller.running.set(false);
+    controller.busy.borrow_mut().take();
 }
 
 fn run_testdisk_bg_next(

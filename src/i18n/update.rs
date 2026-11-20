@@ -91,4 +91,64 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Update failed: {error}",
         "Aktualisierung fehlgeschlagen: {error}",
     ),
+    (
+        "Installation impossible pour l'instant : {what}.",
+        "Installation not possible right now: {what}.",
+        "Installation derzeit nicht möglich: {what}.",
+    ),
+    (
+        "effacement en cours",
+        "erasure in progress",
+        "Löschung läuft",
+    ),
+    (
+        "analyse des disques en cours",
+        "disk analysis in progress",
+        "Analyse der Datenträger läuft",
+    ),
+    (
+        "TestDisk en cours",
+        "TestDisk in progress",
+        "TestDisk läuft",
+    ),
+    (
+        "chargement de la liste des disques en cours",
+        "loading the disk list",
+        "Liste der Datenträger wird geladen",
+    ),
+    (
+        "génération d'un certificat PDF en cours",
+        "generating a PDF certificate",
+        "PDF-Zertifikat wird erstellt",
+    ),
+    (
+        "clôture du lot en cours",
+        "closing the batch",
+        "Charge wird abgeschlossen",
+    ),
+    (
+        "déverrouillage d'un disque en cours",
+        "unlocking a disk",
+        "Datenträger wird entsperrt",
+    ),
+    (
+        "sortie de l'état gelé d'un disque en cours",
+        "taking a disk out of the frozen state",
+        "Datenträger wird aus dem eingefrorenen Zustand geholt",
+    ),
+    (
+        "Lot {id} ouvert : clôturez-le avant d'installer la mise à jour (un lot n'est traité que par une seule version de SecMet).",
+        "Batch {id} is open: close it before installing the update (a batch is processed by a single version of SecMet).",
+        "Charge {id} ist offen: Schließen Sie sie vor der Installation des Updates ab (eine Charge wird nur von einer einzigen SecMet-Version bearbeitet).",
+    ),
+    (
+        "Clôturer le lot…",
+        "Close the batch…",
+        "Charge abschließen…",
+    ),
+    (
+        "AppImage : téléchargez la nouvelle AppImage et remplacez le fichier ; le composant système sera mis à jour au lancement suivant.",
+        "AppImage: download the new AppImage and replace the file; the system component will be updated at the next launch.",
+        "AppImage: Laden Sie das neue AppImage herunter und ersetzen Sie die Datei; die Systemkomponente wird beim nächsten Start aktualisiert.",
+    ),
 ];
