@@ -1186,7 +1186,11 @@ mod tests {
         assert_eq!(read_public_key(&pub_path).unwrap(), None);
         assert!(!key_path.exists() && !pub_path.exists());
 
-        let identity = secmet_attest::keystore::load_or_create(&key_path).unwrap();
+        let identity = secmet_attest::keystore::create(
+            &key_path,
+            secmet_attest::keystore::CreateMode::FirstKey,
+        )
+        .unwrap();
         let info = read_public_key(&pub_path).unwrap().unwrap();
         assert_eq!(info.key_id, identity.key_id());
         assert_eq!(info.public_key, identity.public_key_hex());
