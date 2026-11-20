@@ -208,7 +208,7 @@ pub(super) fn build_ui(app: &Application) {
     let retry_failed_button = Button::with_label(&tr("Relancer les échoués"));
     retry_failed_button.set_sensitive(false);
 
-    let defrozen_button = Button::with_label(&tr("Dé-frozen"));
+    let defrozen_button = Button::with_label(&tr("Dégeler"));
     let unlock_button = Button::with_label(&tr("Déverrouiller"));
     unlock_button.set_tooltip_text(Some(&tr(
         "Déverrouiller un disque ATA Security avec un mot de passe connu",
@@ -526,7 +526,7 @@ pub(super) fn build_ui(app: &Application) {
         );
     });
 
-    // Dé-frozen SATA
+    // Dégel SATA (« Dégeler »)
     let window_for_defrozen = window.clone();
     let disk_widgets_for_defrozen = disk_widgets.clone();
     let operations_active_for_defrozen = operations_active.clone();
@@ -536,7 +536,7 @@ pub(super) fn build_ui(app: &Application) {
             show_error_dialog(
                 &window_for_defrozen,
                 &tr("Opération en cours"),
-                &tr("Terminez ou attendez la fin des effacements avant d'utiliser Dé-frozen."),
+                &tr("Terminez ou attendez la fin des effacements avant d'utiliser « Dégeler »."),
             );
             return;
         }
@@ -714,6 +714,9 @@ pub(super) fn build_ui(app: &Application) {
         window.maximize();
     }
     window.present();
+    // Clé de signature perdue (ou absente sur la clé USB) : décision de
+    // l'opérateur, jamais de recréation silencieuse.
+    super::signing_key_ui::check_at_startup(&window);
 
     run_startup_authorization(
         &window,

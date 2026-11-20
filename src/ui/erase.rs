@@ -734,8 +734,8 @@ pub(super) fn launch_erase_operations_with_passes(
                     widget.progress_text.set_text(&tr("Échec"));
                     let state = job_state_for_error(&error, &reasons);
                     let badge = match state {
-                        JobState::BlockedFrozen => "FROZEN".to_string(),
-                        JobState::BlockedLocked => "LOCKED".to_string(),
+                        JobState::BlockedFrozen => tr("GELÉ"),
+                        JobState::BlockedLocked => tr("VERROUILLÉ"),
                         JobState::DestroyRequired => tr("À DÉTRUIRE"),
                         _ => tr("ÉCHEC"),
                     };

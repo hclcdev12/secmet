@@ -676,6 +676,18 @@ fn banner(
 }
 
 /// Une ligne « libellé  valeur » d'une carte.
+/// Politique affichée : libellé lisible suivi de l'identifiant signé
+/// (« NIST SP 800-88 Rev. 2 (nist-800-88r2) ») ; identifiant seul s'il est
+/// inconnu.
+fn policy_display(id: &str) -> String {
+    let label = match id.trim() {
+        "nist-800-88r1" => "NIST SP 800-88 Rev. 1",
+        "nist-800-88r2" => "NIST SP 800-88 Rev. 2",
+        _ => return or_dash(id),
+    };
+    format!("{label} ({})", id.trim())
+}
+
 struct Row<'a> {
     label: &'a str,
     value: String,
@@ -921,7 +933,7 @@ pub fn certificate_page(
     let left = [
         Row::new(t.operator, or_dash(&a.operator)),
         Row::new(t.software, or_dash(&a.software)),
-        Row::new(t.policy, or_dash(&a.erasure.policy)),
+        Row::new(t.policy, policy_display(&a.erasure.policy)),
         Row::new(t.duration, duration_label(a.erasure.duration_seconds)),
     ];
     let right = [
@@ -1707,6 +1719,20 @@ mod tests {
 
     fn contains(pdf: &[u8], needle: &[u8]) -> bool {
         pdf.windows(needle.len()).any(|w| w == needle)
+    }
+
+    #[test]
+    fn policy_is_shown_with_a_readable_label() {
+        assert_eq!(
+            policy_display("nist-800-88r2"),
+            "NIST SP 800-88 Rev. 2 (nist-800-88r2)"
+        );
+        assert_eq!(
+            policy_display("nist-800-88r1"),
+            "NIST SP 800-88 Rev. 1 (nist-800-88r1)"
+        );
+        assert_eq!(policy_display("autre"), "autre");
+        assert_eq!(policy_display(""), "—");
     }
 
     fn rendered(n: usize) -> Vec<RenderedCertificate> {

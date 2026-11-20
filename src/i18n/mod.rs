@@ -170,6 +170,43 @@ mod tests {
         assert_eq!(Lang::from_code("xx"), Lang::Fr);
     }
 
+    /// D19 : badges LOCKED / FROZEN et bouton de dégel traduits partout ;
+    /// aucun de ces libellés ne reste en dur dans l'interface.
+    #[test]
+    fn ata_lock_and_freeze_labels_are_translated() {
+        for (fr, en, de) in [
+            ("VERROUILLÉ", "LOCKED", "GESPERRT"),
+            ("GELÉ", "FROZEN", "EINGEFROREN"),
+            (" — verrouillé", " — locked", " — gesperrt"),
+            (" — gelé", " — frozen", " — eingefroren"),
+            ("Dégeler", "Unfreeze", "Auftauen"),
+        ] {
+            assert_eq!(tr_in(Lang::En, fr), en);
+            assert_eq!(tr_in(Lang::De, fr), de);
+        }
+        for (name, source) in [
+            ("enrichment.rs", include_str!("../ui/enrichment.rs")),
+            ("erase.rs", include_str!("../ui/erase.rs")),
+            ("disk_list.rs", include_str!("../ui/disk_list.rs")),
+            ("testdisk_ui.rs", include_str!("../ui/testdisk_ui.rs")),
+            ("dialogs.rs", include_str!("../ui/dialogs.rs")),
+            ("app.rs", include_str!("../ui/app.rs")),
+        ] {
+            for literal in [
+                "\"LOCKED\"",
+                "\"FROZEN\"",
+                " — LOCKED\"",
+                " — FROZEN\"",
+                "Dé-frozen",
+            ] {
+                assert!(
+                    !source.contains(literal),
+                    "{name} : libellé non traduit {literal}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn placeholders_are_substituted() {
         let text = trf("Étape {n} : {m}", &[("n", "1"), ("m", "x")]);

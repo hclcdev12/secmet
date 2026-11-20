@@ -73,7 +73,7 @@ fn apply_enrichment_to_widget(
             .set_text(&disk_subtitle_text(&widget.disk, can_shred, &reason));
         widget.checkbox.set_sensitive(can_shred);
         if widget.disk.is_locked == Some(true) {
-            set_status_badge(&widget.status_badge, "LOCKED", "status-failed");
+            set_status_badge(&widget.status_badge, &tr("VERROUILLÉ"), "status-failed");
         } else if can_shred {
             set_status_badge(&widget.status_badge, &tr("INACTIF"), "status-idle");
         } else {

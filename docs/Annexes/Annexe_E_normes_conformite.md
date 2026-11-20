@@ -72,24 +72,26 @@ La référence en vigueur est la **Rev. 2** (26 septembre 2025), qui remplace la
 
 **Politiques de classement.** Le niveau (Purge ou Clear) attribué à chaque méthode dépend d'une politique définie dans le moteur (`crates/secmet-core/src/taxonomy.rs`) ; son identifiant est signé dans chaque attestation (`erasure.policy`) et imprimé sur le certificat :
 
-| Identifiant | Lecture | Statut en 0.4.0 |
-|-------------|---------|-----------------|
-| `nist-800-88r1` | Tableaux par média de la Rev. 1 (annexe A) : Format NVM (crypto et user data) et SECURITY ERASE enhanced sur SSD classés Purge | **Politique par défaut**, la seule utilisée par l'interface |
-| `nist-800-88r2` | Lecture conservatrice (Rev. 2 / IEEE 2883) : Format NVM user data et SECURITY ERASE sur SSD retombent en Clear | Disponible dans le moteur et acceptée par le protocole du helper, **non sélectionnable dans l'interface** |
+| Identifiant | Libellé sur le certificat | Lecture | Statut depuis la 0.4.1 |
+|-------------|---------------------------|---------|------------------------|
+| `nist-800-88r2` | NIST SP 800-88 Rev. 2 | Lecture conservatrice (Rev. 2 / IEEE 2883) : Format NVM user data et SECURITY ERASE sur SSD classés Clear | **Politique par défaut et seule politique proposée** : l'application l'envoie toujours au helper, aucun réglage ne permet d'en changer |
+| `nist-800-88r1` | NIST SP 800-88 Rev. 1 | Tableaux par média de la Rev. 1 (annexe A) : Format NVM (crypto et user data) et SECURITY ERASE enhanced sur SSD classés Purge | **Ancienne lecture**, politique par défaut jusqu'à la 0.4.0. Gardée seulement pour relire et afficher les certificats et sessions antérieurs (un enregistrement ancien sans politique est relu en `nist-800-88r1`, ce qu'il était) ; le helper l'accepte encore dans son protocole, l'interface ne l'envoie jamais |
 
-Le passage de `nist-800-88r2` en politique par défaut est prévu. D'ici là, un certificat portant `nist-800-88r1` indique que le classement suit les tableaux de la Rev. 1 . Les deux politiques ne diffèrent que par le classement de Format NVM user data et de SECURITY ERASE sur SSD.
+Un certificat garde la politique sous laquelle il a été signé : ceux émis jusqu'à la 0.4.0 portent `nist-800-88r1` et restent valides tels quels. Le certificat imprime le libellé lisible à côté de l'identifiant (« NIST SP 800-88 Rev. 2 (nist-800-88r2) »). Les deux politiques ne diffèrent que par le classement de Format NVM user data et de SECURITY ERASE sur SSD.
 
-**Alignement par type de média (politique par défaut `nist-800-88r1`) :**
+> **Effet visible depuis la 0.4.1.** Un SSD SATA effacé par SECURITY ERASE (enhanced ou normal) et un SSD NVMe effacé par Format NVM user data sont désormais classés **Clear**, et non plus Purge. Comme le moteur trie les méthodes par niveau, SANITIZE (et Format NVM crypto sur NVMe) passent devant quand le disque les supporte ; un SSD qui n'offre que SECURITY ERASE ou Format NVM user data sort Clear, et son certificat le dit.
+
+**Alignement par type de média (politique `nist-800-88r2`) :**
 
 | Média | Méthodes dans l'ordre du plan | Niveau |
 |-------|-------------------------------|--------|
-| SSD NVMe | Sanitize block erase / crypto erase, Format NVM crypto / user data, Sanitize overwrite | **Purge** |
-| SSD SATA | SANITIZE crypto scramble / block erase, SECURITY ERASE enhanced | **Purge** ; SECURITY ERASE normal : **Clear** |
+| SSD NVMe | Sanitize block erase / crypto erase, Format NVM crypto, Sanitize overwrite | **Purge** ; Format NVM user data : **Clear** |
+| SSD SATA | SANITIZE crypto scramble / block erase | **Purge** ; SECURITY ERASE enhanced ou normal : **Clear** |
 | HDD SATA | SANITIZE overwrite, SECURITY ERASE (enhanced ou normal) | **Purge** |
 | Tout média, repli | Écriture hôte (motif pseudo-aléatoire recomputable par LBA puis zéros) | **Clear** |
 | Disque derrière un pont USB | Écriture hôte uniquement (aucune commande firmware à travers le pont) | **Clear** |
 
-> Avec la politique `nist-800-88r2`, Format NVM user data et SECURITY ERASE (enhanced comme normal) sur SSD sont classés **Clear** ; Format NVM crypto, les commandes SANITIZE et SECURITY ERASE sur HDD restent **Purge**.
+> Avec l'ancienne politique `nist-800-88r1` (certificats jusqu'à la 0.4.0), Format NVM user data et SECURITY ERASE enhanced sur SSD étaient classés **Purge** ; SECURITY ERASE normal sur SSD restait **Clear**.
 
 ---
 
@@ -230,7 +232,7 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 
 | Référence | Niveau de couverture | Formulation recommandée |
 |-----------|---------------------|-------------------------|
-| NIST SP 800-88 Rev. 2 (remplace la Rev. 1) | **Alignement** | « Aligné sur NIST SP 800-88 » : Purge firmware quand le disque le supporte, Clear sinon, catégorie réellement obtenue sur le certificat ; classement par défaut selon les tableaux de la Rev. 1 (`nist-800-88r1`), voir §4.1 |
+| NIST SP 800-88 Rev. 2 (remplace la Rev. 1) | **Alignement** | « Aligné sur NIST SP 800-88 » : Purge firmware quand le disque le supporte, Clear sinon, catégorie réellement obtenue sur le certificat ; classement selon la Rev. 2 (`nist-800-88r2`, seule politique depuis la 0.4.1), voir §4.1 |
 | IEEE 2883-2022 | **Alignement partiel** | Méthodes natives, vérification échantillonnée, traçabilité signée |
 | ATA / NVMe | **Couverture opérationnelle** | Implémentation native complète pour les cas d'usage atelier |
 | ISO/IEC 21964 | **Non couvert** | Destruction physique hors périmètre, recommandée si nécessaire |
@@ -239,7 +241,7 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 
 ### Formulation de périmètre (proposition)
 
-> SecMet v0.4.0 est un outil d'atelier permettant la sanitization de disques HDD et SSD connectés localement à un banc Linux, par commandes firmware natives (NIST Purge) ou écriture hôte (NIST Clear), chaque étape étant vérifiée par relecture d'échantillons et documentée par une attestation signée vérifiable hors ligne. Il est aligné sur NIST SP 800-88 (Rev. 2 en vigueur ; classement par défaut encore selon les tableaux de la Rev. 1) et sur l'esprit d'IEEE 2883-2022. Il ne remplace pas une procédure de destruction physique, ne couvre pas le stockage distant ou cloud, et ne constitue pas une certification officielle au sens des référentiels cités : aucun organisme ne certifie la conformité à NIST SP 800-88, et SecMet n'a aucune certification.
+> SecMet v0.4.0 est un outil d'atelier permettant la sanitization de disques HDD et SSD connectés localement à un banc Linux, par commandes firmware natives (NIST Purge) ou écriture hôte (NIST Clear), chaque étape étant vérifiée par relecture d'échantillons et documentée par une attestation signée vérifiable hors ligne. Il est aligné sur NIST SP 800-88 Rev. 2 (classement `nist-800-88r2` depuis la 0.4.1 ; les certificats antérieurs portent `nist-800-88r1`) et sur l'esprit d'IEEE 2883-2022. Il ne remplace pas une procédure de destruction physique, ne couvre pas le stockage distant ou cloud, et ne constitue pas une certification officielle au sens des référentiels cités : aucun organisme ne certifie la conformité à NIST SP 800-88, et SecMet n'a aucune certification.
 
 ---
 
@@ -251,7 +253,7 @@ La vérification SecMet est un **contrôle d'atelier échantillonné et cryptogr
 | [Annexe G — Guide utilisateur](Annexe_G_guide_utilisateur.md) | Guide opérateur |
 | [Annexe H — Déploiement du banc](Annexe_H_deploiement_banc.md) | Déploiement |
 | NIST SP 800-88 Rev. 2 (26 septembre 2025, en vigueur) | <https://csrc.nist.gov/pubs/sp/800/88/r2/final> |
-| NIST SP 800-88 Rev. 1 (2014, remplacée ; base de la politique `nist-800-88r1`) | <https://doi.org/10.6028/nist.sp.800-88r1> |
+| NIST SP 800-88 Rev. 1 (2014, remplacée ; base de l'ancienne politique `nist-800-88r1`, certificats jusqu'à la 0.4.0) | <https://doi.org/10.6028/nist.sp.800-88r1> |
 | IEEE 2883-2022 (*Standard for Sanitizing Storage*) | Norme IEEE, diffusion payante |
 | ISO/IEC 21964 (destruction des supports de données) | Norme ISO, diffusion payante |
 

@@ -396,7 +396,7 @@ mod tests {
     }
 
     fn plan(target: &TargetCapabilities) -> ErasePlan {
-        match decide(target, &Policy::default(), &Preferences::default()).unwrap() {
+        match decide(target, &Policy::nist_800_88_rev1(), &Preferences::default()).unwrap() {
             Verdict::Ready(plan) => *plan,
             other => panic!("plan attendu, obtenu {other:?}"),
         }
@@ -587,7 +587,12 @@ mod tests {
             }),
             ..base(MediaType::Ssd, Transport::Nvme)
         };
-        let verdict = decide(&target, &Policy::default(), &Preferences::default()).unwrap();
+        let verdict = decide(
+            &target,
+            &Policy::nist_800_88_rev1(),
+            &Preferences::default(),
+        )
+        .unwrap();
         let v = classify_unrunnable(&verdict);
         assert_eq!(v.disposition, Disposition::DestroyRequired);
         assert_eq!(v.reasons, [DispositionReason::ReadOnlyMedia]);
@@ -597,7 +602,12 @@ mod tests {
     fn protected_and_blocked_targets_are_retried_with_guidance() {
         let mut mounted = sata_hdd();
         mounted.protection.mounted = true;
-        let verdict = decide(&mounted, &Policy::default(), &Preferences::default()).unwrap();
+        let verdict = decide(
+            &mounted,
+            &Policy::nist_800_88_rev1(),
+            &Preferences::default(),
+        )
+        .unwrap();
         let v = classify_unrunnable(&verdict);
         assert_eq!(v.disposition, Disposition::Retry);
         assert_eq!(v.reasons, [DispositionReason::Protected]);
@@ -610,7 +620,12 @@ mod tests {
             }),
             ..sata_hdd()
         };
-        let verdict = decide(&locked, &Policy::default(), &Preferences::default()).unwrap();
+        let verdict = decide(
+            &locked,
+            &Policy::nist_800_88_rev1(),
+            &Preferences::default(),
+        )
+        .unwrap();
         let v = classify_unrunnable(&verdict);
         assert_eq!(v.disposition, Disposition::Retry);
         assert_eq!(

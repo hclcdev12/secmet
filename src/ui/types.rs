@@ -51,7 +51,7 @@ pub(super) enum JobState {
     FailedOther,
     /// Sort `destroy_required` : plus aucune voie logicielle, non relançable.
     DestroyRequired,
-    /// SSD SATA frozen : non relançable tant que Dé-frozen n'a pas été fait.
+    /// SSD SATA frozen : non relançable tant que le dégel (« Dégeler ») n'a pas été fait.
     BlockedFrozen,
     /// ATA Security locked : non relançable sans mot de passe.
     BlockedLocked,

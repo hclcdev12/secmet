@@ -658,7 +658,7 @@ pub(super) fn show_testdisk_dialog(
         let disk = &widget.disk;
         let mut note = disk.model.clone();
         if disk.is_locked == Some(true) {
-            note.push_str(" — LOCKED");
+            note.push_str(&tr(" — verrouillé"));
         }
         if let Some(ref session) = session {
             if let Some(rec) = session

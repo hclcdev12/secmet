@@ -27,7 +27,7 @@ Le produit est considéré **conforme aux besoins exprimés** ([Annexe A](Annexe
 
 | N° | Scénario | Résultat attendu |
 |----|----------|------------------|
-| R-13 | SSD SATA en état frozen : utilisation du bouton Dé-frozen | Disque débloqué après mise en veille, effacement firmware possible |
+| R-13 | SSD SATA en état frozen (badge GELÉ) : utilisation du bouton Dégeler | Disque débloqué après mise en veille, effacement firmware possible |
 | R-04b | `ExecutePlan` envoyé directement au helper pour le disque système (labo sécu) | Helper refuse (`Refused`, motif `HostsSystem`) hors parcours UI |
 | R-14 | SSD USB : effacement tenté | Aucune commande firmware envoyée à travers le pont ; écriture hôte, catégorie Clear, réserve « pont USB » sur le certificat |
 | R-15 | Poste sans `hdparm`, `nvme-cli` ni `smartmontools` | Inventaire, SMART et effacements firmware fonctionnent (accès natifs par le helper) |

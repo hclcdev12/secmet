@@ -948,9 +948,18 @@ impl App {
             ));
         });
         ui.add_space(8.0);
+        // Taille réelle de l'image vérifiée (écrite puis relue), jamais en dur.
+        let image_size = self
+            .verified
+            .as_ref()
+            .map(|(_, i)| fmt_size_decimal(i.uncompressed_size))
+            .map(|s| format!("de {s} "))
+            .unwrap_or_default();
         ui.colored_label(
             ui.visuals().warn_fg_color,
-            "Tout le contenu de ce disque sera définitivement effacé. L'écriture puis la relecture prennent 3 à 5 minutes en USB 3, 15 à 20 en USB 2.",
+            format!(
+                "Tout le contenu de ce disque sera définitivement effacé. L'écriture puis la relecture {image_size}prennent de 5 à 25 minutes selon la clé, davantage en USB 2."
+            ),
         );
         if cfg!(target_os = "linux") && !platform::is_privileged() {
             ui.weak(

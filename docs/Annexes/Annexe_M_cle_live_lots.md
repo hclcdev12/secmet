@@ -51,7 +51,8 @@ SECMET-DATA/                     # racine : root, 0755 (jamais inscriptible par 
 │   ├── settings.json            # langue, logo, opérateur, passes HDD
 │   ├── pdf-logo.jpg
 │   ├── attestation-key.hex      # clé privée de la clé USB (0600)
-│   ├── attestation-key.pub
+│   ├── attestation-key.pub      # clé publique, témoin qu'une clé a existé
+│   ├── key-history.json         # clés créées par l'application (key_id, remplacement)
 │   └── trusted-keys
 ├── lots/<LOT-ID>/               # lot ouvert
 │   ├── lot.json                 # état du lot
@@ -103,6 +104,7 @@ La variable **`SECMET_DATA_DIR`** (chemin absolu, renseignée par la session liv
 
 - **Principe** (inchangé) : chaque attestation est signée Ed25519 avec la clé privée du poste ; `secmet-verify` contrôle la signature et n'accepte que les **clés publiques de confiance** (`--trust`, `/etc/secmet/trusted-keys`…). Une signature valide prouve seulement que le document vient du détenteur de la clé.
 - **Sur une clé live sans persistance**, une nouvelle clé serait créée à chaque démarrage : chaque laptop serait signé par une clé différente et inconnue. Avec `SECMET-DATA`, chaque clé USB a **sa** clé, stable, enregistrée une fois chez le client. Elle est créée par `secmet-make-key.sh` (clé fabriquée depuis le dépôt ou le livrable `.tar`) ou au premier démarrage par `secmet-first-boot` (clé écrite depuis l'image `.img.xz` publiée, qui n'en contient aucune : deux clés écrites depuis la même image n'ont jamais la même identité).
+- **Jamais de recréation silencieuse (0.4.1)** : l'application ne crée jamais de clé de signature sur la clé USB. Si `attestation-key.hex` manque (clé perdue : la `.pub` ou `key-history.json` reste ; ou clé jamais créée), aucun certificat n'est signé et le dialogue « Clé de signature absente » s'ouvre au lancement et avant « Générer le PDF » : il rappelle l'ancien `key_id` et ne crée une nouvelle clé que si l'opérateur le demande, en prévenant que le nouvel identifiant est à communiquer aux clients (inscription dans `trusted-keys`, retrait de l'ancien). La création est notée dans `config/key-history.json`. Sur un poste installé, seule la toute première clé (aucune `.pub`) est créée au premier certificat ; une clé perdue y ouvre le même dialogue. `secmet-first-boot` n'a pas changé (il crée encore la clé au démarrage quand `attestation-key.hex` manque ; à revoir avec la reconstruction de l'image).
 - **Risque** : la clé privée voyage sur la clé USB, dans un fichier non chiffré (`config/attestation-key.hex`, `0600`). Clé USB perdue, volée ou simplement copiée = possibilité de signer de faux certificats qui passent la vérification, éventuellement antidatés (les dates sont déclarées par le signataire). Une copie ne laisse aucune trace sur la clé.
 - **Parades v1** :
   - le client **archive le manifeste signé** de chaque lot clôturé ;
@@ -128,7 +130,7 @@ Les laptops de récupération ont souvent une pile de BIOS épuisée (date en 20
 - Mises à jour : annoncées par le point jaune ; le bouton **Installer la mise à jour** n'est pas proposé pendant un effacement, mais SecMet **ne vérifie pas** qu'un lot est ouvert. La règle initiale « appliquée seulement après la clôture du lot » n'est pas implémentée : un lot peut contenir des certificats de deux versions, ce que chaque attestation indique (champ `software`). Consigne opérateur : installer entre deux lots ([Annexe N](Annexe_N_mises_a_jour.md), §N.1).
 - La clé USB reste protégée comme aujourd'hui : ses partitions sont montées, donc INDISPONIBLE.
 - Bureau de la clé (réalisé) : XFCE sombre et plat (Arc-Dark, icônes elementary-xfce, police Ubuntu, menu Whisker avec recherche, barre translucide masquée en permanence (sort au bord haut de l'écran), fond SecMet, démarrage Plymouth sans messages ; ≈ 30 Mo de paquets), fenêtre SecMet maximisée, dialogue des réglages qui défile selon la hauteur de l'écran. Rien n'interrompt un effacement : pas d'extinction d'écran ni de veille d'inactivité, capot fermé ignoré (logind et gestionnaire d'énergie XFCE), pas de verrouillage au réveil.
-- Dé-frozen (réalisé) : la mise en veille passe par logind (`systemctl suspend`) pour que la session soit prévenue et rallume l'écran au réveil ; un crochet `system-sleep` force en plus DPMS et `xrandr --auto`. La ligne noyau ne porte jamais `nomodeset` (ni `nomodeset=0`, que le noyau lit comme `nomodeset`) : tous les pilotes graphiques seraient désactivés et l'écran ne se rallumerait pas après la veille. La racine reste sur la clé pendant la veille ; la copie du système en mémoire (`toram`) reste disponible comme deuxième entrée du menu (clé retirable après l'ouverture de session, 4 Go de RAM). Pour le diagnostic, le journal système est recopié en texte sur la partition de données (`logs/system/<boot-id>.log`) toutes les minutes, avant une veille et à l'extinction (un journal persistant écrit directement sur la clé bloquait l'extinction).
+- Dégel SATA, bouton **Dégeler** (réalisé) : la mise en veille passe par logind (`systemctl suspend`) pour que la session soit prévenue et rallume l'écran au réveil ; un crochet `system-sleep` force en plus DPMS et `xrandr --auto`. La ligne noyau ne porte jamais `nomodeset` (ni `nomodeset=0`, que le noyau lit comme `nomodeset`) : tous les pilotes graphiques seraient désactivés et l'écran ne se rallumerait pas après la veille. La racine reste sur la clé pendant la veille ; la copie du système en mémoire (`toram`) reste disponible comme deuxième entrée du menu (clé retirable après l'ouverture de session, 4 Go de RAM). Pour le diagnostic, le journal système est recopié en texte sur la partition de données (`logs/system/<boot-id>.log`) toutes les minutes, avant une veille et à l'extinction (un journal persistant écrit directement sur la clé bloquait l'extinction).
 
 ### Un seul logiciel, deux modes (réalisé)
 
@@ -150,7 +152,7 @@ Les mises à jour suivent deux chemins pour une même release ([Annexe N](Annexe
 | Secure Boot actif | Démarre avec le chargeur et le noyau signés d'Ubuntu ; SecMet n'ajoute aucun module noyau | — |
 | BIOS protégé par mot de passe, démarrage USB désactivé | La clé ne démarre pas | Démonter le disque et le traiter au banc |
 | Mode Intel RST / « RAID On » | Le NVMe peut être invisible | Passer en AHCI dans le BIOS, ou banc |
-| SSD SATA gelé (fréquent sur laptop) | SANITIZE et SECURITY ERASE refusés | Dé-frozen par mise en veille (logind) ; la sortie de veille varie selon les modèles : si l'écran reste noir, forcer l'extinction et relancer (le lot est conservé) ; à défaut, écriture hôte ou banc |
+| SSD SATA gelé (fréquent sur laptop) | SANITIZE et SECURITY ERASE refusés | Dégel (bouton **Dégeler**) par mise en veille (logind) ; la sortie de veille varie selon les modèles : si l'écran reste noir, forcer l'extinction et relancer (le lot est conservé) ; à défaut, écriture hôte ou banc |
 | Matériel très récent | Pilotes absents d'un noyau ancien | Noyau HWE d'Ubuntu 24.04 ; image reconstruite périodiquement |
 
 ## M.10 Hors périmètre v1

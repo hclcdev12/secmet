@@ -24,6 +24,18 @@ pub(super) fn show_pdf_generation_dialog(
     global_status: &Label,
     smart_auth_ok: &Rc<Cell<bool>>,
 ) {
+    // Clé de signature perdue : l'opérateur décide d'abord ; le dialogue de
+    // génération se rouvre si une nouvelle clé est créée.
+    {
+        let parent_again = parent.clone();
+        let status_again = global_status.clone();
+        let auth_again = smart_auth_ok.clone();
+        if !super::signing_key_ui::ensure_signing_key(parent, move || {
+            show_pdf_generation_dialog(&parent_again, &status_again, &auth_again)
+        }) {
+            return;
+        }
+    }
     let session = match certificate::current_session() {
         Some(s) if certificate::session_ready_for_pdf() => s,
         _ => {

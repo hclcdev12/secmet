@@ -91,7 +91,7 @@ Chaque release publie l'image `secmet-key_<version>_x86_64.img.xz` : Ubuntu 24.0
 |-------|----------------|
 | **Disque système protégé** | SecMet refuse d'effacer le disque hébergeant la racine `/` (BF-04, [Annexe A](Annexe_A_besoins_fonctionnels.md)). Sur un média live dont la racine est un overlay, l'inventaire ne peut pas rattacher la racine à un disque : SecMet l'indique par un bandeau et une réserve sur le certificat ; la clé reste protégée par ses montages (`/cdrom`, persistance) et par le verrou exclusif du noyau. Vérifier la sélection avec soin. |
 | **Boot firmware** | Vérifier que le poste cible autorise le boot USB ; Secure Boot exige une image signée (c'est le cas de la clé SecMet ; à vérifier pour un live générique). |
-| **SSD SATA frozen** | Sur laptop, l'état frozen est fréquent : bouton **Dé-frozen** (mise en veille). |
+| **SSD SATA frozen** | Sur laptop, l'état frozen est fréquent : bouton **Dégeler** (mise en veille). |
 | **Persistance** (live générique) | Sans partition persistante, `~/.secmet_logs/`, les certificats et la clé de signature sont perdus au redémarrage. Prévoir une persistance ou une copie systématique ; ou lancer SecMet avec `SECMET_DATA_DIR=/chemin/vers/une/partition/montée` pour y placer toutes ses données ([Annexe M](Annexe_M_cle_live_lots.md)). |
 | **Dépendances** (live générique) | Avec l'**AppImage** : seuls `pkexec` (PolicyKit) et FUSE 2 doivent être dans l'image ; GTK4 et TestDisk sont embarqués, la policy est installée au premier lancement. Avec le `.deb` : intégrer `libgtk-4-1`, `policykit-1`, `testdisk`. |
 | **Mises à jour** (live générique) | Reconstruire l'image live (ou remplacer l'AppImage) à chaque nouvelle version. |

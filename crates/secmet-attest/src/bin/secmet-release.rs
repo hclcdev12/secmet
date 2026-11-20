@@ -67,7 +67,9 @@ fn keygen(args: &[String]) -> i32 {
             path.display()
         ));
     }
-    match keystore::load_or_create(path) {
+    // Création explicite (mode Replace : comportement inchangé, seule une
+    // clé privée existante est refusée, ci-dessus).
+    match keystore::create(path, keystore::CreateMode::Replace) {
         Ok(identity) => {
             println!(
                 "clé privée   : {} (0600, à sauvegarder hors ligne)",
@@ -149,7 +151,7 @@ fn sign(args: &[String]) -> i32 {
             key.display()
         ));
     }
-    let identity = match keystore::load_or_create(&key) {
+    let identity = match keystore::load(&key) {
         Ok(identity) => identity,
         Err(e) => return fail(e),
     };

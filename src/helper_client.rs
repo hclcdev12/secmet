@@ -30,6 +30,9 @@ pub use secmet_helper::testdisk::TestdiskRun;
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 /// Délai de lecture sur la connexion de contrôle.
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(120);
+/// Politique envoyée au helper, la même à l'analyse et à l'exécution :
+/// NIST SP 800-88 Rev. 2, seule proposée (décision D5).
+pub const APP_POLICY: PolicyId = PolicyId::Nist80088r2;
 
 /// Erreur d'un appel au helper, avec le `kind` stable du protocole.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -678,7 +681,7 @@ pub fn scan_device(
 ) -> Result<ScanResult, CallError> {
     decode(helper.call(Command::ScanDevice {
         device: name.to_string(),
-        policy: PolicyId::default(),
+        policy: APP_POLICY,
         preferences,
     })?)
 }
@@ -736,7 +739,7 @@ pub fn execute_plan(
         Command::ExecutePlan {
             token: token.to_string(),
             confirm_serial: confirm_serial.to_string(),
-            policy: PolicyId::default(),
+            policy: APP_POLICY,
             preferences,
         },
         true,
