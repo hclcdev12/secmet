@@ -27,7 +27,7 @@ testdisk
     .deb Ubuntu 24.04 et AppImage : paquet Ubuntu 24.04 testdisk
       (7.1-5+nmu1build2 lors de la 0.4.0)
     .deb Ubuntu 22.04 : paquet Ubuntu 22.04 testdisk
-    .rpm : paquet Fedora 42 testdisk
+    .rpm : paquet Fedora 44 testdisk (fc44) ; Fedora 42 pour le .rpm fc42 de transition (0.4.1)
   Texte complet GPL-2.0 : /usr/share/doc/secmet/gpl-2.0.txt
 
 Bibliothèques privées (construction Ubuntu 24.04)

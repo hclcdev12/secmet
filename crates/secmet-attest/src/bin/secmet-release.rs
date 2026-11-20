@@ -11,7 +11,9 @@
 //! `sign` écrit `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` dans le
 //! dossier ; sans liste de fichiers, il prend les `.deb`, `.rpm`,
 //! `.AppImage`, `.exe` (SecMet Clé USB pour Windows), `.tar` (livrable de
-//! la clé USB) et `.img.xz` (image de clé USB) qui s'y trouvent. `verify` contrôle les deux signatures,
+//! la clé USB), `.img.xz` (image de clé USB) et les binaires Linux
+//! autonomes `secmet-verify_<version>_<arch>` et
+//! `secmet-release_<version>_<arch>` qui s'y trouvent. `verify` contrôle les deux signatures,
 //! l'empreinte de chaque fichier et la cohérence de la version ; code 0 si
 //! tout est valide **et** signé par une clé de confiance (`--trust` ou
 //! `$SECMET_RELEASE_TRUSTED_KEYS`, séparateur `:`), 1 sinon, 2 sur usage.
@@ -85,6 +87,31 @@ fn keygen(args: &[String]) -> i32 {
     }
 }
 
+/// Binaires Linux autonomes publiés avec chaque release (outils qui
+/// coexistent avec l'application) : `<outil>_<version>_<arch>`, sans
+/// extension.
+const STANDALONE_TOOLS: [&str; 2] = ["secmet-verify_", "secmet-release_"];
+const STANDALONE_ARCHES: [&str; 2] = ["_x86_64", "_aarch64"];
+
+/// Nom d'un fichier publiable : paquet, AppImage, `.exe`, image ou livrable
+/// de la clé USB, binaire autonome `secmet-verify` ou `secmet-release`.
+fn is_package_file(name: &str) -> bool {
+    let standalone = STANDALONE_TOOLS.iter().any(|tool| {
+        name.strip_prefix(tool).is_some_and(|rest| {
+            STANDALONE_ARCHES
+                .iter()
+                .any(|arch| rest.len() > arch.len() && rest.ends_with(arch))
+        })
+    });
+    standalone
+        || name.ends_with(".deb")
+        || name.ends_with(".rpm")
+        || name.ends_with(".AppImage")
+        || name.ends_with(".exe")
+        || name.ends_with(".img.xz")
+        || name.ends_with(".tar")
+}
+
 /// Fichiers publiables d'un dossier, triés.
 fn package_files(dir: &Path) -> Result<Vec<String>, AttestError> {
     let entries = fs::read_dir(dir).map_err(|e| AttestError::io(dir.display().to_string(), e))?;
@@ -92,14 +119,7 @@ fn package_files(dir: &Path) -> Result<Vec<String>, AttestError> {
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().is_file())
         .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| {
-            name.ends_with(".deb")
-                || name.ends_with(".rpm")
-                || name.ends_with(".AppImage")
-                || name.ends_with(".exe")
-                || name.ends_with(".img.xz")
-                || name.ends_with(".tar")
-        })
+        .filter(|name| is_package_file(name))
         .collect();
     names.sort();
     Ok(names)
@@ -332,5 +352,66 @@ fn verify(args: &[String]) -> i32 {
     } else {
         eprintln!("clé non vérifiée : ajoutez-la avec --trust");
         1
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publishable_names() {
+        for name in [
+            "secmet_0.4.1.ubuntu24.04_amd64.deb",
+            "secmet-0.4.1-1.fc42.x86_64.rpm",
+            "secmet-0.4.1-1.fc44.x86_64.rpm",
+            "SecMet_0.4.1_x86_64.AppImage",
+            "secmet-key-writer_0.4.1_x86_64.exe",
+            "secmet-key_0.4.1_x86_64.img.xz",
+            "secmet-live_0.4.1_x86_64.tar",
+            "secmet-verify_0.4.1_x86_64",
+            "secmet-release_0.4.1_x86_64",
+            "secmet-verify_0.4.1_aarch64",
+        ] {
+            assert!(is_package_file(name), "{name}");
+        }
+        for name in [
+            "SHA256SUMS",
+            "SHA256SUMS.sig",
+            "latest.json",
+            "secmet-verify",
+            "secmet-verify_x86_64",
+            "secmet-verify_0.4.1_x86_64.sha256",
+            "secmet-helper_0.4.1_x86_64",
+            "notes.md",
+        ] {
+            assert!(!is_package_file(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn package_files_lists_packages_and_standalone_tools_sorted() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [
+            "secmet-verify_0.4.1_x86_64",
+            "secmet-release_0.4.1_x86_64",
+            "secmet-0.4.1-1.fc44.x86_64.rpm",
+            "secmet-0.4.1-1.fc42.x86_64.rpm",
+            "SHA256SUMS",
+            "latest.json",
+        ] {
+            fs::write(dir.path().join(name), name).unwrap();
+        }
+        fs::create_dir(dir.path().join("logs")).unwrap();
+        assert_eq!(
+            package_files(dir.path()).unwrap(),
+            [
+                "secmet-0.4.1-1.fc42.x86_64.rpm",
+                "secmet-0.4.1-1.fc44.x86_64.rpm",
+                "secmet-release_0.4.1_x86_64",
+                "secmet-verify_0.4.1_x86_64",
+            ]
+        );
     }
 }

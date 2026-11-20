@@ -85,7 +85,7 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 - SecMet Clé USB (`crates/secmet-key-writer`) : écriture de l'image de la clé sous Linux et Windows, après vérification de la signature de la release puis de l'empreinte de l'image.
 - Réglages : langue (fr, en, de), logo des certificats, nom de l'opérateur par défaut, passes HDD, mode lot, vérification automatique des mises à jour ; sur la clé, recopie des lots clôturés sur l'export et nettoyage.
 - Journalisation sous `~/.secmet_logs/` (0700/0600), migration depuis `shred-graphique`.
-- Distribution : paquets `.deb` (Ubuntu 24.04 et 22.04) et `.rpm` (construit pour Fedora 42), AppImage (composant système installé au premier lancement), image de la clé SecMet (`.img.xz`), livrable de fabrication de la clé (`.tar`), SecMet Clé USB (AppImage Linux et `.exe` Windows) ; `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version.
+- Distribution : paquets `.deb` (Ubuntu 24.04 et 22.04) et `.rpm` (construit pour Fedora 44, et pour Fedora 42 le temps de la transition en 0.4.1), AppImage (composant système installé au premier lancement ; contient aussi `secmet-verify` et `secmet-release`), binaires Linux autonomes `secmet-verify` et `secmet-release`, image de la clé SecMet (`.img.xz`), livrable de fabrication de la clé (`.tar`), SecMet Clé USB (AppImage Linux et `.exe` Windows) ; `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version.
 
 ### 2.2 Hors périmètre
 
@@ -249,7 +249,7 @@ flowchart TB
 | Réseau (mises à jour) | `ureq` 2 + `rustls` (HTTPS, racines embarquées) |
 | Privilèges | PolicyKit + `pkexec` |
 | Packaging | Debian `.deb`, Fedora `.rpm`, AppImage (linuxdeploy dans un conteneur Ubuntu 24.04) ; image de la clé (debootstrap Ubuntu 24.04, `packaging/live/`) ; `.exe` Windows de SecMet Clé USB (compilation croisée MinGW) |
-| Intégration continue | GitHub Actions : `ci.yml` (fmt, clippy, tests, `cargo audit`, shellcheck), `fuzz.yml` (cargo-fuzz), `package.yml` (paquets installés et testés en conteneur ; sur un tag `vX.Y.Z`, construction des onze fichiers de la release, signature avec la clé de version et publication ; tag `vX.Y.Z-rcN` : construction sans publication) |
+| Intégration continue | GitHub Actions : `ci.yml` (fmt, clippy, tests, `cargo audit`, shellcheck), `fuzz.yml` (cargo-fuzz), `package.yml` (paquets installés et testés en conteneur ; sur un tag `vX.Y.Z`, construction des quatorze fichiers de la release, signature avec la clé de version et publication ; tag `vX.Y.Z-rcN` : construction sans publication) |
 
 ### 6.2 Diagramme des composants
 
@@ -324,8 +324,8 @@ flowchart TB
 |---------|------|-------------|
 | `secmet` | Application graphique | `/usr/bin/secmet` |
 | `secmet-helper` | Daemon privilégié (`serve`) | `/usr/bin/secmet-helper` |
-| `secmet-verify` | Vérification d'attestations et de manifestes de lot | `/usr/bin/secmet-verify` |
-| `secmet-release` | Clé de version, signature et vérification d'une release (`keygen`, `sign`, `verify`) ; utilisé au démarrage de la clé pour vérifier le magasin `app/` | `/usr/bin/secmet-release` (`.deb` et `.rpm`) |
+| `secmet-verify` | Vérification d'attestations et de manifestes de lot | `/usr/bin/secmet-verify` (`.deb`, `.rpm`) ; `usr/bin/secmet-verify` de l'AppImage (`./SecMet_<version>_x86_64.AppImage verify …`) ; binaire autonome `secmet-verify_<version>_x86_64` de la release |
+| `secmet-release` | Clé de version, signature et vérification d'une release (`keygen`, `sign`, `verify`) ; utilisé au démarrage de la clé pour vérifier le magasin `app/` | `/usr/bin/secmet-release` (`.deb` et `.rpm`) ; `usr/bin/secmet-release` de l'AppImage (`./SecMet_<version>_x86_64.AppImage release …`) ; binaire autonome `secmet-release_<version>_x86_64` de la release |
 | `secmet-key-writer` | SecMet Clé USB, écriture de l'image de la clé | Livrable séparé : `secmet-key-writer_<version>_x86_64.AppImage`, `secmet-key-writer_<version>_x86_64.exe` |
 | `testdisk` embarqué | Validation optionnelle | `/usr/lib/secmet/bin/testdisk`, bibliothèques sous `/usr/lib/secmet/lib/` |
 | Policy | PolicyKit | `/usr/share/polkit-1/actions/secmet.policy` |
@@ -529,7 +529,7 @@ make key-writer-exe      # dist/secmet-key-writer_<version>_x86_64.exe (compilat
 make release             # dist/release/<version>/ : paquets fumés en conteneurs, SHA256SUMS(.sig), latest.json signés (Annexe N)
 ```
 
-Les fichiers publiés portent le nom de la distribution visée (`secmet_<version>.ubuntu24.04_amd64.deb`, `secmet_<version>.ubuntu22.04_amd64.deb`, `secmet-<version>-1.fc42.x86_64.rpm`). Une release publie onze fichiers (paquets, AppImage, image et livrable de la clé, SecMet Clé USB pour Linux et Windows, `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) ; voir l'[Annexe N](Annexe_N_mises_a_jour.md).
+Les fichiers publiés portent le nom de la distribution visée (`secmet_<version>.ubuntu24.04_amd64.deb`, `secmet_<version>.ubuntu22.04_amd64.deb`, `secmet-<version>-1.fc44.x86_64.rpm`, et en 0.4.1 `secmet-<version>-1.fc42.x86_64.rpm` pour la transition). Une release publie quatorze fichiers (paquets, AppImage, image et livrable de la clé, SecMet Clé USB pour Linux et Windows, binaires autonomes `secmet-verify` et `secmet-release`, `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) ; voir l'[Annexe N](Annexe_N_mises_a_jour.md).
 
 ### 10.2 Dépendances du paquet `.deb`
 

@@ -1,13 +1,18 @@
 name: Package
 
 # Construit les livrables : .deb pour Ubuntu 24.04 et 22.04 (et dérivés :
-# Mint 22 / 21), .rpm Fedora, AppImage (assemblée dans Ubuntu 24.04),
-# SecMet Clé USB (AppImage Linux et .exe Windows, runner windows-latest).
+# Mint 22 / 21), .rpm Fedora 44 et 42 (transition), AppImage (assemblée
+# dans Ubuntu 24.04, avec secmet-verify et secmet-release), les binaires
+# Linux autonomes secmet-verify_<v>_x86_64 et secmet-release_<v>_x86_64
+# (construits avec le .deb Ubuntu 22.04), SecMet Clé USB (AppImage Linux et
+# .exe Windows, runner windows-latest).
 # Chaque paquet est installé et fumé dans son conteneur, à chaque push sur
 # main et sur les pull requests touchant le packaging. Sur un tag vX.Y.Z
 # (ou à la main avec ce tag), le dernier travail renomme les paquets selon
 # la convention GitHub (« ~ » → « . »), signe SHA256SUMS et latest.json avec
-# la clé de version, puis crée la release GitHub dans ce dépôt.
+# la clé de version, puis crée la release GitHub dans ce dépôt : en
+# brouillon, avec exactement les fichiers de SHA256SUMS plus SHA256SUMS,
+# SHA256SUMS.sig et latest.json, publiée une fois la liste vérifiée.
 #
 # Sur un tag ou à la main, la clé USB est publiée avec les paquets sous deux
 # formes signées : le livrable de fabrication secmet-live_<version>_x86_64.tar
@@ -126,6 +131,34 @@ jobs:
           path: dist/*.deb
           if-no-files-found: error
 
+      # Outils annexes publiés aussi comme binaires Linux autonomes, pris de
+      # la construction Ubuntu 22.04 : la glibc la plus ancienne des cibles
+      # (2.35), ils tournent donc sur toutes.
+      - name: Binaires autonomes secmet-verify et secmet-release (fumée, glibc)
+        if: matrix.distro == 'ubuntu22.04'
+        run: |
+          version="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          mkdir -p tools
+          for t in secmet-verify secmet-release; do
+            f="tools/${t}_${version}_x86_64"
+            install -m 0755 "target/release/$t" "$f"
+            "$f" --help > usage.txt
+            head -1 usage.txt | grep -q "^usage: $t "
+            max=$(objdump -T "$f" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+            echo "$t : glibc max requise $max"
+            test "$(printf '%s\n%s\n' "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35
+          done
+          empty="$(mktemp -d)"
+          if "tools/secmet-release_${version}_x86_64" verify "$empty"; then exit 1; fi
+          ls -la tools/
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.distro == 'ubuntu22.04'
+        with:
+          name: tools
+          path: tools/*
+          if-no-files-found: error
+
   rpm:
     name: .rpm Fedora ${{ matrix.version }}
     runs-on: ubuntu-latest
@@ -134,7 +167,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ["42"]
+        # Fedora 44 : plus ancienne version maintenue (s'installe sur 44 et
+        # 45). Fedora 42 en plus le temps de la transition : les SecMet
+        # 0.4.0 cherchent secmet-<v>-1.fc42.x86_64.rpm pour se mettre à jour.
+        version: ["42", "44"]
     steps:
       - name: Dépendances de construction
         run: |
@@ -189,12 +225,15 @@ jobs:
           ./packaging/build_appimage.sh
           ls -la dist/
 
-      - name: Fumée (extraction sans FUSE, glibc requise)
+      # Binaires, outils annexes (usr/bin et aiguillage AppRun verify /
+      # release), copyright de SecMet et de chaque bibliothèque embarquée.
+      - name: Fumée (extraction sans FUSE, outils annexes, copyright, glibc requise)
         run: |
           cd "$(mktemp -d)"
           "$GITHUB_WORKSPACE"/dist/SecMet_*.AppImage --appimage-extract >/dev/null
           test -x squashfs-root/usr/bin/secmet
           test -x squashfs-root/usr/bin/secmet-helper
+          "$GITHUB_WORKSPACE"/packaging/appimage-smoke.sh squashfs-root
           max=$(objdump -T squashfs-root/usr/lib/libgtk-4.so.1 | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
           echo "glibc max requise par libgtk-4 : $max"
           test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
@@ -381,7 +420,7 @@ jobs:
       - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' -o -name 'secmet-verify_*_x86_64' -o -name 'secmet-release_*_x86_64' \) -exec mv {} release/ \;
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
@@ -438,9 +477,39 @@ jobs:
             --version "${{ steps.version.outputs.version }}" --date "$(date -u +%F)" \
             --sums-url "$base/SHA256SUMS" "${notes_args[@]}"
           rm -f "$keyfile"
+          # Vérification contre la clé publique attendue (SECMET_TRUST, celle
+          # que les installations et SecMet Clé USB acceptent), jamais contre
+          # celle du latest.json qu'on vient de produire : un secret recopié
+          # avec une autre clé ferait sinon une release que personne n'accepte.
           pubkey="$(python3 -c "import json;print(json.load(open('release/latest.json'))['public_key'])")"
-          ./target/release/secmet-release verify release --trust "$pubkey"
+          if [ "$pubkey" != "$SECMET_TRUST" ]; then
+            echo "::error::la clé du secret SECMET_RELEASE_KEY ne correspond pas à la clé de version attendue (clé publique $pubkey, attendue $SECMET_TRUST) : rien n'est publié"
+            exit 1
+          fi
+          ./target/release/secmet-release verify release --trust "$SECMET_TRUST"
           cat release/SHA256SUMS
+
+      # Ce qui est publié est exactement ce qui est signé : les fichiers de
+      # SHA256SUMS (2e colonne) plus SHA256SUMS, SHA256SUMS.sig et
+      # latest.json ; chacun des 11 livrables attendus doit y être.
+      - name: Liste des fichiers publiés (tirée de SHA256SUMS)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          v="$VERSION"
+          for f in "secmet_${v}.ubuntu24.04_amd64.deb" "secmet_${v}.ubuntu22.04_amd64.deb" \
+                   "secmet-${v}-1.fc44.x86_64.rpm" "secmet-${v}-1.fc42.x86_64.rpm" \
+                   "SecMet_${v}_x86_64.AppImage" \
+                   "secmet-key-writer_${v}_x86_64.AppImage" "secmet-key-writer_${v}_x86_64.exe" \
+                   "secmet-verify_${v}_x86_64" "secmet-release_${v}_x86_64" \
+                   "secmet-live_${v}_x86_64.tar" "secmet-key_${v}_x86_64.img.xz"; do
+            grep -qx "[0-9a-f]\{64\}  $f" release/SHA256SUMS || { echo "livrable absent de SHA256SUMS : $f"; exit 1; }
+          done
+          { awk '{ sub(/^\*/, "", $2); print $2 }' release/SHA256SUMS; printf '%s\n' SHA256SUMS SHA256SUMS.sig latest.json; } | sort > assets.txt
+          while read -r f; do test -f "release/$f" || { echo "absent de release/ : $f"; exit 1; }; done < assets.txt
+          extra="$(comm -13 assets.txt <(ls release | sort))"
+          [ -z "$extra" ] || echo "::warning::non signés, non publiés : $extra"
+          echo "$(wc -l < assets.txt) fichiers à publier"
 
       - name: Release GitHub
         env:
@@ -454,6 +523,8 @@ jobs:
             # Texte générique dans un heredoc : il contient des apostrophes.
             cat <<NOTES
           Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_${v}_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_${v}_x86_64.AppImage sous Linux, secmet-key-writer_${v}_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_${v}_x86_64.tar : image, secmet-make-key.sh, secmet-release).
+          Fedora : secmet-${v}-1.fc44.x86_64.rpm (Fedora 44 et 45) ; secmet-${v}-1.fc42.x86_64.rpm reste publié le temps de la transition.
+          Outils en ligne de commande, binaires Linux autonomes (chmod +x) : secmet-verify_${v}_x86_64 (certificats et manifestes de lot) et secmet-release_${v}_x86_64 (vérification d'une release) ; aussi dans l'AppImage (./SecMet_${v}_x86_64.AppImage verify …, … release …) et dans les paquets.
           Empreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version ${key_id}).
           NOTES
             if [ "${{ needs.live-mode.outputs.mode }}" = reuse ]; then
@@ -463,6 +534,22 @@ jobs:
           NOTES
             fi
           } > notes.md
-          gh release create "$RELEASE_TAG" --repo "${{ github.repository }}" --title "SecMet ${{ steps.version.outputs.version }}" \
-            --notes-file notes.md release/*
-          gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name'
+          repo="${{ github.repository }}"
+          # Brouillon resté d'une exécution interrompue : remplacé. Une
+          # release publiée n'est jamais touchée.
+          if draft="$(gh release view "$RELEASE_TAG" --repo "$repo" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            [ "$draft" = true ] || { echo "la release $RELEASE_TAG existe déjà"; exit 1; }
+            gh release delete "$RELEASE_TAG" --repo "$repo" --yes
+          fi
+          # Brouillon d'abord, publié seulement si chaque fichier y est :
+          # « latest » ne pointe jamais sur une release incomplète.
+          mapfile -t files < <(sed 's|^|release/|' assets.txt)
+          gh release create "$RELEASE_TAG" --repo "$repo" --title "SecMet $v" \
+            --notes-file notes.md --draft "${files[@]}"
+          gh release view "$RELEASE_TAG" --repo "$repo" --json assets --jq '.assets[].name' | sort > sent.txt
+          if ! cmp -s assets.txt sent.txt; then
+            echo "brouillon incomplet, laissé en brouillon :"; diff assets.txt sent.txt || true
+            exit 1
+          fi
+          gh release edit "$RELEASE_TAG" --repo "$repo" --draft=false
+          echo "release $RELEASE_TAG publiée ($(wc -l < sent.txt) fichiers)"

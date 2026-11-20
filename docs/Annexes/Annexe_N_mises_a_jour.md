@@ -35,13 +35,14 @@
 | Développement | Releases GitHub du dépôt du code **`hclcdev12/secmet`** (public, GPL-3.0-or-later). Jusqu'à la 0.3.5 le canal était `hclcdev12/secmet-releases` ; sa dernière release ne contient qu'un `latest.json` signé dont `sha256sums_url` et `moved_to` renvoient vers `secmet`, ce qui fait basculer les installations existantes. |
 | Production | Le dépôt `hclcdev12/secmet` est l'emplacement actuel, **provisoire** ; le dépôt définitif de l'entreprise reste à décider au lancement. Le déménagement est prévu par `moved_to` (ci-dessous) |
 
-Chaque release contient **11 fichiers** :
+Chaque release contient **14 fichiers** (11 en 0.4.0, avant le second `.rpm` et les binaires autonomes) :
 
 | Fichier | Rôle |
 |---------|------|
 | `secmet_<version>.ubuntu24.04_amd64.deb`, `secmet_<version>.ubuntu22.04_amd64.deb` | Paquets Debian / Ubuntu / Mint (version Debian `<version>~<distro>` dans le paquet ; nom publié selon la convention de GitHub, qui remplace `~` par `.` dans les noms de fichiers d'une release) |
-| `secmet-<version>-1.fc42.x86_64.rpm` | Paquet Fedora |
-| `SecMet_<version>_x86_64.AppImage` | AppImage |
+| `secmet-<version>-1.fc44.x86_64.rpm`, `secmet-<version>-1.fc42.x86_64.rpm` | Paquets Fedora : `fc44` pour Fedora 44 et 45 ; `fc42` publié en plus en 0.4.1, le temps de la transition (les SecMet 0.4.0 cherchent ce nom pour se mettre à jour), puis retiré |
+| `SecMet_<version>_x86_64.AppImage` | AppImage (contient aussi `secmet-verify` et `secmet-release` : `./SecMet_<version>_x86_64.AppImage verify …`, `… release …`) |
+| `secmet-verify_<version>_x86_64`, `secmet-release_<version>_x86_64` | Outils en ligne de commande en binaires Linux autonomes (construits avec le `.deb` Ubuntu 22.04, glibc ≥ 2.35) : vérification des certificats et des manifestes de lot, vérification d'une release ; `chmod +x` après téléchargement |
 | `secmet-key_<version>_x86_64.img.xz` | Image de la clé USB prête à écrire ([Fabriquer sa clé](../Fabriquer_sa_cle.md)) |
 | `secmet-live_<version>_x86_64.tar` | Livrable de fabrication de la clé sous Linux (`secmet-make-key.sh`, image, `secmet-release`) |
 | `secmet-key-writer_<version>_x86_64.AppImage`, `secmet-key-writer_<version>_x86_64.exe` | SecMet Clé USB, outil d'écriture de la clé, pour Linux et Windows |
@@ -83,6 +84,7 @@ Changer d'hébergement ne change pas la confiance : seule compte la clé de vers
 - **Où elle sert aujourd'hui** : à deux endroits.
   - **En CI** (voie normale de publication) : `package.yml` lit la clé privée dans le secret `SECMET_RELEASE_KEY` de l'environnement GitHub `release`, que seul le travail `publish` déclare ; les autres travaux n'ont que la lecture du dépôt, et toutes les actions sont épinglées par empreinte de commit. Le travail écrit la clé dans un fichier temporaire du runner et signe `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` (ainsi que le magasin `app/` de l'image de clé reprise, §N.7) à chaque push d'un tag `vX.Y.Z`, puis publie la release. L'environnement peut exiger une approbation manuelle avant la publication (facultatif). Les journaux, publics, n'affichent pas le secret. Décision du 2026-11-20 : la publication reste automatique au push d'un tag ; pas de signature à la main.
   - **En local** : `packaging/release.sh` (`make release`) signe sur le poste du responsable des versions avec la clé du fichier `SECMET_RELEASE_KEY` (par défaut dans `~/.config/secmet/`).
+  - Dans les deux cas, la release signée est vérifiée avec la clé publique **attendue** (`SECMET_TRUST` de `package.yml`, la même que `RELEASE_PUBLIC_KEYS` de `src/update.rs`), pas avec celle que porte le `latest.json` produit : si le secret (ou le fichier local) contient une autre clé, le travail échoue avant toute publication (« la clé du secret SECMET_RELEASE_KEY ne correspond pas à la clé de version attendue »), au lieu de publier une release que toutes les installations et SecMet Clé USB refuseraient.
 - **Risque** : la signature protège contre la compromission de l'hébergement des fichiers (un fichier remplacé sur la page de release ne passe pas la vérification). Elle **ne protège pas** contre la compromission du dépôt, d'un compte qui peut y pousser un tag ou modifier les workflows, ou de la CI : un tag poussé par un tiers produit une release signée que les applications installées acceptent. Parades en place : secret limité à l'environnement `release` et au travail `publish`, permissions minimales, actions épinglées ; à régler dans GitHub : création des tags `v*` réservée aux administrateurs, double authentification, approbation manuelle facultative.
 - La clé publique est **intégrée à l'application** à la compilation.
 - **Sauvegarde hors ligne obligatoire** : sans elle, plus aucune mise à jour automatique n'est possible sans réinstallation manuelle.
@@ -97,7 +99,7 @@ Changer d'hébergement ne change pas la confiance : seule compte la clé de vers
 | Livrable | Installation |
 |----------|--------------|
 | Banc fixe, `.deb` | `sudo apt install ./secmet_<version>.ubuntu24.04_amd64.deb`. Évolution possible si les bancs installés se multiplient : dépôt APT signé, et `apt upgrade` fait le reste |
-| `.rpm` | `sudo dnf install ./secmet-<version>-1.fc42.x86_64.rpm` |
+| `.rpm` | `sudo dnf install ./secmet-<version>-1.fc44.x86_64.rpm` (Fedora 44 et 45) |
 | AppImage | Remplacer le fichier par la nouvelle AppImage ; au lancement suivant, le dialogue « Mise à jour du composant système » met le helper à jour (un mot de passe administrateur) |
 
 ## N.6 Clé live
@@ -107,7 +109,7 @@ Le système de la clé est en lecture seule ; SecMet fait partie de l'image. Deu
 1. **Mises à jour de SecMet** — sur la partition de données (**réalisé en 0.3.4**) :
    - le bouton **Installer la mise à jour** fonctionne comme sur un poste (installation pour la session, en mémoire) et, sur la clé, range en plus le paquet vérifié avec `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` dans `SECMET-DATA/app/<version>/` ; seules les deux versions les plus récentes sont gardées ; le dossier `app/` appartient à l'opérateur (créé par `secmet-make-key`, et au démarrage par `secmet-app-update` s'il manque : sans lui, l'installation échoue par « Permission non accordée ») ;
    - au démarrage, avant la session (`secmet-app-update.service`, après le montage de la partition, avant LightDM), un script parcourt `app/` de la version la plus récente à la plus ancienne : si elle est plus récente que celle de l'image, `secmet-release verify --file` contrôle la signature de `SHA256SUMS` avec la clé de version (codée dans le script, la même que dans l'application) et l'empreinte du paquet, puis `dpkg-deb -x` déploie le paquet par-dessus le système en mémoire, sans passer par dpkg (les dépendances sont celles de l'image ; `apt-get install` et ses déclencheurs retardaient la session de près de 30 s, et la seule lecture de la base dpkg depuis le squashfs coûte encore une vingtaine de secondes sur un portable modeste ; la base dpkg garde la version de l'image, sans conséquence sur un système qui repart de l'image à chaque démarrage) ; signature invalide ou installation échouée : version suivante, et à défaut celle de l'image ; chaque issue est tracée dans le journal (`secmet-app-update`) ;
-   - `secmet-release` est livré dans les paquets `.deb` et `.rpm` à cet effet.
+   - `secmet-release` est livré dans les paquets `.deb` et `.rpm` à cet effet (et aussi dans l'AppImage et en binaire autonome, pour vérifier une release téléchargée).
 2. **Mises à jour du système** (noyau, bibliothèques, correctifs de sécurité) — en refaisant la clé :
    - pas de mise à jour du système live lui-même ;
    - l'image est reconstruite environ tous les 6 mois ou lors d'une faille importante ;
@@ -115,15 +117,15 @@ Le système de la clé est en lecture seule ; SecMet fait partie de l'image. Deu
 
 ## N.7 Chaîne de publication : `make release`
 
-Deux voies produisent la même release. **En pratique**, c'est `package.yml` (GitHub Actions) qui construit, signe et publie, au push d'un tag `vX.Y.Z` (§N.4). **La voie locale**, ci-dessous, tourne sur le poste du responsable des versions, dans des conteneurs (podman ou docker), sans dépendre de GitHub Actions ; elle reproduit `package.yml` pour la construction et la signature, avec un écart à la publication (étape 5).
+Deux voies produisent la même release. **En pratique**, c'est `package.yml` (GitHub Actions) qui construit, signe et publie, au push d'un tag `vX.Y.Z` (§N.4). **La voie locale**, ci-dessous, tourne sur le poste du responsable des versions, dans des conteneurs (podman ou docker), sans dépendre de GitHub Actions ; elle reproduit `package.yml` pour la construction, la signature et la publication.
 
 Script : `packaging/release.sh` (`make release`, `make publish`). Il refuse un arbre de travail modifié ou un `HEAD` sans le tag `vX.Y.Z` ou `vX.Y.Z-rcN` (options `--allow-dirty`, `--allow-untagged` pour les essais) ; sur un tag `-rcN`, `--publish` est refusé.
 
 1. Contrôles : `cargo fmt --check`, `clippy -D warnings`, tests du workspace, `cargo audit`, shellcheck.
-2. Construction en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 42, AppImage (Ubuntu 24.04), SecMet Clé USB (AppImage et `.exe`), image de la clé et livrable `.tar` (sauf `--skip-live`, voir plus bas).
-3. Installation et contrôle de chaque paquet dans son conteneur (binaires présents, helper refusant d'être lancé hors protocole, TestDisk embarqué, policy PolicyKit) ; contrôle de la glibc requise par l'AppImage (≤ 2.39).
-4. `secmet-release sign` : `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version, puis `secmet-release verify` avec la clé publique.
-5. `--publish` seulement : `gh release create vX.Y.Z` sur le dépôt, après confirmation explicite (`oui`). Une release déjà existante est refusée. **Écart** : `make publish` envoie aujourd'hui 9 fichiers (paquets, AppImage, SecMet Clé USB, `SHA256SUMS`, `SHA256SUMS.sig`, `latest.json`) mais **ni** l'image `secmet-key_<version>_x86_64.img.xz` **ni** le livrable `secmet-live_<version>_x86_64.tar`, pourtant construits et listés dans `SHA256SUMS` ; seule `package.yml` publie les 11 fichiers. Correction à faire dans `release.sh`.
+2. Construction en conteneurs : `.deb` Ubuntu 24.04 et 22.04, `.rpm` Fedora 44 et 42, AppImage (Ubuntu 24.04), binaires autonomes `secmet-verify` et `secmet-release` (conteneur du `.deb` Ubuntu 22.04), SecMet Clé USB (AppImage et `.exe`), image de la clé et livrable `.tar` (sauf `--skip-live`, voir plus bas). Les fichiers d'une construction précédente (paquets, outils, image et `.tar`) sont d'abord effacés de `dist/release/<version>/`.
+3. Installation et contrôle de chaque paquet dans son conteneur (binaires présents, helper refusant d'être lancé hors protocole, TestDisk embarqué, policy PolicyKit) ; contrôle de la glibc requise par l'AppImage (≤ 2.39) et par les binaires autonomes (≤ 2.35) ; AppImage : `secmet-verify` et `secmet-release` présents et aiguillés par `AppRun`, copyright de chaque bibliothèque embarquée (`packaging/appimage-smoke.sh`).
+4. `secmet-release sign` : `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version, puis `secmet-release verify` avec la clé publique **attendue** (celle que l'application et SecMet Clé USB acceptent, `SECMET_RELEASE_TRUST` pour une autre), jamais avec celle du `latest.json` produit : une clé privée qui ne lui correspond pas arrête la chaîne. Les 11 livrables attendus sont contrôlés ; il en manque un (image de la clé avec `--skip-live`, par exemple) : avertissement, et `--publish` refusé.
+5. `--publish` seulement, après confirmation explicite (`oui`) : la liste envoyée est tirée de `SHA256SUMS` (2e colonne) plus `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` (échec si un fichier manque), donc exactement ce qui est signé ; `gh release create vX.Y.Z --draft`, contrôle des fichiers du brouillon, puis `gh release edit --draft=false`. « latest » ne pointe ainsi jamais sur une release incomplète. Une release déjà existante (brouillon compris) est refusée. `package.yml` publie de la même façon ; un brouillon resté d'une exécution interrompue y est remplacé, une release publiée jamais touchée.
 
 Sortie : `dist/release/<version>/`, avec les journaux de construction sous `logs/`. Le tag (`git tag -a vX.Y.Z`) et le push du code restent des gestes explicites du responsable des versions.
 

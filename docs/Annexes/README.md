@@ -17,6 +17,6 @@ Index des annexes de la documentation SecMet, issues du cahier des charges du pr
 | [K](Annexe_K_presentation_produit.md) | Présentation du produit | Vulgarisation SecMet |
 | [L](Annexe_L_validation_testdisk.md) | Validation TestDisk | Contrôle optionnel post-effacement |
 | [M](Annexe_M_cle_live_lots.md) | Clé live et lots persistants | Clé USB SecMet, lots multi-machines, manifeste signé (réalisée et publiée, v0.4.0) |
-| [N](Annexe_N_mises_a_jour.md) | Mises à jour et publication | Mises à jour signées et installation depuis les Réglages, releases GitHub (11 fichiers), convention de version, `make release`, SecMet Clé USB (réalisée et publiée, v0.4.0) |
+| [N](Annexe_N_mises_a_jour.md) | Mises à jour et publication | Mises à jour signées et installation depuis les Réglages, releases GitHub (14 fichiers), convention de version, `make release`, SecMet Clé USB (réalisée et publiée, v0.4.0) |
 
 Page opérateur hors annexes : [Fabriquer sa clé](../Fabriquer_sa_cle.md) (écrire l'image publiée de la clé USB SecMet avec SecMet Clé USB, Raspberry Pi Imager, Rufus ou `dd`).

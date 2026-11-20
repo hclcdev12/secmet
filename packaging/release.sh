@@ -9,15 +9,22 @@
 #                              [--notes <fr.md>] [--notes-en <en.md>] [--notes-de <de.md>]
 #
 # env   : SECMET_RELEASE_KEY    clé privée de version (défaut ~/.config/secmet/release-key.hex)
+#         SECMET_RELEASE_TRUST  clé publique attendue (défaut : la clé de version SecMet)
 #         SECMET_RELEASES_REPO  dépôt GitHub des releases (défaut hclcdev12/secmet)
 #         SECMET_RELEASES_URL   base des téléchargements (défaut https://github.com/<repo>/releases/download)
 #         SECMET_ENGINE         podman ou docker (détecté)
 #
-# Sortie : dist/release/<version>/ avec les 4 paquets, le livrable de fabrication
-#          de la clé USB (secmet-live_<version>_x86_64.tar) et l'image prête à
+# Sortie : dist/release/<version>/ avec les 5 paquets (.deb Ubuntu 24.04 et
+#          22.04, .rpm Fedora 44 et 42, AppImage), SecMet Clé USB (AppImage
+#          et .exe), les binaires Linux autonomes secmet-verify_<version>_x86_64
+#          et secmet-release_<version>_x86_64, le livrable de fabrication de
+#          la clé USB (secmet-live_<version>_x86_64.tar) et l'image prête à
 #          écrire (secmet-key_<version>_x86_64.img.xz), sauf --skip-live,
 #          SHA256SUMS, SHA256SUMS.sig, latest.json et les journaux de
-#          construction (logs/). Deux cadences pour la clé (Annexe N, §N.7) :
+#          construction (logs/). --publish envoie exactement les fichiers
+#          listés par SHA256SUMS, plus SHA256SUMS, SHA256SUMS.sig et
+#          latest.json : release créée en brouillon, liste des fichiers
+#          vérifiée, puis publiée. Deux cadences pour la clé (Annexe N, §N.7) :
 #          si rien du système de la clé n'a changé depuis la release
 #          précédente (packaging/live/live-mode.sh), son image est téléchargée,
 #          vérifiée et reprise avec le nouveau paquet dans app/<version>/
@@ -44,7 +51,7 @@ while [[ $# -gt 0 ]]; do
         --notes) NOTES_FR="$2"; shift ;;
         --notes-en) NOTES_EN="$2"; shift ;;
         --notes-de) NOTES_DE="$2"; shift ;;
-        -h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help) sed -n '2,33p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "option inconnue : $1" >&2; exit 2 ;;
     esac
     shift
@@ -88,7 +95,13 @@ if [[ -z "${NOTES_FR:-}" && "$(git cat-file -t "$TAG" 2>/dev/null || true)" == t
     TAG_NOTES="$(git tag -l --format='%(contents:body)' "$TAG" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
 fi
 [[ -f "$KEY" ]] || die "clé de version absente : $KEY (secmet-release keygen \"$KEY\")"
-PUBKEY="$(tr -d '[:space:]' < "${KEY%.hex}.pub")"
+# Clé publique attendue : celle que les installations et SecMet Clé USB
+# acceptent (src/update.rs, SECMET_TRUST de package.yml), pas celle du
+# fichier .pub posé à côté de la clé ni celle du latest.json produit.
+PUBKEY="${SECMET_RELEASE_TRUST:-bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5}"
+if [[ -f "${KEY%.hex}.pub" && "$(tr -d '[:space:]' < "${KEY%.hex}.pub")" != "$PUBKEY" ]]; then
+    die "la clé $KEY ne correspond pas à la clé de version attendue ($PUBKEY ; SECMET_RELEASE_TRUST pour une autre)"
+fi
 echo "commit : $(git rev-parse --short HEAD)  tag : $TAG$([[ "$RC" -eq 1 ]] && echo " (essai)")  sortie : $OUT_DIR"
 
 ENGINE="${SECMET_ENGINE:-}"
@@ -125,6 +138,24 @@ test -x /usr/lib/secmet/bin/testdisk
 test -f /usr/share/polkit-1/actions/secmet.policy
 echo SMOKE_OK
 '
+# Binaires Linux autonomes secmet-verify et secmet-release : construits avec
+# le .deb Ubuntu 22.04 (glibc 2.35, la plus ancienne des cibles), publiés à
+# côté des paquets. Usage sur stdout et code 0 pour --help, refus d'un
+# dossier sans release.
+smoke_tools='
+set -euo pipefail
+for t in secmet-verify secmet-release; do
+  f="/out/${t}_${VERSION}_x86_64"
+  test -x "$f"
+  "$f" --help | grep -q "^usage: $t"
+  max="$(objdump -T "$f" | grep -o "GLIBC_[0-9.]*" | sort -Vu | tail -1)"
+  test "$(printf "%s\n%s\n" "$max" GLIBC_2.35 | sort -V | tail -1)" = GLIBC_2.35
+  echo "$t : glibc max $max"
+done
+empty="$(mktemp -d)"
+if "/out/secmet-release_${VERSION}_x86_64" verify "$empty" 2>/dev/null; then exit 1; fi
+echo TOOLS_OK
+'
 
 build_in_container() { # <nom> <image> <script>
     local name="$1" image="$2" script="$3"
@@ -147,7 +178,12 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
     rsync -a --exclude target --exclude 'target-*' --exclude dist --exclude .git \
         --exclude fuzz/target --exclude 'packaging/stage' --exclude 'packaging/appimage_stage' --exclude packaging/rpmbuild \
         --exclude packaging/tools "$ROOT_DIR/" "$SRC_COPY/"
-    rm -f "$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage "$OUT_DIR"/*.exe
+    # Rien d'une construction précédente ne doit être signé avec les nouveaux
+    # paquets : ni paquet, ni outil, ni image de clé (même avec --skip-live).
+    rm -f "$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage "$OUT_DIR"/*.exe \
+        "$OUT_DIR"/secmet-verify_*_x86_64 "$OUT_DIR"/secmet-release_*_x86_64 \
+        "$OUT_DIR"/*.img.xz "$OUT_DIR"/*.tar \
+        "$OUT_DIR/SHA256SUMS" "$OUT_DIR/SHA256SUMS.sig" "$OUT_DIR/latest.json"
 
     deb_script="
 set -euo pipefail
@@ -163,6 +199,12 @@ apt-get install -y -qq ./dist/secmet_*.deb >/dev/null
 dpkg -s secmet | grep -E '^(Version|Depends)'
 $smoke_deb_rpm
 cp dist/*.deb /out/
+if [ \"\$SECMET_DEB_DISTRO\" = ubuntu22.04 ]; then
+  export VERSION=$VERSION
+  install -m 0755 target/release/secmet-verify /out/secmet-verify_${VERSION}_x86_64
+  install -m 0755 target/release/secmet-release /out/secmet-release_${VERSION}_x86_64
+  $smoke_tools
+fi
 "
     DEB_DISTRO=ubuntu24.04 build_in_container deb-ubuntu24.04 docker.io/library/ubuntu:24.04 "$deb_script"
     DEB_DISTRO=ubuntu22.04 build_in_container deb-ubuntu22.04 docker.io/library/ubuntu:22.04 "$deb_script"
@@ -180,6 +222,9 @@ rpm -q secmet
 $smoke_deb_rpm
 cp dist/*.rpm /out/
 "
+    # Fedora 44 (plus ancienne version maintenue) ; Fedora 42 en plus le temps
+    # de la transition, pour les SecMet 0.4.0 qui cherchent le nom fc42.
+    build_in_container rpm-fedora44 docker.io/library/fedora:44 "$rpm_script"
     build_in_container rpm-fedora42 docker.io/library/fedora:42 "$rpm_script"
 
     step "AppImage (conteneur Ubuntu 24.04)"
@@ -193,6 +238,7 @@ cp dist/*.rpm /out/
     test -x "$extract/squashfs-root/usr/bin/secmet"
     test -x "$extract/squashfs-root/usr/bin/secmet-helper"
     test -f "$extract/squashfs-root/usr/share/secmet/secmet.policy"
+    "$PKG_DIR/appimage-smoke.sh" "$extract/squashfs-root" || die "AppImage : fumée échouée"
     if command -v objdump >/dev/null 2>&1; then
         max="$(objdump -T "$extract/squashfs-root/usr/lib/libgtk-4.so.1" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)"
         [[ "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" == GLIBC_2.39 ]] \
@@ -235,6 +281,10 @@ fi
 # son premier démarrage en BIOS (packaging/live/image-check.sh : clé de
 # signature créée, export agrandi, version du magasin déployée).
 if [[ "$SKIP_BUILD" -eq 0 && "$SKIP_LIVE" -eq 0 ]]; then
+    # Une image ou un livrable d'une construction précédente de la même
+    # version ne doit pas être repris par erreur.
+    rm -f "$OUT_DIR"/*.img.xz "$OUT_DIR"/*.tar \
+        "$ROOT_DIR/dist/secmet-live_${VERSION}_x86_64.tar" "$ROOT_DIR/dist/secmet-key_${VERSION}_x86_64.img.xz"
     step "Cadence de l'image de la clé USB"
     mode_line="$(SECMET_LIVE_FULL="$FULL_LIVE" SECMET_RELEASES_REPO="$REPO" "$PKG_DIR/live/live-mode.sh" "$VERSION" 2>"$LOG_DIR/live-mode.log" \
         || echo "mode=full reason=live-mode.sh en erreur (voir $LOG_DIR/live-mode.log)")"
@@ -287,6 +337,26 @@ for f in "$OUT_DIR"/secmet_*~*_amd64.deb; do
     [[ -f "$f" ]] && mv "$f" "${f/\~/.}"
 done
 
+# --- 2d. Livrables attendus ---------------------------------------------------
+# Les 11 fichiers signés d'une release (14 publiés avec SHA256SUMS,
+# SHA256SUMS.sig et latest.json). Sans image de clé (--skip-live), la
+# release serait incohérente (SecMet Clé USB et la reprise de l'image
+# suivante la cherchent) : --publish la refuse.
+expected=(
+    "secmet_${VERSION}.ubuntu24.04_amd64.deb" "secmet_${VERSION}.ubuntu22.04_amd64.deb"
+    "secmet-${VERSION}-1.fc44.x86_64.rpm" "secmet-${VERSION}-1.fc42.x86_64.rpm"
+    "SecMet_${VERSION}_x86_64.AppImage"
+    "secmet-key-writer_${VERSION}_x86_64.AppImage" "secmet-key-writer_${VERSION}_x86_64.exe"
+    "secmet-verify_${VERSION}_x86_64" "secmet-release_${VERSION}_x86_64"
+    "secmet-live_${VERSION}_x86_64.tar" "secmet-key_${VERSION}_x86_64.img.xz"
+)
+missing=()
+for f in "${expected[@]}"; do [[ -f "$OUT_DIR/$f" ]] || missing+=("$f"); done
+if [[ "${#missing[@]}" -gt 0 ]]; then
+    [[ "$PUBLISH" -eq 0 ]] || die "livrables absents de $OUT_DIR, publication refusée : ${missing[*]}"
+    echo "attention : livrables absents (release incomplète, non publiable) : ${missing[*]}" >&2
+fi
+
 # --- 3. Empreintes et signatures ---------------------------------------------
 step "Signature avec la clé de version"
 cargo build --release -q -p secmet-attest --bin secmet-release
@@ -298,24 +368,37 @@ notes_args=()
 [[ -n "$NOTES_DE" ]] && notes_args+=(--notes-de "$(cat "$NOTES_DE")")
 "$RELEASE_BIN" sign "$OUT_DIR" --key "$KEY" --version "$VERSION" --date "$DATE" \
     --sums-url "$BASE_URL/$TAG/SHA256SUMS" "${notes_args[@]}"
+signed_pub="$(sed -n 's/.*"public_key": "\([0-9a-f]*\)".*/\1/p' "$OUT_DIR/latest.json" | head -1)"
+[[ "$signed_pub" == "$PUBKEY" ]] \
+    || die "la clé $KEY ne correspond pas à la clé de version attendue (signé avec $signed_pub, attendue $PUBKEY) : rien n'est publié"
 "$RELEASE_BIN" verify "$OUT_DIR" --trust "$PUBKEY" >/dev/null
 echo "vérification locale : OK"
 
 # --- 4. Publication -----------------------------------------------------------
-assets=("$OUT_DIR"/*.deb "$OUT_DIR"/*.rpm "$OUT_DIR"/*.AppImage
-        "$OUT_DIR/SHA256SUMS" "$OUT_DIR/SHA256SUMS.sig" "$OUT_DIR/latest.json")
-for f in "$OUT_DIR"/*.exe; do [[ -f "$f" ]] && assets+=("$f"); done
+# Ce qui est publié est exactement ce qui est signé : les fichiers listés par
+# SHA256SUMS (2e colonne), plus SHA256SUMS, SHA256SUMS.sig et latest.json.
+assets=()
+while read -r _ name; do
+    name="${name#\*}"
+    [[ -n "$name" ]] || continue
+    [[ -f "$OUT_DIR/$name" ]] || die "$name, listé par SHA256SUMS, absent de $OUT_DIR"
+    assets+=("$OUT_DIR/$name")
+done < "$OUT_DIR/SHA256SUMS"
+for f in SHA256SUMS SHA256SUMS.sig latest.json; do
+    [[ -f "$OUT_DIR/$f" ]] || die "$f absent de $OUT_DIR"
+    assets+=("$OUT_DIR/$f")
+done
 step "Résumé"
 ls -la "${assets[@]}"
 if [[ "$PUBLISH" -eq 0 ]]; then
     echo
-    echo "Rien n'a été publié. Pour publier sur $REPO : packaging/release.sh --publish --skip-build --skip-checks"
+    echo "${#assets[@]} fichiers. Rien n'a été publié. Pour publier sur $REPO : packaging/release.sh --publish --skip-build --skip-checks"
     exit 0
 fi
 
 command -v gh >/dev/null 2>&1 || die "gh (GitHub CLI) requis pour publier"
 if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-    die "la release $TAG existe déjà sur $REPO"
+    die "la release $TAG existe déjà sur $REPO (un brouillon resté d'un essai interrompu se supprime avec gh release delete $TAG --repo $REPO)"
 fi
 echo
 echo "Publication de SecMet $VERSION sur https://github.com/$REPO (release $TAG, ${#assets[@]} fichiers)."
@@ -331,5 +414,12 @@ if [[ -z "$notes_file" ]]; then
             "$(sed -n 's/.*"key_id": "\([0-9a-f]*\)".*/\1/p' "$OUT_DIR/latest.json" | head -1)"
     } > "$notes_file"
 fi
-gh release create "$TAG" --repo "$REPO" --title "SecMet $VERSION" --notes-file "$notes_file" "${assets[@]}"
+# Brouillon d'abord : « latest » ne pointe jamais sur une release dont un
+# fichier manque. Publiée seulement si la liste envoyée est complète.
+gh release create "$TAG" --repo "$REPO" --title "SecMet $VERSION" --notes-file "$notes_file" --draft "${assets[@]}"
+wanted="$(for f in "${assets[@]}"; do basename "$f"; done | sort)"
+sent="$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' | sort)"
+[[ "$sent" == "$wanted" ]] || die "brouillon $TAG incomplet (laissé en brouillon) : $(comm -23 <(echo "$wanted") <(echo "$sent") | tr '\n' ' ')"
+gh release edit "$TAG" --repo "$REPO" --draft=false
+echo "release $TAG publiée (${#assets[@]} fichiers)"
 echo "latest.json : https://github.com/$REPO/releases/latest/download/latest.json"
