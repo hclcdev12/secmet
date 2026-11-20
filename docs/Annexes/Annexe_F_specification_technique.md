@@ -75,7 +75,7 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 - Plan d'effacement par disque (moteur aligné sur NIST SP 800-88 ; politique par défaut `nist-800-88r1`, politique `nist-800-88r2` disponible dans le moteur, voir [Annexe E §4.1](Annexe_E_normes_conformite.md#41-nist-sp-800-88)) : Purge firmware, replis explicites, dégradation annoncée, écriture hôte en dernier.
 - Exécution par le helper : canaris avant commande firmware, sanitize sondé, Format NVM et SECURITY ERASE UNIT bloquants avec progression temporelle, écriture hôte `O_EXCL | O_DIRECT` avec débit et ETA, relecture d'échantillons, recherche de signatures résiduelles.
 - Sélection multiple, effacements en parallèle, Stop, relance des échoués.
-- Dé-frozen SATA (veille système), déverrouillage ATA avec mot de passe connu, levée automatique des mots de passe posés par SecMet.
+- Dégel SATA (bouton **Dégeler**, veille système), déverrouillage ATA avec mot de passe connu, levée automatique des mots de passe posés par SecMet.
 - Certificat PDF natif (une page par disque ou lot) rédigé dans la langue de l'interface (fr, en, de), attestation JSON canonique signée Ed25519, QR code, vérificateur `secmet-verify` avec clés de confiance.
 - Validation TestDisk optionnelle (lecture seule).
 - Sort du support à l'issue de chaque opération (réemploi, destruction recommandée ou requise, à relancer), « Marquer à détruire » pour un disque non effaçable, bordereau de destruction dans le PDF de lot.
@@ -133,7 +133,7 @@ flowchart TB
 | **UC-01** | Démarrer une session | Application installée, `pkexec` setuid | Helper lancé après un mot de passe, inventaire affiché sans bloquer la fenêtre |
 | **UC-02** | Rafraîchir les disques | Session active | Inventaire relu, scans relancés ; refusé pendant un effacement |
 | **UC-03** | Effacer un ou plusieurs disques | Verdict `ready`, disques non protégés | Plan exécuté, statut, validation et rapport par disque |
-| **UC-04** | Dé-geler un disque SATA | Disque FROZEN, aucun job en cours | Veille, ré-identification, FROZEN levé |
+| **UC-04** | Dégeler un disque SATA | Disque gelé (ATA frozen), aucun job en cours | Veille, ré-identification, gel levé |
 | **UC-05** | Déverrouiller un disque ATA | Mot de passe connu | SECURITY UNLOCK puis DISABLE PASSWORD |
 | **UC-06** | Arrêter un effacement | Écriture hôte ou sanitize en cours | Arrêt entre deux blocs ou deux sondages ; firmware bloquant non interrompu |
 | **UC-07** | Consulter l'état d'un disque | Scan effectué | Identité, capacités, SMART, verdict |
@@ -173,7 +173,7 @@ flowchart TB
 | **EF-09** | Exécuter les plans en parallèle, un job par disque, ouverture `O_EXCL | O_DIRECT` et ré-identification avant écriture | Deux disques effacés simultanément ; nœud recréé entre-temps refusé |
 | **EF-10** | Publier la progression : étape, phase, pourcentage, octets, débit, ETA, annulable | Barre et texte mis à jour ; Stop grisé pendant une commande non annulable |
 | **EF-11** | Annuler entre deux blocs ou deux sondages ; ne jamais interrompre une relecture après succès firmware | Statut ARRÊTÉ ; relecture complète |
-| **EF-12** | Dé-frozen par veille système, refusé pendant un job | FROZEN levé après reprise |
+| **EF-12** | Dégel (bouton **Dégeler**) par veille système, refusé pendant un job | Gel ATA levé après reprise |
 | **EF-13** | Valider chaque étape : relecture d'échantillons (canaris, motif attendu, zéros), signatures résiduelles en tête et queue | Verdict de validation dans journaux et certificat |
 | **EF-14** | SECURITY ERASE UNIT : mot de passe aléatoire enregistré dans le coffre avant SET PASSWORD, levé après ; levée automatique au scan suivant si interrompu | Disque jamais laissé verrouillé par SecMet ; refus consigné, entrée mise de côté |
 
@@ -361,17 +361,17 @@ Entrée : capacités de la cible (média, transport, ATA/NVMe, santé, protectio
 
 Ordre des candidats : NVMe Sanitize (block, crypto), Format NVM (crypto, user data), Sanitize overwrite ; ATA SANITIZE (crypto scramble, block erase, overwrite HDD), SECURITY ERASE (enhanced, normal) ; écriture hôte. Chaque étape porte ses critères d'échec et sa spécification de relecture.
 
-| Méthode | `nist-800-88r1` (défaut) | `nist-800-88r2` |
+| Méthode | `nist-800-88r2` (seule politique depuis la 0.4.1) | `nist-800-88r1` (ancienne, jusqu'à la 0.4.0) |
 |---------|-----------------|-----------------|
 | NVMe / ATA SANITIZE | Purge | Purge |
 | Format NVM crypto | Purge | Purge |
-| Format NVM user data | Purge | Clear |
-| SECURITY ERASE enhanced (SSD) | Purge | Clear |
+| Format NVM user data | Clear | Purge |
+| SECURITY ERASE enhanced (SSD) | Clear | Purge |
 | SECURITY ERASE normal ou enhanced (HDD) | Purge | Purge |
 | SECURITY ERASE normal (SSD) | Clear | Clear |
 | Écriture hôte | Clear, jamais Purge | Clear, jamais Purge |
 
-La politique par défaut est `nist-800-88r1` (`impl Default for Policy`, `taxonomy.rs`) ; l'interface envoie toujours la politique par défaut (`PolicyId::default()`), `nist-800-88r2` n'est accessible que par le protocole du helper. Le passage par défaut à `nist-800-88r2` est prévu (§10.5).
+La politique est `nist-800-88r2` (`impl Default for Policy`, `taxonomy.rs` ; `PolicyId::default()` du protocole) : l'application envoie toujours `helper_client::APP_POLICY` (Rev. 2), la même à l'analyse et à l'exécution, et n'offre aucun choix de révision. Le certificat imprime « NIST SP 800-88 Rev. 2 (nist-800-88r2) ». L'identifiant `nist-800-88r1` (`taxonomy::LEGACY_POLICY_ID`) ne sert plus qu'à relire les certificats et sessions antérieurs ; le helper l'accepte encore dans son protocole. Comme les candidats sont triés par niveau, la politique change aussi l'ordre du plan : sur un SSD, SANITIZE et Format NVM crypto passent devant SECURITY ERASE et Format NVM user data, qui sortent Clear (effet visible depuis la 0.4.1).
 
 ### 6.6 Flux d'effacement
 
@@ -410,11 +410,11 @@ Mono-fenêtre, flux atelier (détecter → sélectionner → effacer → certifi
 | Sélection | « Tout sélectionner », total |
 | Cartes | Case, nom, bouton i, badge d'état, sous-titre, progression, Stop, vérification, Détails |
 | Bandeau de lot | Lot en cours (identifiant, opérateur, nombre d'entrées), bouton Clôturer (ou Abandonner le lot) |
-| Actions | Rafraîchir, TestDisk, Générer le PDF, Relancer les échoués, Déverrouiller, Marquer à détruire, Dé-frozen, Lancer la suppression sécurisée |
+| Actions | Rafraîchir, TestDisk, Générer le PDF, Relancer les échoués, Déverrouiller, Marquer à détruire, Dégeler, Lancer la suppression sécurisée |
 
 ### 7.3 États d'une carte
 
-Badges affichés : `INACTIF`, `ANALYSE…` (identification en cours), `EN ATTENTE`, `EN COURS`, `ARRÊT…`, `ARRÊTÉ`, `TERMINÉ`, `ÉCHEC`, `À DÉTRUIRE` (échec terminal ou disque marqué à détruire), `INDISPONIBLE` (protection), `LOCKED` (verrou ATA Security ; libellé non traduit). Un disque gelé n'a pas de badge propre : son sous-titre porte « FROZEN » (et « LOCKED » pour un verrou ATA). La vérification affiche OK / KO / non effectuée.
+Badges affichés : `INACTIF`, `ANALYSE…` (identification en cours), `EN ATTENTE`, `EN COURS`, `ARRÊT…`, `ARRÊTÉ`, `TERMINÉ`, `ÉCHEC`, `À DÉTRUIRE` (échec terminal ou disque marqué à détruire), `INDISPONIBLE` (protection), `VERROUILLÉ` (verrou ATA Security ; LOCKED en anglais, GESPERRT en allemand), `GELÉ` (effacement refusé parce que le disque est gelé ; FROZEN, EINGEFROREN). Avant l'effacement, un disque gelé n'a pas de badge propre : son sous-titre porte « gelé » (et « verrouillé » pour un verrou ATA), dans la langue de l'interface. Le terme technique « ATA Security LOCKED » des messages et les journaux (en français) ne changent pas. La vérification affiche OK / KO / non effectuée.
 
 ### 7.4 Identité visuelle
 
@@ -562,7 +562,6 @@ cargo clippy --workspace --all-targets -- -D warnings ; cargo fmt --all
 - Codes stables pour tous les messages du helper (traduction intégrale des détails d'erreur).
 - Épinglage et empreinte des outils linuxdeploy téléchargés par la construction de l'AppImage.
 - Supervision centralisée (hors périmètre actuel).
-- Politique `nist-800-88r2` par défaut, dans le code, l'interface et les certificats (prévu).
 - Évolutions de la clé USB (chiffrement de la clé de signature par une phrase de passe, etc.) : voir l'[Annexe M](Annexe_M_cle_live_lots.md).
 
 La clé USB SecMet, les lots persistants, les mises à jour signées avec installation depuis l'application et SecMet Clé USB sont réalisés (§2.1).

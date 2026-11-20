@@ -10,7 +10,7 @@ use secmet_attest::sign::SigningIdentity;
 use secmet_attest::{export, keystore};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::i18n::{self, tr_in, Lang};
@@ -133,12 +133,94 @@ pub fn open_folder(path: &Path) -> Result<(), String> {
     open_folder_in_file_manager(path)
 }
 
-/// Clé de signature du poste (`attestation-key.hex` dans le dossier de
-/// configuration : `~/.config/secmet` ou `SECMET_DATA_DIR/config`), créée au
-/// premier certificat. La clé publique est écrite à côté (`.pub`).
+/// Chemin de la clé de signature (`attestation-key.hex` dans le dossier de
+/// configuration : `~/.config/secmet` ou `SECMET_DATA_DIR/config`).
+pub(crate) fn signing_key_path() -> PathBuf {
+    crate::paths::config_file(keystore::KEY_FILE)
+}
+
+/// Création de la clé laissée à l'opérateur : `Some(état)` quand la clé
+/// manque et qu'elle ne peut pas être créée sans lui (clé perdue, ou clé
+/// USB SecMet sans clé : `secmet-first-boot` aurait dû la créer). `None`
+/// quand la clé est là, ou que c'est la toute première d'un poste.
+pub(crate) fn signing_key_needs_operator() -> Option<keystore::KeyState> {
+    operator_decision(
+        keystore::state(&signing_key_path()).ok()?,
+        crate::paths::dedicated_data_dir(),
+    )
+}
+
+/// Règle pure de [`signing_key_needs_operator`].
+fn operator_decision(state: keystore::KeyState, dedicated: bool) -> Option<keystore::KeyState> {
+    match state {
+        keystore::KeyState::Plain => None,
+        keystore::KeyState::Missing if !dedicated => None,
+        other => Some(other),
+    }
+}
+
+/// Clé de signature du poste. Jamais recréée en silence : sur un poste,
+/// seule la toute première clé (aucune `.pub` ni historique) est créée au
+/// premier certificat ; une clé perdue, ou absente sur la clé USB, attend
+/// la décision de l'opérateur (dialogue « Clé de signature absente »).
 pub(crate) fn signing_identity() -> Result<SigningIdentity, String> {
-    let path = crate::paths::config_file(keystore::KEY_FILE);
-    keystore::load_or_create(&path).map_err(|e| format!("Clé d'attestation : {e}"))
+    let path = signing_key_path();
+    if keystore::state(&path)
+        .ok()
+        .and_then(|s| operator_decision(s, crate::paths::dedicated_data_dir()))
+        .is_some()
+    {
+        return Err(i18n::tr(
+            "Clé de signature absente : aucun certificat n'est signé. \
+             Relancez SecMet pour créer une nouvelle clé.",
+        ));
+    }
+    if path.exists() {
+        return keystore::load(&path).map_err(|e| format!("Clé d'attestation : {e}"));
+    }
+    create_signing_key(keystore::CreateMode::FirstKey).or_else(|e| {
+        // Une autre instance vient de la créer : la relire.
+        if path.exists() {
+            keystore::load(&path).map_err(|e| format!("Clé d'attestation : {e}"))
+        } else {
+            Err(e)
+        }
+    })
+}
+
+/// Clé publique (64 hex) de la clé de signature, lue dans la `.pub` sans
+/// charger la clé privée.
+pub(crate) fn signing_public_key_hex() -> Result<String, String> {
+    keystore::public_key_hex(&signing_key_path()).map_err(|e| format!("Clé d'attestation : {e}"))
+}
+
+/// Crée la clé de signature : première clé d'un poste
+/// ([`keystore::CreateMode::FirstKey`]) ou remplacement d'une clé perdue
+/// demandé par l'opérateur ([`keystore::CreateMode::Replace`]). La création
+/// est notée dans `key-history.json` et sur la sortie d'erreur.
+pub(crate) fn create_signing_key(mode: keystore::CreateMode) -> Result<SigningIdentity, String> {
+    let path = signing_key_path();
+    let replaces = keystore::state(&path)
+        .ok()
+        .and_then(|s| s.previous_key_id());
+    let identity = keystore::create(&path, mode).map_err(|e| format!("Clé d'attestation : {e}"))?;
+    let entry = keystore::HistoryEntry {
+        created_at: crate::clock::stamp(),
+        key_id: identity.key_id(),
+        public_key: identity.public_key_hex(),
+        replaces: replaces.clone(),
+    };
+    if let Err(e) = keystore::record_creation(&path, entry) {
+        eprintln!("Clé d'attestation : historique non écrit : {e}");
+    }
+    eprintln!(
+        "Clé de signature des certificats créée : key_id {}{}",
+        identity.key_id(),
+        replaces
+            .map(|old| format!(" (remplace la clé perdue {old})"))
+            .unwrap_or_default()
+    );
+    Ok(identity)
 }
 
 /// Langue du PDF correspondant à celle de l'interface.
@@ -382,6 +464,10 @@ pub(crate) fn attestation_from_record(
                 .filter(|l| !l.is_empty())
                 .unwrap_or_else(|| rec.erase_method.clone()),
             nist_level,
+            // Repli d'un enregistrement ancien sans job : ces sessions ont
+            // toutes été classées en Rev. 1 (défaut avant la 0.4.1), le dire
+            // autrement serait faux. Les nouvelles portent la politique du
+            // job (Rev. 2).
             policy: job
                 .map(|j| j.policy.clone())
                 .filter(|p| !p.is_empty())
@@ -416,5 +502,30 @@ pub(crate) fn attestation_from_record(
             serial: session.bench.serial.clone(),
         },
         report_sha256: file_sha256(rec.technical_log_path.as_deref()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+    use super::*;
+    use keystore::KeyState;
+
+    #[test]
+    fn a_missing_key_is_created_alone_only_for_the_first_key_of_a_workstation() {
+        let lost = KeyState::Lost {
+            previous_public_key: None,
+        };
+        // Poste : la toute première clé se crée au premier certificat.
+        assert_eq!(operator_decision(KeyState::Missing, false), None);
+        assert_eq!(operator_decision(KeyState::Plain, false), None);
+        assert_eq!(operator_decision(lost.clone(), false), Some(lost.clone()));
+        // Clé USB : jamais de création automatique.
+        assert_eq!(
+            operator_decision(KeyState::Missing, true),
+            Some(KeyState::Missing)
+        );
+        assert_eq!(operator_decision(KeyState::Plain, true), None);
+        assert_eq!(operator_decision(lost.clone(), true), Some(lost));
     }
 }

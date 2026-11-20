@@ -151,7 +151,11 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "clear the disk's Failure mode (new inventory)",
         "den Failure-Modus des Datenträgers beenden (neue Inventur)",
     ),
-    ("dé-frozen par mise en veille", "un-freeze by suspend-to-RAM", "per Standby entsperren (frozen)"),
+    (
+        "dégeler par mise en veille",
+        "unfreeze by suspend-to-RAM",
+        "per Standby auftauen",
+    ),
     (
         "retirer le mot de passe ATA posé par un tiers",
         "remove the ATA password set by a third party",

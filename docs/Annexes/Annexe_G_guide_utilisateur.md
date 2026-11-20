@@ -8,7 +8,7 @@ Ce guide est pensé pour un **atelier** : branchement de disques, effacement, v�
 
 Une seule action : **Lancer la suppression sécurisée**. Pour chaque disque coché, le moteur établit un **plan** à partir de ce que le disque déclare (IDENTIFY DEVICE, Identify Controller, journal sanitize, état ATA Security) et des protections du système :
 
-- **Purge firmware d'abord** : NVMe Sanitize ou Format NVM, ATA SANITIZE, SECURITY ERASE UNIT (HDD et SSD SATA).
+- **Commandes firmware d'abord** : NVMe Sanitize ou Format NVM, ATA SANITIZE, SECURITY ERASE UNIT (HDD et SSD SATA). Classement NIST SP 800-88 Rev. 2 : Purge, sauf SECURITY ERASE sur SSD et Format NVM user data, classés Clear ; SANITIZE passe donc devant sur un SSD qui le supporte.
 - **Replis explicites** si une méthode est écartée (disque gelé, mot de passe tiers, pont USB) : le dialogue de confirmation affiche la méthode retenue, le nombre de replis et, le cas échéant, la dégradation (par exemple « Purge → Clear »).
 - **Écriture hôte** en dernier recours : passes pseudo-aléatoires puis zéros. Pour un HDD sans commande firmware, le dialogue propose **1 passe + zéros** (défaut, NIST Clear) ou 3 passes (choix mémorisé).
 - **Disques USB** : aucune commande firmware n'est envoyée à travers un pont USB ; écriture hôte, catégorie Clear.
@@ -40,11 +40,11 @@ Si vous aviez l'ancien paquet `shred-graphique`, au **premier lancement** de Sec
 | Bandeau d'avertissement | Rappel permanent de l'irréversibilité |
 | Avis sur l'hôte | Visible seulement si la racine du système n'a pas pu être rattachée à un disque local (média live, ZFS) : le disque système n'est alors protégé que par le verrou exclusif du noyau, vérifiez la sélection |
 | Ligne de sélection | **Tout sélectionner**, total de la capacité cochée |
-| Cartes disques | Case à cocher, nom, bouton **i** (identité, SMART, capacités), badge d'état (INACTIF, ANALYSE…, EN ATTENTE, EN COURS, ARRÊT…, ARRÊTÉ, TERMINÉ, ÉCHEC, À DÉTRUIRE, INDISPONIBLE, LOCKED), sous-titre (type, capacité, modèle, série, FROZEN, LOCKED, motif d'indisponibilité), barre de progression, bouton Stop, bouton **Marquer à détruire** (disque verrouillé ou en lecture seule) |
+| Cartes disques | Case à cocher, nom, bouton **i** (identité, SMART, capacités), badge d'état (INACTIF, ANALYSE…, EN ATTENTE, EN COURS, ARRÊT…, ARRÊTÉ, TERMINÉ, ÉCHEC, À DÉTRUIRE, INDISPONIBLE, VERROUILLÉ, GELÉ), sous-titre (type, capacité, modèle, série, gelé, verrouillé, motif d'indisponibilité), barre de progression, bouton Stop, bouton **Marquer à détruire** (disque verrouillé ou en lecture seule) |
 | Bandeau de lot | En mode lot : lot en cours (identifiant, opérateur, nombre de machines ou de disques) et bouton **Clôturer** |
-| Barre d'actions | **Rafraîchir**, **TestDisk**, **Générer le PDF**, **Relancer les échoués**, **Déverrouiller**, **Dé-frozen**, **Lancer la suppression sécurisée** |
+| Barre d'actions | **Rafraîchir**, **TestDisk**, **Générer le PDF**, **Relancer les échoués**, **Déverrouiller**, **Dégeler**, **Lancer la suppression sécurisée** |
 
-**ANALYSE…** : identification du disque en cours ; **EN ATTENTE** : disque retenu pour l'effacement, en attente de son tour ; **ARRÊT…** : arrêt demandé, en cours ; **LOCKED** (libellé non traduit) : disque verrouillé par un mot de passe ATA.
+**ANALYSE…** : identification du disque en cours ; **EN ATTENTE** : disque retenu pour l'effacement, en attente de son tour ; **ARRÊT…** : arrêt demandé, en cours ; **VERROUILLÉ** (LOCKED en anglais, GESPERRT en allemand) : disque verrouillé par un mot de passe ATA ; **GELÉ** (FROZEN, EINGEFROREN) : commandes ATA Security gelées par le BIOS, effacement firmware refusé tant que le disque n'est pas dégelé.
 
 Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis identification firmware disque par disque (modèle, série, SMART, capacités, verdict du moteur).
 
@@ -52,12 +52,12 @@ Les cartes se remplissent en deux temps : inventaire immédiat (sysfs), puis ide
 
 1. Brancher les disques (interne ou USB). Cliquer **Rafraîchir** si un disque vient d'être branché.
 2. Cocher un ou plusieurs disques. Un disque monté, membre d'un volume, support du système ou dont l'inspection a échoué reste INDISPONIBLE avec son motif.
-3. Si un disque SATA est **FROZEN** : bouton **Dé-frozen** (voir §6). Si un disque est verrouillé par un mot de passe ATA (**LOCKED**) : bouton **Déverrouiller** (voir §7).
+3. Si un disque SATA est **GELÉ** : bouton **Dégeler** (voir §6). Si un disque est verrouillé par un mot de passe ATA (**VERROUILLÉ**) : bouton **Déverrouiller** (voir §7).
 4. Cliquer **Lancer la suppression sécurisée** : le dialogue de confirmation récapitule, par disque, la méthode, la catégorie NIST et les replis ; pour un HDD en écriture hôte, choisir le nombre de passes. Confirmer.
 5. Suivre la progression : étape du plan, phase (canaris, firmware, relecture), pourcentage, débit et ETA pour l'écriture hôte, pourcentage du disque pour un sanitize, temps restant estimé pour un SECURITY ERASE (durée annoncée par le disque).
 6. **Stop** interrompt une écriture hôte entre deux blocs ou un sanitize entre deux sondages. Pendant un Format NVM ou un SECURITY ERASE UNIT, le bouton est grisé : la commande ne peut pas être interrompue (débrancher le disque la fait échouer et laisse un mot de passe que SecMet lèvera au scan suivant).
 7. À la fin de chaque disque : **Vérification : OK** (blocs relus, anomalies, signatures résiduelles) ou KO avec le bouton **Détails vérification**. Le moteur conclut sur le **sort du support** : un succès peut porter « destruction physique recommandée » (état du disque), un échec est soit **ÉCHEC** (à relancer, avec la consigne : liaison, firmware, blocage) soit **À DÉTRUIRE** (secteurs illisibles, écritures non persistantes, firmware sans effet, disque déjà condamné par le SMART). **Relancer les échoués** relance uniquement les disques en ÉCHEC, jamais ceux à détruire.
-8. Un disque **verrouillé** par un mot de passe ATA inconnu (badge LOCKED) ou **en lecture seule** n'est jamais forcé et ne peut pas être coché. Si le mot de passe du propriétaire est connu, **Déverrouiller** le lève et l'effacement devient possible. Sinon, le bouton **Marquer à détruire** de sa ligne le sort du circuit de réemploi sans rien lancer : le disque est enregistré dans la session et le lot avec le sort « destruction physique requise », le certificat est produit comme pour un échec, et le badge passe à **À DÉTRUIRE**.
+8. Un disque **verrouillé** par un mot de passe ATA inconnu (badge VERROUILLÉ) ou **en lecture seule** n'est jamais forcé et ne peut pas être coché. Si le mot de passe du propriétaire est connu, **Déverrouiller** le lève et l'effacement devient possible. Sinon, le bouton **Marquer à détruire** de sa ligne le sort du circuit de réemploi sans rien lancer : le disque est enregistré dans la session et le lot avec le sort « destruction physique requise », le certificat est produit comme pour un échec, et le badge passe à **À DÉTRUIRE**.
 
 ## 5) Certificat et archivage
 
@@ -102,15 +102,15 @@ Le programme contrôle la signature et n'accepte que les **clés de confiance** 
 
 Pour un **lot** clôturé (§8, §9), `secmet-verify --manifest L-…-manifest.json --trust <clé>` vérifie le manifeste signé et contrôle que toutes les attestations listées sont présentes et intactes dans le dossier, et qu'aucune n'a été ajoutée.
 
-## 6) Dé-frozen SATA
+## 6) Dégeler un disque SATA
 
-Sur certains PC, le BIOS/UEFI « gèle » les commandes ATA Security au démarrage (état **FROZEN**) : le disque refuse SANITIZE et SECURITY ERASE.
+Sur certains PC, le BIOS/UEFI « gèle » les commandes ATA Security au démarrage (état ATA « frozen », affiché **GELÉ**) : le disque refuse SANITIZE et SECURITY ERASE.
 
-1. Cliquer **Dé-frozen** (barre du bas) et vérifier la liste des disques gelés.
+1. Cliquer **Dégeler** (barre du bas) et vérifier la liste des disques gelés.
 2. Cliquer **Mettre en veille** : la machine entre en veille ; la réveiller (bouton d'alimentation). Le helper ré-identifie le disque à la reprise.
-3. Cliquer **Rafraîchir** pour confirmer l'absence de FROZEN.
+3. Cliquer **Rafraîchir** pour confirmer que la mention « gelé » a disparu.
 
-Le dé-frozen est refusé tant qu'un effacement est en cours. Alternatives manuelles : hot-plug SATA, mode AHCI plutôt que RAID/RST.
+Le dégel est refusé tant qu'un effacement est en cours. Alternatives manuelles : hot-plug SATA, mode AHCI plutôt que RAID/RST.
 
 ## 7) Déverrouiller un disque ATA
 
@@ -195,8 +195,8 @@ Styles centralisés dans [`resources/secmet.css`](../../resources/secmet.css) (t
 
 - **Refus « pkexec sans bit setuid » au démarrage** : pas de repli sudo ; `make fix-pkexec` ou contacter l'administrateur.
 - **Disque INDISPONIBLE** : lire le motif dans le sous-titre (monté, swap, membre d'un volume, disque système, lecture seule). Démonter ou détacher, puis **Rafraîchir**.
-- **Disque INDISPONIBLE pour blocage** (motif dans le sous-titre) : verrouillé, badge LOCKED (Déverrouiller), compteur de tentatives expiré (cycle d'alimentation), sanitize en cours ou en échec (attendre ou CLEAR via le helper au prochain scan).
-- **FROZEN** : Dé-frozen puis Rafraîchir.
+- **Disque INDISPONIBLE pour blocage** (motif dans le sous-titre) : verrouillé, badge VERROUILLÉ (Déverrouiller), compteur de tentatives expiré (cycle d'alimentation), sanitize en cours ou en échec (attendre ou CLEAR via le helper au prochain scan).
+- **GELÉ** : Dégeler puis Rafraîchir.
 - **Stop grisé** : commande firmware bloquante en cours (Format NVM, SECURITY ERASE UNIT) ; attendre la fin estimée.
 - **Vérification KO** : le firmware a acquitté sans effacer ou des signatures subsistent ; le plan passe au repli suivant automatiquement ; sinon **Relancer les échoués**.
 - **Badge À DÉTRUIRE** : le moteur a conclu qu'aucune voie logicielle ne reste (le dialogue d'échec donne la raison), ou l'opérateur a utilisé **Marquer à détruire** sur un disque verrouillé ou en lecture seule. Ne pas relancer : remettre le disque à la filière de destruction physique ; à la clôture du lot, le PDF contient un **bordereau de destruction** avec les numéros de série concernés.

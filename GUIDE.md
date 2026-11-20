@@ -14,13 +14,13 @@ Pour arrêter un effacement en cours : bouton **⏹** sur la ligne du disque (é
 
 - **ÉCHEC** : le disque peut être relancé ; **Relancer les échoués** relance uniquement les disques en ÉCHEC.
 - **À DÉTRUIRE** : aucune voie logicielle ne reste. Ne relancez pas : remettez le disque à la destruction physique.
-- Disque **verrouillé** par un mot de passe ATA (badge **LOCKED**) : si le mot de passe du propriétaire est connu, **Déverrouiller** le lève ; sinon, **Marquer à détruire** sur sa ligne l’enregistre comme « destruction physique requise » sans rien lancer.
+- Disque **verrouillé** par un mot de passe ATA (badge **VERROUILLÉ** ; LOCKED en anglais, GESPERRT en allemand) : si le mot de passe du propriétaire est connu, **Déverrouiller** le lève ; sinon, **Marquer à détruire** sur sa ligne l’enregistre comme « destruction physique requise » sans rien lancer.
 
-## Disque « frozen » (gelé)
+## Disque gelé (« frozen »)
 
-Si un SSD SATA est gelé et ne peut pas être effacé :
+Si un SSD SATA est gelé (badge ou sous-titre **GELÉ** ; FROZEN en anglais, EINGEFROREN en allemand) et ne peut pas être effacé :
 
-1. Cliquez **Dé-frozen**.
+1. Cliquez **Dégeler** (Unfreeze, Auftauen).
 2. Cliquez **Mettre en veille**, puis réveillez la machine.
 3. Cliquez **Rafraîchir**, puis relancez l’effacement.
 

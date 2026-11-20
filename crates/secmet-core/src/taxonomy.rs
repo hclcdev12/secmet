@@ -340,7 +340,9 @@ pub struct Policy {
 
 impl Policy {
     /// NIST SP 800-88 Rev. 1 (2014), annexe A : Format NVM SES 1 ou 2 et
-    /// Security Erase sont Purge.
+    /// Security Erase sont Purge. Ancienne lecture : l'application ne la
+    /// propose plus ; elle sert à relire les sessions et certificats émis
+    /// avant la 0.4.1 et reste acceptée par le helper.
     pub const fn nist_800_88_rev1() -> Self {
         Self {
             id: "nist-800-88r1",
@@ -355,8 +357,9 @@ impl Policy {
         }
     }
 
-    /// Lecture conservatrice (Rev. 2 / IEEE 2883) : Format user-data erase
-    /// et Security Erase sur SSD retombent en Clear.
+    /// NIST SP 800-88 Rev. 2 (2025), lecture conservatrice avec IEEE 2883 :
+    /// Format user-data erase et Security Erase sur SSD retombent en Clear.
+    /// Politique par défaut et seule politique proposée.
     pub const fn nist_800_88_rev2() -> Self {
         Self {
             id: "nist-800-88r2",
@@ -366,6 +369,16 @@ impl Policy {
             ata_security_erase_normal_ssd: NistLevel::Clear,
             ata_security_erase_hdd: NistLevel::Purge,
             ..Self::nist_800_88_rev1()
+        }
+    }
+
+    /// Libellé lisible d'un identifiant de politique (« NIST SP 800-88
+    /// Rev. 2 »), `None` pour un identifiant inconnu.
+    pub fn label_of(id: &str) -> Option<&'static str> {
+        match id {
+            "nist-800-88r1" => Some("NIST SP 800-88 Rev. 1"),
+            "nist-800-88r2" => Some("NIST SP 800-88 Rev. 2"),
+            _ => None,
         }
     }
 
@@ -395,9 +408,15 @@ impl Policy {
     }
 }
 
+/// Identifiant de la Rev. 1, gardé pour relire les enregistrements
+/// anciens (sessions et certificats sans politique explicite, tous classés
+/// en Rev. 1 avant la 0.4.1).
+pub const LEGACY_POLICY_ID: &str = "nist-800-88r1";
+
 impl Default for Policy {
+    /// NIST SP 800-88 Rev. 2 (décision D5 : seule politique proposée).
     fn default() -> Self {
-        Self::nist_800_88_rev1()
+        Self::nist_800_88_rev2()
     }
 }
 
@@ -405,6 +424,26 @@ impl Default for Policy {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
+
+    #[test]
+    fn default_policy_is_rev2() {
+        assert_eq!(Policy::default().id, "nist-800-88r2");
+        assert_eq!(Policy::default(), Policy::nist_800_88_rev2());
+        assert_eq!(LEGACY_POLICY_ID, Policy::nist_800_88_rev1().id);
+    }
+
+    #[test]
+    fn policy_labels_are_readable() {
+        assert_eq!(
+            Policy::label_of("nist-800-88r2"),
+            Some("NIST SP 800-88 Rev. 2")
+        );
+        assert_eq!(
+            Policy::label_of(LEGACY_POLICY_ID),
+            Some("NIST SP 800-88 Rev. 1")
+        );
+        assert_eq!(Policy::label_of("autre"), None);
+    }
 
     #[test]
     fn host_overwrite_is_never_purge_whatever_the_passes() {

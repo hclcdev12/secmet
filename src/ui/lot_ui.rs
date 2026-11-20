@@ -137,8 +137,9 @@ struct StaleCertificate {
 /// par la clé de ce poste et désigne la même session ; sinon erreur.
 fn stale_certificates(lot: &Lot) -> Result<Vec<StaleCertificate>, String> {
     let dir = lot.certificates_dir();
-    let identity = certificate::signing_identity()?;
-    let trusted = vec![identity.public_key_hex()];
+    // Clé publique seule (`.pub`) : le contrôle n'a pas besoin de la clé
+    // privée et ne la crée jamais.
+    let trusted = vec![certificate::signing_public_key_hex()?];
     let mut stale = Vec::new();
     for entry in lot
         .state()

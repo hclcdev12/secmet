@@ -8,7 +8,7 @@ Les besoins ci-dessous expriment **ce que le client attend du produit**, indépe
 
 | ID | Besoin | Priorité |
 |----|--------|----------|
-| BF-01 | L'application doit afficher la liste des disques physiques connectés au banc et leur état opérationnel (badges INACTIF, INDISPONIBLE, EN ATTENTE, ANALYSE…, EN COURS, ARRÊT…, ARRÊTÉ, TERMINÉ, ÉCHEC, LOCKED, À DÉTRUIRE ; mention FROZEN sur la carte d'un SSD SATA gelé) | Indispensable |
+| BF-01 | L'application doit afficher la liste des disques physiques connectés au banc et leur état opérationnel (badges INACTIF, INDISPONIBLE, EN ATTENTE, ANALYSE…, EN COURS, ARRÊT…, ARRÊTÉ, TERMINÉ, ÉCHEC, VERROUILLÉ, GELÉ, À DÉTRUIRE ; mention « gelé » sur la carte d'un SSD SATA gelé), traduits dans la langue de l'interface | Indispensable |
 | BF-02 | L'application doit permettre de rafraîchir la liste après branchement ou débranchement | Indispensable |
 | BF-03 | L'application doit indiquer le type de chaque disque (disque dur, SSD, USB, etc.) | Indispensable |
 | BF-04 | L'application doit empêcher l'effacement du disque sur lequel fonctionne le banc | Indispensable |

@@ -35,7 +35,7 @@ SecMet est une application **Rust** (GTK4) pour l'effacement sécurisé de disqu
 - Inventaire des disques par sysfs (transport, protections système, LVM/RAID tracés) puis identification firmware (IDENTIFY DEVICE / Identify Controller) via le helper, rafraîchissement à chaud.
 - Sélection multiple, effacements en parallèle de tous les disques cochés, arrêt d'une opération en cours (bouton **Stop**).
 - Plan décidé par le moteur `secmet-core` : Purge firmware d'abord, replis explicites, écriture hôte en dernier. HDD sans sanitize : choix des passes dans le dialogue de confirmation (défaut **1 passe + zéros**, NIST Clear ; option « historique » 3 passes).
-- **Dé-frozen** : dialogue dédié pour les disques SATA gelés (mise en veille système). **Déverrouiller** : levée d'un mot de passe ATA connu.
+- **Dégeler** : dialogue dédié pour les disques SATA gelés (mise en veille système). **Déverrouiller** : levée d'un mot de passe ATA connu.
 - Disques **USB** listés : écriture hôte uniquement (aucune commande firmware à travers un pont USB), catégorie Clear.
 - Élévation des privilèges via **PolicyKit** (`pkexec`) et helper dédié ; un seul mot de passe par session.
 
@@ -183,20 +183,22 @@ Le certificat indique la **méthode réellement obtenue** et sa **catégorie NIS
 
 ### Correspondance NIST SP 800-88
 
-Politique appliquée par défaut : `nist-800-88r1`, correspondance de la Rev. 1 ; son identifiant figure sur chaque attestation.
+Politique appliquée : `nist-800-88r2` (NIST SP 800-88 Rev. 2, lecture conservatrice avec IEEE 2883), la seule proposée depuis la 0.4.1 ; son identifiant et son libellé figurent sur chaque attestation et chaque certificat.
 
 | Méthode | Niveau NIST | Couverture |
 |---|---|---|
-| NVMe / ATA Sanitize, Format NVM ses=2/1, Security Erase (HDD, enhanced sur SSD) | **Purge** | Espace adressable + zones cachées (over-provisioning, cellules réallouées) |
-| Écriture hôte (1 ou 3 passes + zéros), Security Erase normal sur SSD | **Clear** | Espace adressable uniquement |
+| NVMe / ATA Sanitize, Format NVM ses=2 (crypto), Security Erase sur HDD | **Purge** | Espace adressable + zones cachées (over-provisioning, cellules réallouées) |
+| Écriture hôte (1 ou 3 passes + zéros), Format NVM ses=1 (user data), Security Erase (enhanced ou normal) sur SSD | **Clear** | Espace adressable uniquement |
 | TRIM seul | — | Jamais retenu comme méthode |
 
-Références : NIST SP 800-88 Rev. 2, *Guidelines for Media Sanitization* (26 septembre 2025), qui remplace la Rev. 1 — <https://csrc.nist.gov/pubs/sp/800/88/r2/final> ; NIST SP 800-88 Rev. 1 (déc. 2014), dont le tableau ci-dessus reprend les correspondances par média — <https://doi.org/10.6028/nist.sp.800-88r1>. La Rev. 2 renvoie aux techniques d'IEEE 2883 sans reprendre les tableaux par média de la Rev. 1. Le moteur contient une seconde politique, `nist-800-88r2`, plus conservatrice (Format NVM user-data erase et Security Erase sur SSD classés Clear) ; elle est acceptée par le helper mais pas encore proposée dans l'interface. Son passage en politique par défaut est prévu. SecMet n'est certifié par aucun organisme (le NIST ne certifie pas de produits) : ses méthodes sont alignées sur la norme, sans certification.
+**Effet visible depuis la 0.4.1** : un SSD SATA effacé par Security Erase et un SSD NVMe effacé par Format NVM user data sont désormais classés **Clear** (ils l'étaient Purge jusqu'à la 0.4.0) ; Sanitize, quand le disque le supporte, passe devant et donne Purge.
+
+Références : NIST SP 800-88 Rev. 2, *Guidelines for Media Sanitization* (26 septembre 2025), qui remplace la Rev. 1 — <https://csrc.nist.gov/pubs/sp/800/88/r2/final> ; NIST SP 800-88 Rev. 1 (déc. 2014) — <https://doi.org/10.6028/nist.sp.800-88r1>. La Rev. 2 renvoie aux techniques d'IEEE 2883 sans reprendre les tableaux par média de la Rev. 1. L'ancienne politique `nist-800-88r1` (tableaux de la Rev. 1 : Format NVM user data et Security Erase enhanced sur SSD classés Purge), par défaut jusqu'à la 0.4.0, ne sert plus qu'à relire et afficher les certificats et sessions antérieurs ; le helper l'accepte encore dans son protocole, l'application ne l'envoie jamais. SecMet n'est certifié par aucun organisme (le NIST ne certifie pas de produits) : ses méthodes sont alignées sur la norme, sans certification.
 
 ### Limitations
 
 - **USB** : aucune commande firmware n'est envoyée à travers un pont USB (acquittements non fiables) ; écriture hôte, catégorie Clear.
-- **Frozen (SATA)** : bouton **Dé-frozen** (veille système via le helper, disque ré-identifié à la reprise) ou hot-plug / AHCI.
+- **Frozen (SATA)** : bouton **Dégeler** (veille système via le helper, disque ré-identifié à la reprise) ou hot-plug / AHCI.
 - **Format NVM / SECURITY ERASE UNIT** : bloquants dans le pilote, non interruptibles ; le sanitize et l'écriture hôte s'interrompent entre deux sondages ou deux blocs.
 - **HDD** : SANITIZE OVERWRITE ou Security Erase donnent Purge quand le disque les supporte ; sinon écriture hôte (défaut **1 passe + zéros**, option « historique » 3 passes, mémorisée dans `~/.config/secmet/settings.json`).
 

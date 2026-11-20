@@ -13,6 +13,7 @@ mod erase;
 mod lot_ui;
 mod pdf_ui;
 mod settings_ui;
+mod signing_key_ui;
 mod testdisk_ui;
 mod types;
 mod update_ui;

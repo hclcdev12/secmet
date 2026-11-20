@@ -71,4 +71,41 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("Non disponible", "Not available", "Nicht verfügbar"),
     ("INCONNU", "UNKNOWN", "UNBEKANNT"),
     ("non effectuée", "not performed", "nicht durchgeführt"),
+    // ── signing_key_ui.rs : clé de signature absente ──
+    (
+        "Clé de signature absente",
+        "Signing key missing",
+        "Signaturschlüssel fehlt",
+    ),
+    (
+        "Clé de signature créée",
+        "Signing key created",
+        "Signaturschlüssel erstellt",
+    ),
+    (
+        "Créer une nouvelle clé",
+        "Create a new key",
+        "Neuen Schlüssel erstellen",
+    ),
+    ("inconnu", "unknown", "unbekannt"),
+    (
+        "Clé de signature absente : aucun certificat n'est signé. Relancez SecMet pour créer une nouvelle clé.",
+        "Signing key missing: no certificate is signed. Restart SecMet to create a new key.",
+        "Signaturschlüssel fehlt: Es wird kein Zertifikat signiert. Starten Sie SecMet neu, um einen neuen Schlüssel zu erstellen.",
+    ),
+    (
+        "La clé de signature des certificats de ce poste a disparu (ancien key_id : {key_id}).\n\nLes certificats déjà émis restent vérifiables avec l'ancienne clé publique, mais plus aucun certificat ne peut être signé par elle. Aucun certificat n'est signé tant qu'aucune clé n'est choisie.\n\nVous pouvez créer une nouvelle clé : elle aura un nouvel identifiant (key_id), à communiquer à vos clients pour qu'ils l'inscrivent dans leur liste de confiance (trusted-keys). Si l'ancienne clé a pu être copiée, demandez-leur aussi de retirer l'ancien identifiant.\n\nCréer une nouvelle clé de signature ?",
+        "The certificate signing key of this workstation has disappeared (previous key_id: {key_id}).\n\nCertificates already issued remain verifiable with the previous public key, but no certificate can be signed with it any more. No certificate is signed until a key is chosen.\n\nYou can create a new key: it will have a new identifier (key_id), which you must give to your customers so that they add it to their trust list (trusted-keys). If the previous key may have been copied, also ask them to remove the previous identifier.\n\nCreate a new signing key?",
+        "Der Zertifikat-Signaturschlüssel dieses Arbeitsplatzes ist verschwunden (bisherige key_id: {key_id}).\n\nBereits ausgestellte Zertifikate bleiben mit dem bisherigen öffentlichen Schlüssel prüfbar, aber kein Zertifikat kann mehr damit signiert werden. Solange kein Schlüssel gewählt ist, wird kein Zertifikat signiert.\n\nSie können einen neuen Schlüssel erstellen: Er erhält eine neue Kennung (key_id), die Sie Ihren Kunden mitteilen, damit sie sie in ihre Vertrauensliste (trusted-keys) aufnehmen. Falls der bisherige Schlüssel kopiert worden sein könnte, bitten Sie sie auch, die bisherige Kennung zu entfernen.\n\nNeuen Signaturschlüssel erstellen?",
+    ),
+    (
+        "Cette clé USB SecMet n'a pas de clé de signature des certificats (elle est normalement créée au premier démarrage). Aucun certificat n'est signé tant qu'aucune clé n'est créée.\n\nSi cette clé USB a déjà signé des certificats, sa clé de signature a été perdue : une nouvelle clé aura un nouvel identifiant (key_id), à communiquer à vos clients pour qu'ils l'inscrivent dans leur liste de confiance (trusted-keys).\n\nCréer une clé de signature ?",
+        "This SecMet USB key has no certificate signing key (it is normally created at first boot). No certificate is signed until a key is created.\n\nIf this USB key has already signed certificates, its signing key has been lost: a new key will have a new identifier (key_id), which you must give to your customers so that they add it to their trust list (trusted-keys).\n\nCreate a signing key?",
+        "Dieser SecMet-USB-Stick hat keinen Zertifikat-Signaturschlüssel (er wird normalerweise beim ersten Start erstellt). Solange kein Schlüssel erstellt ist, wird kein Zertifikat signiert.\n\nFalls dieser USB-Stick bereits Zertifikate signiert hat, ist sein Signaturschlüssel verloren: Ein neuer Schlüssel erhält eine neue Kennung (key_id), die Sie Ihren Kunden mitteilen, damit sie sie in ihre Vertrauensliste (trusted-keys) aufnehmen.\n\nSignaturschlüssel erstellen?",
+    ),
+    (
+        "Nouvelle clé de signature créée.\n\nkey_id : {key_id}\nClé publique : {public_key}\n\nCommuniquez ce nouvel identifiant à vos clients : il figure aussi sur chaque certificat signé avec cette clé.",
+        "New signing key created.\n\nkey_id: {key_id}\nPublic key: {public_key}\n\nGive this new identifier to your customers: it also appears on every certificate signed with this key.",
+        "Neuer Signaturschlüssel erstellt.\n\nkey_id: {key_id}\nÖffentlicher Schlüssel: {public_key}\n\nTeilen Sie diese neue Kennung Ihren Kunden mit: Sie steht auch auf jedem mit diesem Schlüssel signierten Zertifikat.",
+    ),
 ];

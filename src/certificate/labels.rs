@@ -122,7 +122,7 @@ pub fn guidance_label(code: &str) -> String {
         "PowerCycle" => tr("couper puis remettre l'alimentation du disque"),
         "WaitForSanitize" => tr("attendre la fin du sanitize en cours"),
         "ClearSanitizeFailure" => tr("sortir le disque du mode Failure (nouvel inventaire)"),
-        "SuspendToRam" => tr("dé-frozen par mise en veille"),
+        "SuspendToRam" => tr("dégeler par mise en veille"),
         "RemoveForeignPassword" => tr("retirer le mot de passe ATA posé par un tiers"),
         "AttachNatively" => tr("brancher le disque en SATA natif plutôt que sur un pont USB"),
         other => other.to_string(),

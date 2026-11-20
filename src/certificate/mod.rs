@@ -12,8 +12,11 @@ pub use labels::{
     disposition_label, disposition_label_in, guidances_label, media_label, method_label,
     pdf_result_from_success_flag, pdf_result_label, reasons_label,
 };
+pub(crate) use pdf::{
+    create_signing_key, pdf_lang, render_pdf_bundle_in, signing_identity,
+    signing_key_needs_operator, signing_public_key_hex,
+};
 pub use pdf::{open_certificates_folder, open_folder, open_pdf, render_pdf_bundle};
-pub(crate) use pdf::{pdf_lang, render_pdf_bundle_in, signing_identity};
 
 use crate::app_identity::{CERT_ID_PREFIX, PKG_NAME};
 use crate::disk::Disk;

@@ -148,7 +148,7 @@ pub struct ErasureFacts {
     pub method_label: String,
     /// Catégorie NIST revendiquée.
     pub nist_level: NistLevel,
-    /// Politique de classification (`nist-800-88r1`).
+    /// Politique de classification (`nist-800-88r2` ; `nist-800-88r1` pour les certificats antérieurs à la 0.4.1).
     pub policy: String,
     /// Issue.
     pub outcome: Outcome,

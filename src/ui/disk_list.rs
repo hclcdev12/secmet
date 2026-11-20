@@ -255,12 +255,12 @@ pub(super) fn disk_subtitle_text(disk: &Disk, can_shred: bool, reason: &str) -> 
         text.push_str(&tr(" — USB (écriture hôte)"));
     }
     if disk.is_locked == Some(true) {
-        text.push_str(" — LOCKED");
+        text.push_str(&tr(" — verrouillé"));
     } else if disk.security_enabled == Some(true) {
         text.push_str(&tr(" — mot de passe ATA actif"));
     }
     if disk.is_frozen == Some(true) {
-        text.push_str(" — FROZEN");
+        text.push_str(&tr(" — gelé"));
     }
     if let Some(recovery) = &disk.recovery {
         text.push_str(&if recovery.recovered() {

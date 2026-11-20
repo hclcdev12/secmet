@@ -56,6 +56,12 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ),
     // ── enrichment.rs / disk_list.rs : badges et sous-titres ──
     ("INACTIF", "IDLE", "INAKTIV"),
+    // Verrou et gel ATA Security (badges et sous-titres) ; le terme technique
+    // « ATA Security LOCKED » des messages reste tel quel.
+    ("VERROUILLÉ", "LOCKED", "GESPERRT"),
+    ("GELÉ", "FROZEN", "EINGEFROREN"),
+    (" — verrouillé", " — locked", " — gesperrt"),
+    (" — gelé", " — frozen", " — eingefroren"),
     ("INDISPONIBLE", "UNAVAILABLE", "NICHT VERFÜGBAR"),
     ("ANALYSE…", "ANALYZING…", "ANALYSE…"),
     (" — Inspection…", " — Inspecting…", " — Prüfung…"),
@@ -109,8 +115,12 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "❌ No disk detected",
         "❌ Kein Datenträger erkannt",
     ),
-    // ── dialogs.rs : dé-frozen ──
-    ("Dé-frozen SATA", "SATA un-freeze", "SATA-Auftauen"),
+    // ── dialogs.rs : dégel SATA ──
+    (
+        "Dégeler les disques SATA",
+        "Unfreeze SATA disks",
+        "SATA-Datenträger auftauen",
+    ),
     (
         "Le BIOS/UEFI peut geler les commandes ATA Security (état « frozen ») au démarrage.\n\nProcédure :\n1. Vérifier la liste des disques gelés ci-dessous.\n2. Cliquer « Mettre en veille » : la machine s'endort quelques secondes et se réveille d'elle-même ; le gel est levé sur la plupart des machines.\n3. Cliquer « Rafraîchir » pour mettre à jour les cartes.\n\nSi l'écran reste noir au réveil, maintenir le bouton d'alimentation pour éteindre, puis redémarrer : rien n'est perdu (le lot est conservé). Sans dégel, l'effacement par écriture (NIST Clear) reste possible ; sur un SSD qui supporte SANITIZE, le gel n'empêche pas le Purge.",
         "The BIOS/UEFI may freeze ATA Security commands (\"frozen\" state) at boot.\n\nProcedure:\n1. Check the list of frozen disks below.\n2. Click \"Suspend\": the machine sleeps for a few seconds and wakes up by itself; the freeze is lifted on most machines.\n3. Click \"Refresh\" to update the cards.\n\nIf the screen stays black after waking, hold the power button to switch off, then restart: nothing is lost (the batch is kept). Without un-freezing, host-write erasure (NIST Clear) remains possible; on an SSD that supports SANITIZE, the freeze does not prevent Purge.",
@@ -133,7 +143,7 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Administrator session missing",
         "Administratorsitzung fehlt",
     ),
-    ("Dé-frozen", "Un-freeze", "Auftauen"),
+    ("Dégeler", "Unfreeze", "Auftauen"),
     (
         "Le disque est encore gelé après la reprise.\nEssayez un hot-plug SATA ou le mode AHCI dans le BIOS.",
         "The disk is still frozen after resume.\nTry a SATA hot-plug or AHCI mode in the BIOS.",
@@ -310,9 +320,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "{disk} kann nicht gelöscht werden",
     ),
     (
-        "Terminez ou attendez la fin des effacements avant d'utiliser Dé-frozen.",
-        "Finish or wait for the erasures to complete before using Un-freeze.",
-        "Beenden Sie die Löschvorgänge oder warten Sie deren Ende ab, bevor Sie Auftauen verwenden.",
+        "Terminez ou attendez la fin des effacements avant d'utiliser « Dégeler ».",
+        "Finish or wait for the erasures to complete before using “Unfreeze”.",
+        "Beenden Sie die Löschvorgänge oder warten Sie deren Ende ab, bevor Sie „Auftauen“ verwenden.",
     ),
     (
         "Opérations en cours",

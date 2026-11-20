@@ -27,13 +27,16 @@ use crate::error::{HelperError, Opener};
 pub const MAX_MESSAGE_BYTES: usize = 1 << 20;
 
 /// Politique de classification demandée par l'UI.
+///
+/// L'application envoie toujours la Rev. 2 (décision D5) ; la Rev. 1 reste
+/// acceptée pour la compatibilité du protocole.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum PolicyId {
-    /// NIST SP 800-88 Rev. 1 (défaut).
-    #[default]
+    /// NIST SP 800-88 Rev. 1 (ancienne lecture, plus proposée).
     Nist80088r1,
-    /// Lecture conservatrice Rev. 2 / IEEE 2883.
+    /// NIST SP 800-88 Rev. 2, lecture conservatrice avec IEEE 2883 (défaut).
+    #[default]
     Nist80088r2,
 }
 
@@ -430,7 +433,7 @@ mod tests {
             Command::ExecutePlan {
                 token: "t".into(),
                 confirm_serial: "S".into(),
-                policy: PolicyId::default(),
+                policy: PolicyId::Nist80088r1,
                 preferences: PreferencesWire {
                     host_passes: 3,
                     ..PreferencesWire::default()
@@ -482,6 +485,18 @@ mod tests {
             serde_json::from_str(r#"{"id":7,"cmd":{"type":"ScanDevice","device":"sdb"}}"#).unwrap();
         assert!(matches!(
             minimal.cmd,
+            Command::ScanDevice {
+                policy: PolicyId::Nist80088r2,
+                ..
+            }
+        ));
+        // La Rev. 1 reste acceptée quand elle est demandée explicitement.
+        let legacy: Request = serde_json::from_str(
+            r#"{"id":8,"cmd":{"type":"ScanDevice","device":"sdb","policy":"nist80088r1"}}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            legacy.cmd,
             Command::ScanDevice {
                 policy: PolicyId::Nist80088r1,
                 ..
@@ -568,6 +583,11 @@ mod tests {
         assert_eq!(engine.host_passes, 2);
         assert!(!engine.allow_host_fallback);
         assert_eq!(PolicyId::Nist80088r2.policy().id, "nist-800-88r2");
+        assert_eq!(PolicyId::default(), PolicyId::Nist80088r2);
+        assert_eq!(
+            PolicyId::default().policy(),
+            secmet_core::taxonomy::Policy::default()
+        );
         assert_eq!(
             serde_json::to_string(&PolicyId::Nist80088r1).unwrap(),
             "\"nist80088r1\""

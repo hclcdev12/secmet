@@ -1,4 +1,4 @@
-//! Dialogues GTK (erreur, confirmation, dé-frozen, déverrouillage ATA).
+//! Dialogues GTK (erreur, confirmation, dégel SATA, déverrouillage ATA).
 use gtk4::prelude::*;
 use gtk4::{
     ApplicationWindow, Box as GtkBox, Button, ButtonsType, CheckButton, ComboBoxText, Dialog,
@@ -23,7 +23,7 @@ pub(super) fn show_defrozen_dialog(
     operations_active: Rc<Cell<bool>>,
 ) {
     let dialog = Dialog::builder()
-        .title(tr("Dé-frozen SATA"))
+        .title(tr("Dégeler les disques SATA"))
         .modal(true)
         .transient_for(parent)
         .build();
@@ -117,7 +117,7 @@ pub(super) fn show_defrozen_dialog(
                     if outcome.still_frozen {
                         show_error_dialog(
                             &parent,
-                            &tr("Dé-frozen"),
+                            &tr("Dégeler"),
                             &tr("Le disque est encore gelé après la reprise.\n\
                                  Essayez un hot-plug SATA ou le mode AHCI dans le BIOS."),
                         );
