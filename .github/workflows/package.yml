@@ -48,8 +48,10 @@ name: Package
 on:
   push:
     branches: ["main"]
-    # vX.Y.Z publie ; vX.Y.Z-rcN construit tout (paquets, image, .exe)
-    # sans créer la release (répétition générale, Annexe N §N.9).
+    # vX.Y.Z publie ; vX.Y.Z-rcN construit et signe tout (paquets, image,
+    # .exe) et le publie en pré-release, jamais « Latest » : le canal de mise
+    # à jour (releases/latest) et les « deux cadences » l'ignorent
+    # (répétition générale, Annexe N §N.9).
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"]
   pull_request:
     branches: ["main"]
@@ -466,7 +468,7 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && !contains(inputs.tag || github.ref_name, '-rc') && needs.deb.result == 'success' && needs.deb-install.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.deb-install.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
     needs: [deb, deb-install, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
     runs-on: ubuntu-latest
     # Seul travail qui lit la clé de version et écrit la release.
@@ -508,6 +510,9 @@ jobs:
         run: |
           tag="$RELEASE_TAG"
           version="${tag#v}"
+          # Candidate vX.Y.Z-rcN : mêmes sources et mêmes noms de fichiers
+          # que la version visée.
+          version="${version%-rc*}"
           cargo_version="$(grep -m1 '^version' Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
           test "$version" = "$cargo_version" || { echo "tag $tag ≠ Cargo.toml $cargo_version"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -638,12 +643,19 @@ jobs:
           # Brouillon d'abord, publié seulement si chaque fichier y est :
           # « latest » ne pointe jamais sur une release incomplète.
           mapfile -t files < <(sed 's|^|release/|' assets.txt)
-          gh release create "$RELEASE_TAG" --repo "$repo" --title "SecMet $v" \
-            --notes-file notes.md --draft "${files[@]}"
+          # Candidate -rc : pré-release, jamais « Latest ».
+          pre=()
+          case "$RELEASE_TAG" in *-rc*) pre=(--prerelease) ;; esac
+          gh release create "$RELEASE_TAG" --repo "$repo" --title "SecMet ${RELEASE_TAG#v}" \
+            --notes-file notes.md --draft "${pre[@]}" "${files[@]}"
           gh release view "$RELEASE_TAG" --repo "$repo" --json assets --jq '.assets[].name' | sort > sent.txt
           if ! cmp -s assets.txt sent.txt; then
             echo "brouillon incomplet, laissé en brouillon :"; diff assets.txt sent.txt || true
             exit 1
           fi
-          gh release edit "$RELEASE_TAG" --repo "$repo" --draft=false
+          if [ "${#pre[@]}" -gt 0 ]; then
+            gh release edit "$RELEASE_TAG" --repo "$repo" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --repo "$repo" --draft=false
+          fi
           echo "release $RELEASE_TAG publiée ($(wc -l < sent.txt) fichiers)"
