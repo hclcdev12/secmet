@@ -332,6 +332,28 @@ mod tests {
     }
 
     #[test]
+    fn live_key_app_update_trusts_the_same_keys() {
+        // secmet-app-update (clé USB, au démarrage) vérifie le magasin app/
+        // avec sa propre liste TRUST_KEYS : elle doit rester celle-ci.
+        let script = include_str!("../packaging/live/overlay/usr/local/bin/secmet-app-update");
+        let block = script
+            .split("TRUST_KEYS=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap();
+        let mut script_keys: Vec<String> = block
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(str::to_string)
+            .collect();
+        let mut keys = trusted_release_keys();
+        script_keys.sort();
+        keys.sort();
+        assert_eq!(script_keys, keys);
+    }
+
+    #[test]
     fn availability_follows_installed_version() {
         let id = SigningIdentity::from_seed(&[4u8; 32]);
         let newer = UpdateState {

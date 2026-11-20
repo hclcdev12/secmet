@@ -1450,4 +1450,35 @@ mod tests {
             .finish_machine(99, EntryStatus::Finished, vec![])
             .is_err());
     }
+
+    /// Format lu en `sh` par `secmet-app-update` (clé USB, décision D14) :
+    /// statut et logiciel du lot sur une ligne indentée de deux espaces,
+    /// statuts des entrées machine plus indentés.
+    #[test]
+    fn lot_json_format_read_by_live_app_update() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut lot = Lot::open(
+            tmp.path(),
+            "Jean",
+            "",
+            &crate::certificate::software_line(),
+            LotScope::Machines,
+        )
+        .unwrap();
+        let e = lot.start_machine(machine("PC1"), vec![], "SEC-1").unwrap();
+        lot.finish_machine(e, EntryStatus::Finished, vec![])
+            .unwrap();
+        let read = |lot: &Lot| fs::read_to_string(lot.dir.join(LOT_FILE)).unwrap();
+        let text = read(&lot);
+        let software = format!("  \"software\": \"secmet {}\",", env!("CARGO_PKG_VERSION"));
+        assert!(text.lines().any(|l| l == software), "{text}");
+        let top_status: Vec<&str> = text
+            .lines()
+            .filter(|l| l.starts_with("  \"status\": "))
+            .collect();
+        assert_eq!(top_status, ["  \"status\": \"open\","], "{text}");
+        assert!(text.lines().any(|l| l == "      \"status\": \"finished\","));
+        lot.close(&"0".repeat(64)).unwrap();
+        assert!(read(&lot).lines().any(|l| l == "  \"status\": \"closed\","));
+    }
 }

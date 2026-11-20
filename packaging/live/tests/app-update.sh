@@ -4,7 +4,9 @@
 # par des doublures dans le PATH (mountpoint, dpkg-query, dpkg, secmet-release,
 # dpkg-deb, logger). Vérifie l'ordre des versions (la plus récente d'abord,
 # régression du 2026-11-06), le repli sur signature invalide ou installation
-# échouée, et les cas « rien à faire ».
+# échouée, les cas « rien à faire », la garde « lot ouvert » (décision D14 :
+# lot ouvert sous la version déployée, sous l'ancienne, sans version lisible,
+# clôturé, plusieurs lots) et le passage de toutes les clés de version.
 #
 # usage : packaging/live/tests/app-update.sh        (code 0 si tout passe)
 set -euo pipefail
@@ -37,9 +39,21 @@ cat > "$BIN/dpkg" <<'SH'
 SH
 cat > "$BIN/secmet-release" <<'SH'
 #!/bin/sh
-# verify <dir> --trust <clé> --file <nom> : invalide si <dir>/INVALID existe.
-echo "verify $2 $6" >> "$FAKE_CALLS"
-[ ! -f "$2/INVALID" ]
+# verify <dir> [--trust <clé>]... --file <nom> : invalide si <dir>/INVALID
+# existe. Les clés reçues vont dans $FAKE_TRUST, une par ligne.
+[ "$1" = verify ] || exit 2
+dir=$2; shift 2
+file=
+: > "$FAKE_TRUST"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --trust) echo "$2" >> "$FAKE_TRUST"; shift 2 ;;
+        --file) file=$2; shift 2 ;;
+        *) exit 2 ;;
+    esac
+done
+echo "verify $dir $file" >> "$FAKE_CALLS"
+[ ! -f "$dir/INVALID" ]
 SH
 cat > "$BIN/dpkg-deb" <<'SH'
 #!/bin/sh
@@ -65,10 +79,41 @@ setup() {
         printf 'deb' > "$T/data/app/$v/secmet_${v}.ubuntu24.04_amd64.deb"
     done
     export FAKE_CALLS="$T/calls" FAKE_DEPLOYED="$T/deployed" FAKE_LOGGER="$T/logger" FAKE_MOUNTED=1
-    : > "$FAKE_CALLS"; : > "$FAKE_DEPLOYED"; : > "$FAKE_LOGGER"
+    export FAKE_TRUST="$T/trust"
+    : > "$FAKE_CALLS"; : > "$FAKE_DEPLOYED"; : > "$FAKE_LOGGER"; : > "$FAKE_TRUST"
+}
+lot() {
+    # lot <identifiant> <statut> <version|-> : lot.json au format de
+    # serde_json::to_string_pretty (src/lot.rs), avec une entrée machine
+    # dont le statut, plus indenté, ne doit pas être pris pour celui du lot.
+    # Version « - » : champ software absent.
+    local d="$T/data/lots/$1" sw=""
+    mkdir -p "$d"
+    [ "$3" = - ] || sw="  \"software\": \"secmet $3\",
+"
+    cat > "$d/lot.json" <<JSON
+{
+  "version": 1,
+  "id": "$1",
+  "operator": "Jean",
+  "reference": "",
+${sw}  "opened_at": "2026-11-20 09:00:00",
+  "closed_at": null,
+  "status": "$2",
+  "scope": "machines",
+  "entries": [
+    {
+      "id": 1,
+      "status": "finished",
+      "certificates": []
+    }
+  ],
+  "next_entry_id": 2
+}
+JSON
 }
 run() {
-    PATH="$BIN:$PATH" SECMET_APP_UPDATE_DATA="$T/data" SECMET_APP_UPDATE_RUN="$T/run" sh "$SCRIPT"
+    PATH="$BIN:$PATH" SECMET_APP_UPDATE_DATA="$T/data" SECMET_APP_UPDATE_RUN="$T/run" sh "${1:-$SCRIPT}"
 }
 deployed() { sed 's#.*/app/\([^/]*\)/.*#\1#' "$FAKE_DEPLOYED" | tr '\n' ' ' | sed 's/ $//'; }
 check() {
@@ -135,6 +180,75 @@ rm -rf "$T/data/app"
 run
 check "app/ recréé" "oui" "$([ -d "$T/data/app" ] && echo oui || echo non)"
 check "rien déployé" "" "$(deployed)"
+
+echo "# lot ouvert sous la version du magasin : déployée"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA open 0.3.10
+run
+check "déploie 0.3.10" "0.3.10" "$(deployed)"
+
+echo "# lot ouvert sous la version installée (ancienne) : reportée"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA open 0.3.9
+run
+check "rien déployé" "" "$(deployed)"
+check "aucune vérification" "" "$(cat "$FAKE_CALLS")"
+has "journal : reportée" "version 0.3.10 reportée : lot L-20261120-AAAA ouvert sous secmet 0.3.9 ; déploiement au démarrage qui suivra sa clôture"
+check "pas de marqueur" "non" "$([ -e "$T/run/secmet-app-update.version" ] && echo oui || echo non)"
+
+echo "# lot ouvert sous une version intermédiaire du magasin : celle du lot"
+setup 0.3.8 0.3.9 0.3.10
+lot L-20261120-AAAA open 0.3.9
+run
+check "déploie 0.3.9" "0.3.9" "$(deployed)"
+has "journal : 0.3.10 reportée" "version 0.3.10 reportée : lot L-20261120-AAAA"
+
+echo "# lot ouvert sans version lisible (version inconnue) : reportée"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA open -
+run
+check "rien déployé" "" "$(deployed)"
+has "journal : version inconnue" "version 0.3.10 reportée : lot L-20261120-AAAA ouvert sous secmet ?"
+
+echo "# lot sans statut lisible : compté comme ouvert"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA open 0.3.9
+sed -i '/^  "status"/d' "$T/data/lots/L-20261120-AAAA/lot.json"
+run
+check "rien déployé" "" "$(deployed)"
+
+echo "# pas de lot (dossier lots/ vide ou absent) : déployée"
+setup 0.3.9 0.3.10
+mkdir -p "$T/data/lots"
+run
+check "déploie 0.3.10" "0.3.10" "$(deployed)"
+
+echo "# lot clôturé ou abandonné sous l'ancienne version : déployée"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA closed 0.3.9
+lot L-20261120-BBBB abandoned 0.3.9
+run
+check "déploie 0.3.10" "0.3.10" "$(deployed)"
+
+echo "# plusieurs lots ouverts : tous doivent être sous la version"
+setup 0.3.9 0.3.10
+lot L-20261120-AAAA open 0.3.10
+lot L-20261120-BBBB open 0.3.9
+run
+check "rien déployé" "" "$(deployed)"
+has "journal : lot bloquant nommé" "lot L-20261120-BBBB ouvert sous secmet 0.3.9"
+
+echo "# clés de version : chacune passée à secmet-release"
+setup 0.3.9 0.3.10
+run
+check "clés du script" "$(sed -n '/^TRUST_KEYS="/,/^"/p' "$SCRIPT" | grep -E '^[0-9a-f]{64}$')" "$(cat "$FAKE_TRUST")"
+check "une clé au moins" "oui" "$([ -s "$FAKE_TRUST" ] && echo oui || echo non)"
+sed '/^TRUST_KEYS="/a\
+0000000000000000000000000000000000000000000000000000000000000001' "$SCRIPT" > "$T/two-keys"
+setup 0.3.9 0.3.10
+run "$T/two-keys"
+check "deux clés passées" "2" "$(wc -l < "$FAKE_TRUST" | tr -d ' ')"
+check "déploie 0.3.10 avec deux clés" "0.3.10" "$(deployed)"
 
 echo "# partition non montée : sortie silencieuse"
 setup 0.3.7 0.3.10
