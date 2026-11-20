@@ -70,12 +70,14 @@ Avec `SECMET_DATA_DIR=/chemin` (clé live, annexe M), `~/.config/secmet/` devien
 make deb        # dist/secmet_<version>_amd64.deb (TestDisk embarqué sous /usr/lib/secmet/)
 make rpm        # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
 make appimage   # dist/SecMet_<version>_x86_64.AppImage, assemblée dans un conteneur Ubuntu 24.04
-make live       # dist/live/ : image de la clé USB SecMet (conteneur privilégié) ; make live-key DEV=/dev/sdX l'écrit
+make live       # dist/live/ : image de la clé USB SecMet (conteneur Debian 13 privilégié) ; make live-key DEV=/dev/sdX l'écrit
 make release    # dist/release/<version>/ : les 14 fichiers (5 paquets fumés en conteneurs : .deb 24.04 et 22.04, .rpm fc44 et fc42, AppImage ; SecMet Clé USB AppImage et .exe ; secmet-verify et secmet-release autonomes ; .img.xz et .tar de la clé ; SHA256SUMS(.sig), latest.json signés)
 make publish    # idem, puis release GitHub (confirmation) ; n'envoie pas encore .img.xz ni .tar (release.sh, liste assets) ; le push d'un tag vX.Y.Z suffit (package.yml)
 ```
 
 L'AppImage **doit** être assemblée dans le conteneur (`packaging/appimage.Containerfile`) : les bibliothèques GTK embarquées sont liées à la glibc de la machine de construction, et le banc est en glibc 2.39. Voir [Annexe H](Annexes/Annexe_H_deploiement_banc.md).
+
+Historique des entrées de démarrage de la clé (`packaging/live/grub.cfg`, dont les commentaires ne portent plus ni date ni modèle) : le gel au réveil constaté le 2026-11-02 sur un HP ProBook 455 G3 venait de `nomodeset`, pas de la racine sur la clé ; la veille du dé-frozen avec la racine sur la clé y a été vérifiée le 2026-11-05.
 
 La CI GitHub Actions (`ci.yml`, `fuzz.yml`, `package.yml`) rejoue fmt, clippy, tests, `cargo audit`, shellcheck, fuzzing et construction des paquets ; détail dans le [README](../README.md#intégration-continue).
 
