@@ -381,6 +381,9 @@ jobs:
         run: |
           ./packaging/live/bundle_live.sh
           tar -tf dist/secmet-live_*_x86_64.tar | grep -E 'filesystem.squashfs|secmet-make-key.sh|secmet-release$|packages.manifest$'
+          # Licences et offre de sources (B4) dans le livrable.
+          tar -tf dist/secmet-live_*_x86_64.tar | grep -E '/LICENCES/(LISEZMOI-LICENCES|OFFRE_SOURCES).txt$|/LICENSE$'
+          tar -xOf dist/secmet-live_*_x86_64.tar --wildcards '*/LISEZMOI.txt' | grep -q OFFRE
 
       - name: Script de mise à jour au démarrage (doublures)
         run: ./packaging/live/tests/app-update.sh

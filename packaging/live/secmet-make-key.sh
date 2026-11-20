@@ -119,10 +119,12 @@ mkdir -p "$MNT/sys" "$MNT/data"
 # --- Partition système ---------------------------------------------------------
 echo "Système : noyau, initrd, squashfs, GRUB…"
 mount "$SYS" "$MNT/sys"
-rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot"
+rm -rf "$MNT/sys/live" "$MNT/sys/EFI" "$MNT/sys/boot" "$MNT/sys/LICENCES"
 mkdir -p "$MNT/sys/live" "$MNT/sys/EFI/BOOT" "$MNT/sys/boot/grub"
 cp "$LIVE_DIR/vmlinuz" "$LIVE_DIR/initrd.img" "$LIVE_DIR/filesystem.squashfs" "$MNT/sys/live/"
 cp "$ROOT_DIR/packaging/live/grub.cfg" "$MNT/sys/boot/grub/grub.cfg"
+# Licences et offre de sources de l'image (licences.sh), comme l'image publiée.
+[[ -d "$LIVE_DIR/licenses" ]] && cp -r "$LIVE_DIR/licenses" "$MNT/sys/LICENCES"
 # UEFI : chaîne signée Debian (shim + grub signé + MokManager) copiée telle
 # quelle, lisible avec Secure Boot. grub.cfg aux trois endroits, identiques
 # (comme make_key_image.sh) : le grub signé de Debian lit $prefix/grub.cfg

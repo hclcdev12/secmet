@@ -410,14 +410,6 @@ cp "$(ls -1 "$ROOTFS"/boot/initrd.img-* | sort -V | tail -1)" "$OUT/initrd.img"
 initrd_mb=$(( $(stat -c %s "$OUT/initrd.img") / 1048576 ))
 echo "initrd : ${initrd_mb} Mo"
 [[ "$initrd_mb" -le 120 ]] || { echo "initrd de ${initrd_mb} Mo : crochet zz-secmet-trim non appliqué ?" >&2; exit 1; }
-# /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
-# embarqué : la clé démarre sur les copies de la partition système.
-# -wildcards : sans lui, les motifs -e sont pris au pied de la lettre.
-# zstd 19 plutôt que xz : 19 Mo de plus à copier (725 contre 706), mais une
-# décompression trois fois plus rapide, et c'est elle qui coûte sur les
-# processeurs lents (session XFCE, base dpkg, services) : mesuré le 2026-11-05.
-mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
-    -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
 # Chaîne UEFI : jamais « la version du jour » ; fetch_efi.sh échoue si une
 # version, une empreinte ou un émetteur diffère de efi-pin.sha256.
 step "Chaîne UEFI épinglée (shim, MokManager, GRUB)"
@@ -454,6 +446,20 @@ for must in linux-image-amd64 testdisk secmet live-boot shim-signed shim-helpers
 done
 [[ "$n_manifest" -ge 500 ]] || { echo "manifeste : $n_manifest paquets seulement" >&2; exit 1; }
 echo "packages.manifest : $n_manifest paquets"
+# Licences et offre de sources (B4) : LICENCES/ de la partition de
+# démarrage et du livrable, résumé dans /usr/share/doc/secmet-live/ du
+# système (avant le squashfs).
+step "Licences"
+SRC="$SRC" "$SRC/packaging/live/licences.sh" "$ROOTFS" "$EFI_PKG" "$OUT/packages.manifest" "$OUT" "$VERSION"
+step "squashfs"
+# /boot (noyau, initrd, System.map : 220 Mo incompressibles) n'est pas
+# embarqué : la clé démarre sur les copies de la partition système.
+# -wildcards : sans lui, les motifs -e sont pris au pied de la lettre.
+# zstd 19 plutôt que xz : 19 Mo de plus à copier (725 contre 706), mais une
+# décompression trois fois plus rapide, et c'est elle qui coûte sur les
+# processeurs lents (session XFCE, base dpkg, services) : mesuré le 2026-11-05.
+mksquashfs "$ROOTFS" "$OUT/filesystem.squashfs" -comp zstd -Xcompression-level 19 -b 1M -noappend -quiet \
+    -wildcards -e 'boot/*' >/tmp/squash.log 2>&1 || { tail -10 /tmp/squash.log; exit 1; }
 cp -a /usr/lib/grub/i386-pc/. "$OUT/bios/"
 chmod 0644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs "$OUT"/efi/*
 echo "secmet $(dpkg-deb -f "$DEB" Version) ; noyau $(basename "$(ls -1 "$ROOTFS"/boot/vmlinuz-* | sort -V | tail -1)")" > "$OUT/VERSION"

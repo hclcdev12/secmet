@@ -88,6 +88,7 @@ echo "== livrable précédent"
 tar -C "$WORK" -xf "$TAR"
 PREV_DIR="$WORK/secmet-live-$PREV_VERSION"
 [[ -f "$PREV_DIR/dist/live/filesystem.squashfs" && -f "$PREV_DIR/dist/live/VERSION" ]] || die "livrable sans dist/live complet"
+[[ -d "$PREV_DIR/dist/live/licenses" ]] || die "livrable $PREV_VERSION sans licences de l'image (image antérieure à Debian 13) : construction complète (--full-live, full_live)"
 [[ -f "$PREV_DIR/dist/live/packages.manifest" ]] || die "livrable $PREV_VERSION sans manifeste des paquets (image antérieure à Debian 13) : construction complète (--full-live, full_live)"
 echo "  système : $(cat "$PREV_DIR/dist/live/VERSION")"
 

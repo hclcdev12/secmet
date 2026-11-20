@@ -40,6 +40,7 @@ fi
 for f in vmlinuz initrd.img efi/shimx64.efi efi/grubx64.efi efi/mmx64.efi; do
     [[ -f "$LIVE/$f" ]] || die "$LIVE/$f absent"
 done
+[[ -f "$LIVE/licenses/LISEZMOI-LICENCES.txt" ]] || die "$LIVE/licenses absent (image antérieure aux licences sur la clé : construction complète, make live ou --full-live)"
 [[ -f "$LIVE/packages.manifest" ]] || die "$LIVE/packages.manifest absent (image antérieure au manifeste des paquets : construction complète, make live ou --full-live)"
 
 NAME="secmet-live-$VERSION"
@@ -49,11 +50,14 @@ trap 'rm -rf "$STAGE"' EXIT
 D="$STAGE/$NAME"
 mkdir -p "$D/dist/live" "$D/packaging/live" "$D/target/release"
 cp "$LIVE/vmlinuz" "$LIVE/initrd.img" "$LIVE/filesystem.squashfs" "$LIVE/VERSION" "$LIVE/packages.manifest" "$D/dist/live/"
-cp -r "$LIVE/efi" "$D/dist/live/"
+cp -r "$LIVE/efi" "$LIVE/licenses" "$D/dist/live/"
 [[ -d "$LIVE/bios" ]] && cp -r "$LIVE/bios" "$D/dist/live/"
 [[ -n "$STORE" ]] && cp -r "$STORE" "$D/dist/live/app"
 cp "$ROOT_DIR/packaging/live/secmet-make-key.sh" "$ROOT_DIR/packaging/live/grub.cfg" "$D/packaging/live/"
 cp "$RELEASE_BIN" "$D/target/release/"
+# Licence de SecMet à la racine du livrable ; celles de l'image dans LICENCES/.
+cp "$ROOT_DIR/LICENSE" "$D/LICENSE"
+cp -r "$LIVE/licenses" "$D/LICENCES"
 store_note=""
 [[ -n "$STORE" ]] && store_note="
 Système de l'image : SecMet $image_version ; SecMet $VERSION est dans dist/live/app/$VERSION/
@@ -74,6 +78,15 @@ Mettre à jour la partition système d'une clé existante (données conservées)
 Empreinte et signature : SHA256SUMS et SHA256SUMS.sig de la release
 (secmet-release verify <dossier> --trust <clé publique> --file $(basename "$OUT")).
 Documentation : packaging/live/README.md et docs/Annexes/Annexe_M_cle_live_lots.md du dépôt.
+
+Licences et sources :
+SecMet est sous GNU GPL version 3 ou ultérieure (LICENSE). L'image est un
+agrégat de programmes distincts, chacun sous sa licence : LICENCES/ (aussi
+sur la partition SECMET-SYS de chaque clé) donne le résumé
+(LISEZMOI-LICENCES.txt), la liste des paquets (packages.manifest), les
+fichiers copyright de la chaîne de démarrage, du noyau et des micrologiciels,
+les textes GPL-2, GPL-3 et LGPL-2.1, et l'OFFRE écrite de sources
+(OFFRE_SOURCES.txt). Code source de SecMet : https://github.com/hclcdev12/secmet
 TXT
 mkdir -p "$ROOT_DIR/dist"
 tar -C "$STAGE" --owner=0 --group=0 --numeric-owner -cf "$OUT" "$NAME"

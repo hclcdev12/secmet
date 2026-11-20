@@ -28,7 +28,7 @@ SecMet est un logiciel libre sous **GNU GPL version 3 ou ultérieure** (décisio
 
 ### 1.1 Livrables couverts
 
-Une release publie 14 fichiers. Ce document couvre les onze livrables logiciels :
+Une release publie 15 fichiers. Ce document couvre les douze livrables (onze logiciels et la liste des paquets de l'image de la clé) :
 
 | Livrable | Contenu | Sections |
 |---|---|---|
@@ -37,7 +37,7 @@ Une release publie 14 fichiers. Ce document couvre les onze livrables logiciels 
 | `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | outils en ligne de commande seuls (construits sous Ubuntu 22.04), crates Rust liées statiquement, aucune bibliothèque embarquée (glibc de l'hôte seulement) ; licence GPL-3.0 et avis des crates : ceux du dépôt (`LICENSE`, §2) | §2 |
 | `secmet-key-writer_<v>_x86_64.AppImage` | SecMet Clé USB pour Linux (egui), aucune bibliothèque embarquée | §2, §3.3, §6.2 |
 | `secmet-key-writer_<v>_x86_64.exe` | SecMet Clé USB pour Windows (egui, wgpu/Direct3D 12, Schannel) | §2, §3.4, §6.2 |
-| `secmet-key_<v>_x86_64.img.xz`, `secmet-live_<v>_x86_64.tar` | image de la clé USB : système Ubuntu 24.04 complet, plus le `.deb` SecMet | §7 |
+| `secmet-key_<v>_x86_64.img.xz`, `secmet-live_<v>_x86_64.tar`, `secmet-key_<v>_x86_64.packages.tar` | image de la clé USB : système SecMet Live basé sur Debian 13 (Ubuntu 24.04 jusqu'à la 0.4.1), plus le `.deb` SecMet ; liste de ses paquets | §7 |
 
 `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` sont des données produites par SecMet (empreintes, signature, description de la version) : aucune licence tierce.
 
@@ -262,43 +262,38 @@ Le champ SPDX de `epaint_default_fonts` (« (MIT OR Apache-2.0) AND OFL-1.1 AND 
 
 ## 7. Image de la clé USB (`secmet-key_<v>_x86_64.img.xz`, `secmet-live_<v>_x86_64.tar`)
 
-L'image de la clé et le livrable `.tar` (qui contient le noyau, l'initrd, le squashfs, les fichiers EFI et BIOS, le cas échéant le paquet SecMet plus récent que l'image et sa signature, `secmet-make-key.sh`, `grub.cfg` et le binaire `secmet-release`) redistribuent un **système Ubuntu 24.04 « noble » complet**, construit par `packaging/live/build_rootfs.sh` (debootstrap, composants `main` et `universe`), plus le `.deb` SecMet. Pour la licence, c'est un **agrégat** : chaque composant garde sa licence, et la licence de SecMet ne s'étend pas au système.
+Depuis la 0.5.0, l'image de la clé et le livrable `.tar` (qui contient le noyau, l'initrd, le squashfs, les fichiers EFI et BIOS, les licences de l'image, le cas échéant le paquet SecMet plus récent que l'image et sa signature, `secmet-make-key.sh`, `grub.cfg` et le binaire `secmet-release`) redistribuent un système **SecMet Live basé sur Debian 13 « trixie »**, construit par `packaging/live/build_rootfs.sh` (debootstrap, sections `main` et `non-free-firmware`, ni `contrib` ni `non-free`), plus le `.deb` SecMet. Pour la licence, c'est un **agrégat** : chaque composant garde sa licence, et la licence de SecMet ne s'étend pas au système. Les images 0.4.1 et antérieures étaient basées sur Ubuntu 24.04 : leurs obligations (sources, marque Ubuntu, §7.3) restent attachées à ces images déjà distribuées.
 
 ### 7.1 Composants notables
 
 | Composant | Licence | Remarque |
 |---|---|---|
-| Noyau Linux (`linux-image-generic-hwe-24.04`) | **GPL-2.0-only** | module ZFS (CDDL) supprimé de l'image ; reste `v4l2loopback` (GPL-2) |
-| GRUB (`grub-efi-amd64-signed`, `grub-pc-bin` : `grubx64.efi`, modules i386-pc, `core.img`) | **GPL-3.0+** | copiés sur la partition de démarrage, signés par Canonical (EFI) |
-| shim (`shim-signed` : `shimx64.efi`, MokManager `mmx64.efi`) | licence de type BSD | signé par Microsoft ; MokManager permet à l'utilisateur d'enregistrer sa propre clé |
-| live-boot | **GPL-3.0+** | **modifié** par `build_rootfs.sh` (`9990-toram-todisk.sh`, par `sed`) : le script public tient lieu de source de la modification |
-| XFCE, LightDM, coreutils, bash, systemd, NetworkManager, udisks2, Zathura… | GPL-2+, GPL-3+, LGPL | paquets Ubuntu non modifiés |
-| Ghostscript (`libgs10`), `jbig2dec`, `fonts-urw-base35` | **AGPL-3.0+** (polices URW : AGPL avec exception pour les polices) | présents en dépendance d'autres paquets, non modifiés, sans usage réseau |
-| Microcodes `intel-microcode`, `amd64-microcode`, firmwares `linux-firmware` | **non libres**, redistribution autorisée en binaire non modifié | avis à reproduire ; pas d'usage promotionnel du nom des fabricants ; ingénierie inverse interdite. La clé n'est donc pas « 100 % libre » |
-| Polices du système (`fonts-ubuntu`, `fonts-dejavu`, `fonts-noto-color-emoji`) | UFL-1.0, Bitstream Vera / domaine public, OFL-1.1 | |
-| TestDisk (paquet Ubuntu) | GPL-2.0+ | |
+| Noyau Linux (`linux-image-amd64`, signé par Debian) | **GPL-2.0-only** | non modifié ; modules sans objet retirés de l'image |
+| GRUB (`grub-efi-amd64-signed`, `grub-pc-bin` : `grubx64.efi`, modules i386-pc, `core.img`) | **GPL-3.0+** | copiés sur la partition de démarrage ; `grubx64.efi` signé par Debian, `core.img` BIOS assemblé par `make_key_image.sh` |
+| shim (`shim-signed` : `shimx64.efi` ; `shim-helpers-amd64-signed` : MokManager `mmx64.efi`) | BSD-2-Clause | shim signé par Microsoft (autorités 2011 et 2023), MokManager par Debian ; MokManager permet à l'utilisateur d'enregistrer sa propre clé (GPL-3 §6, informations d'installation) |
+| live-boot | **GPL-3.0+** | **modifié** par `build_rootfs.sh` (`9990-toram-todisk.sh`, par `sed`) : le script public tient lieu de source de la modification, datée dans `LISEZMOI-LICENCES.txt` |
+| XFCE, LightDM, coreutils, bash, systemd, NetworkManager, udisks2, Zathura, `mate-polkit`… | GPL-2+, GPL-3+, LGPL | paquets Debian non modifiés |
+| Ghostscript et polices URW, s'ils sont tirés par d'autres paquets | **AGPL-3.0+** (polices URW : AGPL avec exception pour les polices) | non modifiés, sans usage réseau ; présence exacte : manifeste (§7.2) |
+| Microcodes `intel-microcode`, `amd64-microcode`, micrologiciels `firmware-*` (section `non-free-firmware`) | **non libres**, redistribution autorisée en binaire non modifié | liste retenue et raisons des exclusions dans `build_rootfs.sh` : `firmware-ivtv` et `firmware-ipw2x00` exclus (licence à accepter), la construction échoue si un paquet demande d'accepter une licence. Avis à reproduire ; pas d'usage promotionnel du nom des fabricants ; ingénierie inverse interdite. La clé n'est donc pas « 100 % libre ». Licences relues une fois (aucune clause d'usage non commercial) : à relire à chaque changement de la liste |
+| Polices du système (`fonts-cantarell`, `fonts-dejavu`, `fonts-noto-color-emoji`) | OFL-1.1, Bitstream Vera / domaine public, OFL-1.1 | `fonts-ubuntu` (UFL, section `non-free` chez Debian) n'est plus installée |
+| TestDisk (paquet Debian) | GPL-2.0+ | |
 | SecMet (`.deb`) et thème Plymouth « secmet » | voir §1 et §6.1 | |
 
-Les avis de licence de chaque paquet sont conservés dans l'image (`/usr/share/doc/<paquet>/copyright`). Les fichiers de démarrage copiés sur la partition FAT (shim, GRUB) ne sont accompagnés d'aucun texte de licence sur cette partition.
+Les avis de licence de chaque paquet sont conservés dans le système (`/usr/share/doc/<paquet>/copyright`). La partition de démarrage porte un dossier **`LICENCES/`** (`packaging/live/licences.sh`), repris tel quel dans le livrable `.tar` : `LISEZMOI-LICENCES.txt` (agrégat, rôle de chaque fichier de la partition, modification de live-boot, Secure Boot et MokManager, avertissement de marque Debian), `OFFRE_SOURCES.txt` (offre écrite de sources de 3 ans ; titulaire : décision D1), `packages.manifest` (§7.2), textes GPL-2, GPL-3 et LGPL-2.1, licence de SecMet et de ses images, et le fichier `copyright` de Debian (un par paquet source) de shim, MokManager, GRUB EFI et BIOS, du noyau, de live-boot, des microcodes et des micrologiciels. Le `LISEZMOI.txt` du `.tar` a une section « Licences et sources » et `LICENSE` est à sa racine. Résumé, offre et manifeste sont aussi dans `/usr/share/doc/secmet-live/` du système, cité par `/etc/motd`.
 
 ### 7.2 Liste des paquets d'une version
 
-La liste exacte des paquets (plus de 600) et de leurs versions change à chaque construction de l'image ; elle n'est pas reproduite ici. Elle se lit dans l'image publiée :
+Chaque release publie la liste exacte des paquets de l'image, `secmet-key_<v>_x86_64.packages.tar` (un fichier `.txt`, signé dans `SHA256SUMS`) : paquet, version, architecture, paquet source, version source, `Built-Using` et `Static-Built-Using`, chaîne de démarrage de la partition FAT comprise. La même liste est dans `dist/live/packages.manifest` du `.tar` et dans `LICENCES/` de la clé. Elle se lit aussi sur une clé démarrée :
 
 ```bash
-# sur une clé démarrée
 dpkg-query -W -f '${Package} ${Version}\n'
-# depuis le livrable .tar, sans démarrer
-tar -xf secmet-live_<v>_x86_64.tar
-unsquashfs -d rootfs secmet-live-<v>/dist/live/filesystem.squashfs var/lib/dpkg usr/share/doc
-dpkg-query --admindir=rootfs/var/lib/dpkg -W -f '${Package} ${Version}\n'
 ```
 
-Les licences de chaque paquet sont dans `rootfs/usr/share/doc/<paquet>/copyright`.
+### 7.3 Marques
 
-### 7.3 Marque Ubuntu
+**Debian (images 0.5.0 et suivantes).** La politique de marque de Debian (https://www.debian.org/trademark) permet la mention factuelle « basé sur Debian » sans demande, avec l'avertissement « Debian est une marque déposée de Software in the Public Interest, Inc. ; SecMet n'est ni affilié au projet Debian, ni approuvé par lui » ; elle interdit « Debian » dans un nom de produit et réserve le logo. Le système s'appelle donc **SecMet Live** (`os-release`, `issue`, `motd`, écran de démarrage SecMet, sans logo Debian) ; la mention et l'avertissement figurent dans le `motd`, `LISEZMOI-LICENCES.txt`, le `LISEZMOI.txt` du `.tar` et la documentation. Restent, techniques : `/etc/debian_version`, `EFI/debian` (préfixe du GRUB signé), la section `.sbat`, la version du noyau et les noms de paquets. Ne jamais présenter ni vendre la clé comme « Debian » ou « Debian officielle », ni mettre le logo Debian sur son étiquette (rapport 8).
 
-La politique de propriété intellectuelle de Canonical (https://canonical.com/legal/intellectual-property-policy, §3) demande qu'une redistribution **modifiée** d'Ubuntu soit approuvée par Canonical si elle est associée aux marques Ubuntu ; sinon, les marques doivent être retirées ou remplacées. La même politique précise qu'elle ne réduit pas les droits accordés par les licences libres des paquets. La clé SecMet est un système dérivé : elle ne doit **pas** être présentée ni vendue comme « Ubuntu ». Le fond d'écran et l'écran de démarrage sont déjà ceux de SecMet ; certains fichiers du système (`base-files`, `lsb-release`) affichent encore « Ubuntu ». La conduite à tenir (retrait des mentions restantes ou accord de Canonical) est **à valider**.
+**Ubuntu (images 0.4.1 et antérieures).** La politique de propriété intellectuelle de Canonical (https://canonical.com/legal/intellectual-property-policy, §3) demande qu'une redistribution **modifiée** d'Ubuntu soit approuvée par Canonical si elle est associée aux marques Ubuntu ; sinon, les marques doivent être retirées ou remplacées. Ces images ne doivent pas être présentées ni vendues comme « Ubuntu » ; certains de leurs fichiers (`base-files`, `lsb-release`) affichent encore « Ubuntu ».
 
 ---
 
@@ -312,8 +307,8 @@ La politique de propriété intellectuelle de Canonical (https://canonical.com/l
 
 1. publier avec chaque release une **archive des sources correspondantes** des composants GPL, LGPL et AGPL redistribués (TestDisk et ses bibliothèques, bibliothèques de l'AppImage, paquets de l'image de clé, GRUB, shim, live-boot modifié), produite à partir de la liste exacte des paquets de la version ; **ou** joindre une **offre écrite, valable au moins 3 ans**, de fournir ces sources (GPL-2 §3(b) ; GPL-3 §6) ;
 2. joindre aux livrables qui n'en ont pas un fichier d'avis tiers : le `.exe` et l'AppImage de SecMet Clé USB (aujourd'hui seulement `LICENSE` dans l'AppImage, rien à côté du `.exe`), le `.tar` et la partition de démarrage de la clé (textes GPL-3 de GRUB, avis shim) ;
-3. publier avec chaque image de clé la liste de ses paquets (§7.2) ;
-4. faire valider par un juriste le traitement de la marque Ubuntu (§7.3).
+3. ~~publier avec chaque image de clé la liste de ses paquets (§7.2)~~ : fait en 0.5.0 ;
+4. faire valider par un juriste le traitement des marques (§7.3 : Debian à partir de la 0.5.0, Ubuntu pour les images antérieures).
 
 Aucun de ces points n'est réalisé en 0.4.0.
 
@@ -361,4 +356,4 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet |
 | | `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt` | Avis des crates, des polices d'egui et du runtime AppImage (`key-writer-linux.txt` + `appimage-runtime.txt`), affiché par « À propos » et `--licenses` |
 | `.exe` SecMet Clé USB | (dans l'exécutable) | Avis `key-writer-windows.txt` et `LICENSE` intégrés : fenêtre « À propos » (bouton « Enregistrer… »), `secmet-key-writer.exe --licenses` |
-| Image de clé, `.tar` | `/usr/share/doc/*/copyright` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) | Avis des paquets Ubuntu ; aucun texte sur la partition de démarrage ni dans le `LISEZMOI.txt` du `.tar` |
+| Image de clé, `.tar` | `/usr/share/doc/*/copyright` et `/usr/share/doc/secmet-live/` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) ; `LICENCES/` sur la partition de démarrage et dans le `.tar`, `LICENSE` à la racine du `.tar` | Avis des paquets Debian ; résumé, offre de sources, manifeste, textes GPL et `copyright` des composants de démarrage et des micrologiciels (§7.1) |
