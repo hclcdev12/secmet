@@ -7,7 +7,9 @@ name: Package
 # (construits avec le .deb Ubuntu 22.04), SecMet Clé USB (AppImage Linux et
 # .exe Windows, runner windows-latest).
 # Chaque paquet est installé et fumé dans son conteneur, à chaque push sur
-# main et sur les pull requests touchant le packaging. Sur un tag vX.Y.Z
+# main et sur les pull requests touchant le packaging ; un push de main
+# dont le commit porte déjà un tag de version est sauté (travail « gate ») :
+# le run du tag fait le même travail. Sur un tag vX.Y.Z
 # (ou à la main avec ce tag), le dernier travail renomme les paquets selon
 # la convention GitHub (« ~ » → « . »), signe SHA256SUMS et latest.json avec
 # la clé de version, puis crée la release GitHub dans ce dépôt : en
@@ -74,6 +76,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Miroir Ubuntu des conteneurs (.deb, AppImage) : celui d'Azure, voisin des
+  # runners GitHub. Sur la 0.5.0-rc3, archive.ubuntu.com a mis 40 min à
+  # servir les paquets (release en 76 min au lieu de 20).
+  SECMET_APT_MIRROR: http://azure.archive.ubuntu.com/ubuntu
   SECMET_FORCE_BUILD: "1"
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   # Clé publique de version : ce que la clé USB (secmet-app-update) et
@@ -84,8 +90,33 @@ permissions:
   contents: read
 
 jobs:
+  # Un « git push origin main vX.Y.Z » lance ce workflow deux fois sur le
+  # même commit (branche et tag) : la construction de main, en double, est
+  # sautée quand le commit porte déjà un tag de version (le run du tag fait
+  # tout, avec les mêmes contrôles).
+  gate:
+    name: Commit déjà tagué ?
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.tag.outputs.skip }}
+    steps:
+      - id: tag
+        run: |
+          skip=false
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = branch ]; then
+            tags=$(git ls-remote --tags "https://github.com/$GITHUB_REPOSITORY" \
+              | awk -v sha="$GITHUB_SHA" '$1 == sha && $2 ~ /^refs\/tags\/v[0-9]/ { print $2 }')
+            if [ -n "$tags" ]; then
+              skip=true
+              echo "Commit $GITHUB_SHA déjà tagué ($(echo $tags | tr '\n' ' ')) : construction faite par le run du tag." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
   deb:
     name: .deb ${{ matrix.distro }}
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     container:
       image: ubuntu:${{ matrix.version }}
@@ -101,6 +132,11 @@ jobs:
       - name: Dépendances de construction
         run: |
           export DEBIAN_FRONTEND=noninteractive
+          # Miroir et nouvelles tentatives (voir SECMET_APT_MIRROR) ; 22.04
+          # lit sources.list, 24.04 ubuntu.sources.
+          sed -i "s|http://archive.ubuntu.com/ubuntu|$SECMET_APT_MIRROR|g" \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+          printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80secmet-retries
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential pkg-config curl ca-certificates git \
@@ -208,6 +244,8 @@ jobs:
 
   rpm:
     name: .rpm Fedora ${{ matrix.version }}
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     container:
       image: fedora:${{ matrix.version }}
@@ -268,6 +306,8 @@ jobs:
 
   appimage:
     name: AppImage (conteneur Ubuntu 24.04)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -300,6 +340,8 @@ jobs:
 
   key-writer:
     name: SecMet Clé USB (AppImage, conteneur Ubuntu 24.04)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -329,6 +371,8 @@ jobs:
 
   key-writer-windows:
     name: SecMet Clé USB (.exe Windows)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

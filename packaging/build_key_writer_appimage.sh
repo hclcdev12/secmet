@@ -28,7 +28,10 @@ if [[ -z "${SECMET_IN_CONTAINER:-}" && "${SECMET_APPIMAGE_NATIVE:-0}" != "1" ]];
     fi
     IMAGE="secmet-appimage-builder:ubuntu24.04"
     echo "Image de construction ($engine) : $IMAGE"
-    "$engine" build -t "$IMAGE" -f "$PKG_DIR/appimage.Containerfile" "$PKG_DIR"
+    # SECMET_APT_MIRROR : miroir Ubuntu de l'image de construction (CI).
+    mirror=()
+    [[ -n "${SECMET_APT_MIRROR:-}" ]] && mirror=(--build-arg "APT_MIRROR=$SECMET_APT_MIRROR")
+    "$engine" build "${mirror[@]}" -t "$IMAGE" -f "$PKG_DIR/appimage.Containerfile" "$PKG_DIR"
     mkdir -p "$ROOT_DIR/target-appimage" "$DIST_DIR"
     exec "$engine" run --rm \
         -v "$ROOT_DIR:/src:Z" \

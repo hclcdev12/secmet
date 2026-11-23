@@ -17,7 +17,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-RUN apt-get update \
+# Miroir Ubuntu au choix (CI : celui d'Azure, voisin des runners GitHub ;
+# archive.ubuntu.com a mis 40 min à servir les paquets de la 0.5.0-rc3) et
+# nouvelles tentatives sur une connexion qui cale.
+ARG APT_MIRROR=
+RUN if [ -n "$APT_MIRROR" ]; then \
+        sed -i "s|http://archive.ubuntu.com/ubuntu|$APT_MIRROR|g" /etc/apt/sources.list.d/ubuntu.sources; \
+    fi \
+ && printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' > /etc/apt/apt.conf.d/80secmet-retries \
+ && apt-get update \
  && apt-get install -y --no-install-recommends \
         build-essential ca-certificates curl file git pkg-config dpkg-dev \
         libgtk-4-dev libglib2.0-dev libglib2.0-bin libgdk-pixbuf2.0-bin \
