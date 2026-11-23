@@ -746,9 +746,9 @@ impl Server {
         };
         if plan.steps().any(|s| s.whole_controller) {
             // Une commande sur tout le contrôleur : les frères doivent être
-            // libres eux aussi. Rouvrir avec la garde étendue.
-            drop(isolated);
-            let widened = isolation::open_for_erase(&self.config.paths, &expected, true)?;
+            // libres eux aussi. Garde étendue sur le même descripteur (le
+            // refermer relancerait la sonde de udev sur le disque).
+            let widened = isolation::widen(&self.config.paths, &expected, isolated)?;
             return self.spawn_job(conn, request_id, id, widened, plan);
         }
         self.spawn_job(conn, request_id, id, isolated, plan)

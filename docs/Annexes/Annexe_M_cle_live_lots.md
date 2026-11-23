@@ -156,6 +156,7 @@ Les mises à jour suivent deux chemins pour une même release ([Annexe N](Annexe
 | Mode Intel RST / « RAID On » | Le NVMe peut être invisible | Passer en AHCI dans le BIOS, ou banc |
 | SSD SATA gelé (fréquent sur laptop) | SANITIZE et SECURITY ERASE refusés | Dégel (bouton **Dégeler**) par mise en veille (logind) ; la sortie de veille varie selon les modèles : si l'écran reste noir, forcer l'extinction et relancer (le lot est conservé) ; à défaut, écriture hôte ou banc |
 | Matériel très récent | Pilotes absents d'un noyau ancien | Noyau 6.12 de Debian 13, mis à jour par les versions intermédiaires de trixie ; image reconstruite périodiquement |
+| Wi-Fi Broadcom ancien (BCM4312, BCM4313, BCM43142, BCM4352… ; constaté sur HP ProBook 455 G3) | Aucun réseau Wi-Fi dans le menu réseau : la puce n'a pas de pilote libre, seulement le pilote propriétaire `wl` (`broadcom-sta`, section non-free de Debian), volontairement absent de la clé (module compilé non redistribuable tel quel, refusé par Secure Boot faute de signature) | Câble Ethernet, partage de connexion USB d'un téléphone, ou clé Wi-Fi USB à puce prise en charge (MediaTek MT7601U ou MT7612U, Realtek RTL8188, Atheros AR9271) : ses réseaux apparaissent dans le menu réseau de la barre du haut (Réseaux disponibles, puis mot de passe) |
 
 ## M.10 Hors périmètre v1
 

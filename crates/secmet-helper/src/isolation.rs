@@ -10,16 +10,32 @@
 //! 4. ré-identification firmware derrière ce descripteur : S/N et empreinte
 //!    identiques au jeton ; protections fraîches (`mountinfo`, `swaps`,
 //!    `holders/`) toutes à faux ;
+//!
+//!    Puis verrou `flock(LOCK_EX)` sur le disque entier, gardé jusqu'à la
+//!    fermeture du descripteur : udev ne relit pas un disque verrouillé
+//!    (« Locking Block Device Access » de systemd), donc aucune sonde ne
+//!    s'ouvre pendant l'effacement ;
 //! 5. `/proc/*/fd` : aucun autre processus ne tient le disque, une de ses
 //!    partitions, ni (pour une commande portant sur tout le contrôleur NVMe)
-//!    un namespace frère.
+//!    un namespace frère. Les sondes de udev et udisks, ouvertes quelques
+//!    millisecondes après un événement (fermeture d'un descripteur en
+//!    écriture, par exemple les canaris), sont attendues au plus
+//!    [`SETTLE_TIMEOUT`] ; tout autre détenteur est refusé aussitôt.
+//!
+//! [`widen`] étend la garde aux namespaces frères sans refermer le
+//! descripteur : une fermeture relancerait la sonde de udev (constaté le
+//! 2026-11-20 sur NVMe Sanitize, Lenovo Yoga Pro 7 : `(udev-worker)` tenait
+//! le disque à la réouverture).
 //!
 //! Chaque refus est une [`IsolationError`] explicite : `Busy`,
 //! `IdentityMismatch`, `OpenersFound`.
 
-use std::fs;
+use std::fs::{self, File};
+use std::os::fd::AsFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use secmet_device::block::{device_path, BlockDevice, OpenMode};
 use secmet_device::protection::DevNum;
@@ -131,13 +147,71 @@ pub fn find_openers(proc_root: &Path, self_pid: u32, targets: &[DevNum]) -> Vec<
     })
 }
 
-/// Vérifie qu'aucun autre processus ne tient `targets`.
+/// Attente maximale des sondes système (udev, udisks) et du verrou.
+pub const SETTLE_TIMEOUT: Duration = Duration::from_secs(10);
+const SETTLE_STEP: Duration = Duration::from_millis(100);
+
+/// Processus système qui relisent un disque juste après un événement udev
+/// et le relâchent d'eux-mêmes (`comm` tel que lu dans `/proc`).
+const TRANSIENT_PROBERS: &[&str] = &["(udev-worker)", "systemd-udevd", "udisksd"];
+
+fn only_transient_probers(openers: &[Opener]) -> bool {
+    openers
+        .iter()
+        .all(|o| TRANSIENT_PROBERS.contains(&o.comm.as_str()))
+}
+
+/// Interroge `find` jusqu'à ce qu'il ne trouve plus personne. Tant que les
+/// seuls détenteurs sont des sondes système, attend (au plus `timeout`) ;
+/// tout autre détenteur, ou l'échéance, donne `OpenersFound`.
+fn wait_until_released(
+    mut find: impl FnMut() -> Vec<Opener>,
+    timeout: Duration,
+    step: Duration,
+) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let openers = find();
+        if openers.is_empty() {
+            return Ok(());
+        }
+        if !only_transient_probers(&openers) || Instant::now() >= deadline {
+            return Err(IsolationError::OpenersFound(openers).into());
+        }
+        thread::sleep(step);
+    }
+}
+
+/// Vérifie qu'aucun autre processus ne tient `targets` (sondes udev et
+/// udisks attendues au plus [`SETTLE_TIMEOUT`]).
 pub fn ensure_no_openers(proc_root: &Path, targets: &[DevNum]) -> Result<()> {
-    let openers = find_openers(proc_root, std::process::id(), targets);
-    if openers.is_empty() {
-        Ok(())
-    } else {
-        Err(IsolationError::OpenersFound(openers).into())
+    let self_pid = std::process::id();
+    wait_until_released(
+        || find_openers(proc_root, self_pid, targets),
+        SETTLE_TIMEOUT,
+        SETTLE_STEP,
+    )
+}
+
+/// Verrou exclusif `flock` sur le disque entier (attendu au plus
+/// `timeout` : udev le tient en partagé le temps d'une sonde).
+fn lock_whole_disk(file: &File, path: &Path, timeout: Duration) -> Result<()> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let locked = secmet_device::sys::try_lock_exclusive(file.as_fd())
+            .map_err(|e| HelperError::io(format!("flock {}", path.display()), e))?;
+        if locked {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err(IsolationError::Busy(format!(
+                "{} : verrou exclusif (flock) tenu par un autre processus depuis {} s",
+                path.display(),
+                timeout.as_secs()
+            ))
+            .into());
+        }
+        thread::sleep(SETTLE_STEP);
     }
 }
 
@@ -202,8 +276,38 @@ pub fn open_for_erase(
         return Err(IsolationError::Busy(describe_protection(&scan.caps.protection)).into());
     }
 
+    // 4 bis. Verrou exclusif : plus aucune sonde udev jusqu'à la fermeture.
+    lock_whole_disk(device.file(), &path, SETTLE_TIMEOUT)?;
+
     // 5. Aucun autre détenteur.
-    let mut guarded = vec![wanted];
+    let guarded = guard(paths, expected, &scan, whole_controller)?;
+
+    Ok(Isolated {
+        device,
+        scan,
+        guarded,
+    })
+}
+
+/// Étend la garde d'une cible déjà ouverte aux namespaces frères (commande
+/// sur tout le contrôleur NVMe), sans refermer son descripteur.
+pub fn widen(paths: &SysfsPaths, expected: &DiskIdentity, isolated: Isolated) -> Result<Isolated> {
+    let guarded = guard(paths, expected, &isolated.scan, true)?;
+    Ok(Isolated {
+        guarded,
+        ..isolated
+    })
+}
+
+/// Numéros gardés (disque, partitions, et frères si `whole_controller`),
+/// après contrôle des protections des frères et des détenteurs.
+fn guard(
+    paths: &SysfsPaths,
+    expected: &DiskIdentity,
+    scan: &Scan,
+    whole_controller: bool,
+) -> Result<Vec<DevNum>> {
+    let mut guarded = vec![devnum_of(expected)];
     guarded.extend(partition_devnums(paths, &scan.entry));
     if whole_controller {
         for sibling in sibling_namespaces(paths, &expected.name)? {
@@ -225,12 +329,7 @@ pub fn open_for_erase(
         }
     }
     ensure_no_openers(&paths.proc, &guarded)?;
-
-    Ok(Isolated {
-        device,
-        scan,
-        guarded,
-    })
+    Ok(guarded)
 }
 
 fn describe_protection(p: &secmet_core::taxonomy::ProtectionFlags) -> String {
@@ -298,6 +397,68 @@ mod tests {
         assert!(find_openers(Path::new("/proc"), std::process::id(), &[nowhere]).is_empty());
         assert!(find_openers(Path::new("/proc"), std::process::id(), &[]).is_empty());
         assert!(ensure_no_openers(Path::new("/proc"), &[nowhere]).is_ok());
+    }
+
+    fn opener(comm: &str) -> Opener {
+        Opener {
+            pid: 7,
+            comm: comm.into(),
+            fd: 3,
+            target: "/dev/nvme0n1".into(),
+        }
+    }
+
+    #[test]
+    fn transient_probers_are_awaited_until_they_leave() {
+        // Sonde udev puis udisks, puis plus personne : accepté.
+        let mut rounds = vec![
+            vec![],
+            vec![opener("udisksd")],
+            vec![opener("(udev-worker)"), opener("(udev-worker)")],
+        ];
+        let step = Duration::from_millis(1);
+        assert!(
+            wait_until_released(|| rounds.pop().unwrap_or_default(), SETTLE_TIMEOUT, step).is_ok()
+        );
+    }
+
+    #[test]
+    fn any_other_holder_is_refused_at_once() {
+        let mut calls = 0;
+        let err = wait_until_released(
+            || {
+                calls += 1;
+                vec![opener("(udev-worker)"), opener("dd")]
+            },
+            SETTLE_TIMEOUT,
+            Duration::from_millis(1),
+        )
+        .unwrap_err();
+        assert_eq!(calls, 1);
+        assert!(err.to_string().contains("dd"), "{err}");
+    }
+
+    #[test]
+    fn a_probe_that_never_leaves_is_refused_at_the_deadline() {
+        let err = wait_until_released(
+            || vec![opener("(udev-worker)")],
+            Duration::from_millis(30),
+            Duration::from_millis(5),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("udev-worker"), "{err}");
+    }
+
+    #[test]
+    fn whole_disk_lock_is_exclusive_and_waits_then_refuses() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let first = File::open(tmp.path()).unwrap();
+        let second = File::open(tmp.path()).unwrap();
+        lock_whole_disk(&first, tmp.path(), Duration::ZERO).unwrap();
+        let err = lock_whole_disk(&second, tmp.path(), Duration::from_millis(150)).unwrap_err();
+        assert!(err.to_string().contains("flock"), "{err}");
+        drop(first);
+        lock_whole_disk(&second, tmp.path(), Duration::ZERO).unwrap();
     }
 
     #[test]

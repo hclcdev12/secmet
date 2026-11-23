@@ -238,6 +238,18 @@ pub fn logical_block_size(fd: BorrowedFd<'_>) -> io::Result<u32> {
     u32::try_from(size).map_err(|_| io::Error::other("taille de bloc invalide"))
 }
 
+/// Verrou `flock(LOCK_EX | LOCK_NB)` : `Ok(false)` si un autre descripteur
+/// tient déjà un verrou (udev le prend en partagé le temps d'une sonde).
+/// Libéré à la fermeture du descripteur.
+pub fn try_lock_exclusive(fd: BorrowedFd<'_>) -> io::Result<bool> {
+    // SAFETY: `flock` ne lit ni n'écrit aucune mémoire ; descripteur emprunté valide.
+    match check(unsafe { libc::flock(fd.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) }) {
+        Ok(_) => Ok(true),
+        Err(e) if e.raw_os_error() == Some(libc::EWOULDBLOCK) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
 /// Le périphérique est-il en lecture seule (`BLKROGET`) ?
 pub fn block_device_read_only(fd: BorrowedFd<'_>) -> io::Result<bool> {
     let mut ro: libc::c_int = 0;
