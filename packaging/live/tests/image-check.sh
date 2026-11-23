@@ -50,11 +50,17 @@ SH
 if [[ -z "${SECMET_RELEASE_BIN:-}" ]]; then
     cat > "$BIN/secmet-release" <<'SH'
 #!/bin/sh
-# verify-system <dossier> --trust <clé> --json <fichier> : rapport
+# verify-system <dossier> [--trust <clé>]... --json <fichier> : rapport
 # $FAKE_STATUS si <dossier>/live/filesystem.squashfs existe.
 echo "verify-system $2" >> "$FAKE_CALLS"
+json=""; prev=""
+for a in "$@"; do
+    [ "$prev" = --json ] && json="$a"
+    [ "$prev" = --trust ] && echo "$a" >> "$FAKE_CALLS.trust"
+    prev="$a"
+done
 [ -f "$2/live/filesystem.squashfs" ] || exit 1
-printf '{\n  "status": "%s",\n  "system": "secmet essai",\n  "files": 3,\n  "problems": []\n}\n' "$FAKE_STATUS" > "$6"
+printf '{\n  "status": "%s",\n  "system": "secmet essai",\n  "files": 3,\n  "problems": []\n}\n' "$FAKE_STATUS" > "$json"
 echo "système      : secmet essai"
 echo "état         : $FAKE_STATUS"
 [ "$FAKE_STATUS" = ok ] || echo "  boot/grub/grub.cfg : empreinte différente"
@@ -77,7 +83,7 @@ check() { # <nom> <attendu> <obtenu>
 setup() {
     rm -rf "$T/run" "$T/medium" "$T/data" "$T/tree"
     mkdir -p "$T/run" "$T/medium/live" "$T/data" "$T/tree/live"
-    : > "$T/mounts"; : > "$T/logger"; : > "$T/calls"
+    : > "$T/mounts"; : > "$T/logger"; : > "$T/calls"; rm -f "$T/calls.trust"
     echo squashfs > "$T/medium/live/filesystem.squashfs"
     echo squashfs > "$T/tree/live/filesystem.squashfs"
     unset FAKE_SYS_DEV FAKE_MOUNT_FAIL
@@ -98,6 +104,7 @@ if [[ -z "${SECMET_RELEASE_BIN:-}" ]]; then
     run
     check "support live : rapport" "ok" "$(status)"
     check "support live : vérifié sur place" "verify-system $T/medium" "$(cat "$T/calls")"
+    check "clés de version passées à secmet-release" "bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5" "$(cat "$T/calls.trust")"
     check "copie sur la partition de données" "ok" "$(sed -n 's/^ *"status": *"\([a-z]*\)".*/\1/p' "$T/data/logs/system/image-check.json")"
     check "journal" "1" "$(grep -c '^système de la clé : ok (.* s ; secmet essai)$' "$T/logger")"
 
@@ -144,9 +151,12 @@ else
     echo "set timeout=0" > "$T/medium/boot/grub/grub.cfg"
     "$ROOT_DIR/packaging/live/system-sums.sh" "$T/medium" "secmet essai" > "$T/medium/SYSTEM.sums"
     "$SECMET_RELEASE_BIN" sign-system "$T/medium" --key "$T/test-key.hex" > /dev/null
-    # La clé de confiance du script est la clé de version : on la remplace
-    # par celle de test dans une copie.
-    sed "s/^TRUST=.*/TRUST=$trust/" "$SCRIPT" > "$T/script"; SCRIPT="$T/script"
+    # Les clés de confiance du script sont les clés de version : remplacées
+    # dans une copie par une autre clé (future clé de version, qui n'a rien
+    # signé) suivie de celle de test : une signature par l'une suffit.
+    "$SECMET_RELEASE_BIN" keygen "$T/other-key.hex" > /dev/null
+    other="$(tr -d '[:space:]' < "$T/other-key.pub")"
+    awk -v k="$trust" -v o="$other" '/^TRUST_KEYS="$/ { print; print o; print k; skip = 1; next } skip && /^"$/ { skip = 0 } !skip' "$SCRIPT" > "$T/script"; SCRIPT="$T/script"
     echo "$T/medium" >> "$T/mounts"
     run
     check "réel : système scellé intact" "ok" "$(status)"

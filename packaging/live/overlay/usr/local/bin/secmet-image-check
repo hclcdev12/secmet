@@ -23,8 +23,14 @@ OUT="$RUN/system-integrity.json"
 MEDIUM="${SECMET_IMAGE_CHECK_MEDIUM:-/run/live/medium}"
 DATA="${SECMET_IMAGE_CHECK_DATA:-/media/secmet-data}"
 MNT="$RUN/sys"
-# Clé de version : celle de secmet-app-update et des releases.
-TRUST=bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+# Clés de version acceptées, une par ligne : même liste que TRUST_KEYS de
+# secmet-app-update et RELEASE_PUBLIC_KEYS (src/update.rs, contrôlé par un
+# test). Une signature par l'une d'elles suffit : lors d'un changement de
+# clé, la future s'ajoute ici avant d'être utilisée (sinon toutes les clés
+# en service afficheraient « système altéré »), l'ancienne se retire ensuite.
+TRUST_KEYS="
+bde3e3d9de271f8de9bb26c8dd4ed73f4c7344e309ebac7c3dffd50e02ca3bd5
+"
 mkdir -p "$RUN" && chmod 755 "$RUN"
 
 report() { # <status> <écart>
@@ -65,8 +71,13 @@ if ! command -v secmet-release >/dev/null 2>&1; then
     finish
 fi
 
+# Arguments --trust de secmet-release, un par clé de version.
+set --
+for k in $TRUST_KEYS; do
+    set -- "$@" --trust "$k"
+done
 t0=$(date +%s)
-secmet-release verify-system "$ROOT" --trust "$TRUST" --json "$OUT" > "$RUN/verify.log" 2>&1
+secmet-release verify-system "$ROOT" "$@" --json "$OUT" > "$RUN/verify.log" 2>&1
 rc=$?
 [ -s "$OUT" ] || report error "secmet-release verify-system : code $rc"
 status=$(sed -n 's/^ *"status": *"\([a-z]*\)".*/\1/p' "$OUT" | head -1)
