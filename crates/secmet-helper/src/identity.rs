@@ -167,9 +167,17 @@ pub fn devnum_of_path(path: &Path) -> io::Result<DevNum> {
 pub fn fresh_protection(paths: &SysfsPaths, devnum: DevNum) -> Result<ProtectionFlags> {
     match protection::protection_of(paths, devnum) {
         Ok(p) => Ok(ProtectionFlags::from(p)),
-        Err(DeviceError::Untraceable(detail)) => Err(IsolationError::Busy(format!(
-            "montage ou swap non traçable, tout est considéré protégé: {detail}"
-        ))
+        Err(DeviceError::Untraceable(detail)) => Err(IsolationError::Busy(
+            match crate::live_medium::lost_medium(paths) {
+                Some(medium) => format!(
+                    "la clé SecMet a été déconnectée (veille) et le système n'a pas pu s'y \
+                     rebrancher ({medium}) : redémarrez sur la clé"
+                ),
+                None => {
+                    format!("montage ou swap non traçable, tout est considéré protégé: {detail}")
+                }
+            },
+        )
         .into()),
         Err(e) => Err(e.into()),
     }

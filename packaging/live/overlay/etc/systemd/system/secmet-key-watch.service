@@ -1,0 +1,21 @@
+# Clé SecMet : veilleur de la clé (secmet-helper key-watch). Certains
+# portables coupent l'USB pendant la veille du dégel : la clé revient sous un
+# autre nom. Le veilleur, entièrement en mémoire (copié par
+# secmet-key-watch-prepare), rebranche alors le système live sur la clé
+# revenue et remonte données et export, s'ils sont bien ceux de la clé
+# démarrée. Un service lancé au réveil échouerait : systemd-executor lui-même
+# est sur la clé perdue.
+[Unit]
+Description=SecMet : veilleur de la cle (rebranchement apres veille)
+After=local-fs.target secmet-app-update.service
+ConditionPathIsDirectory=/run/live
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/sbin/secmet-key-watch-prepare
+ExecStart=/run/secmet/lib/ld.so --library-path /run/secmet/lib /run/secmet/bin/secmet-helper key-watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -28,6 +28,7 @@ pub mod hostinfo;
 pub mod identity;
 pub mod ipc;
 pub mod isolation;
+pub mod live_medium;
 pub mod polkit;
 pub mod recovery;
 pub mod runner;

@@ -1,0 +1,52 @@
+#!/bin/sh
+# Clé SecMet : préparation du veilleur secmet-key-watch.service (copie en
+# mémoire du helper, de son chargeur et de ses bibliothèques ; PARTUUID des
+# partitions système et données de la clé démarrée).
+set -eu
+# Déjà fait (redémarrage du veilleur, peut-être clé perdue) : rien à relire.
+[ -e /run/secmet/ready ] && exit 0
+# Binaire, chargeur et bibliothèques en mémoire : au réveil, même la
+# recherche d'un fichier sur la clé perdue échoue (blocs de répertoire du
+# squashfs illisibles), ld.so compris. Lancé par
+#   /run/secmet/lib/ld.so --library-path /run/secmet/lib /run/secmet/bin/secmet-helper
+# /run est monté noexec : petit tmpfs exécutable à part (majeur 0, ignoré
+# par le calcul des protections de SecMet).
+mkdir -p /run/secmet
+mountpoint -q /run/secmet || mount -t tmpfs -o mode=0755,size=16m,nosuid,nodev secmet-reattach /run/secmet
+mkdir -p /run/secmet/bin /run/secmet/lib
+install -m 0755 /usr/bin/secmet-helper /run/secmet/bin/secmet-helper
+ldd /usr/bin/secmet-helper | while read -r first second third _; do
+    case "$first" in
+        /*) lib=$first ;;                     # chargeur : /lib64/ld-linux-x86-64.so.2 (0x…)
+        *) if [ "$second" = "=>" ]; then lib=$third; else continue; fi ;;
+    esac
+    case "$lib" in
+        */ld-linux*) install -m 0755 "$(readlink -f "$lib")" /run/secmet/lib/ld.so ;;
+        /*) install -m 0644 "$(readlink -f "$lib")" "/run/secmet/lib/$(basename "$lib")" ;;
+    esac
+done
+[ -x /run/secmet/lib/ld.so ]
+
+# PARTUUID de la partition derrière $1 (chemin /dev/…), via les liens udev.
+partuuid() {
+    for link in /dev/disk/by-partuuid/*; do
+        [ -e "$link" ] || continue
+        if [ "$(readlink -f "$link")" = "$1" ]; then
+            basename "$link"
+            return 0
+        fi
+    done
+    return 1
+}
+
+system=$(findmnt -rn -o SOURCE /run/live/medium 2>/dev/null || true)
+case "$system" in
+    /dev/*) partuuid "$(readlink -f "$system")" > /run/secmet/system.partuuid || rm -f /run/secmet/system.partuuid ;;
+    *) rm -f /run/secmet/system.partuuid ;;  # copie en mémoire
+esac
+data=$(findmnt -rn -o SOURCE /media/secmet-data 2>/dev/null || true)
+case "$data" in
+    /dev/*) partuuid "$(readlink -f "$data")" > /run/secmet/data.partuuid || rm -f /run/secmet/data.partuuid ;;
+    *) rm -f /run/secmet/data.partuuid ;;
+esac
+touch /run/secmet/ready

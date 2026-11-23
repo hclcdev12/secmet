@@ -210,7 +210,7 @@ cp -a "$SRC/packaging/live/overlay/." "$ROOTFS/"
 # Bits d'exécution posés ici, quel que soit l'état du dépôt d'origine : un
 # crochet initramfs ou de veille non exécutable est ignoré en silence
 # (constaté le 2026-11-06 : initrd de 184 Mo au lieu de 75 sur GitHub).
-chmod 0755 "$ROOTFS"/usr/local/bin/secmet-* "$ROOTFS"/etc/initramfs-tools/hooks/* \
+chmod 0755 "$ROOTFS"/usr/local/bin/secmet-* "$ROOTFS"/usr/local/sbin/secmet-* "$ROOTFS"/etc/initramfs-tools/hooks/* \
     "$ROOTFS"/usr/lib/systemd/system-sleep/*
 # Fond d'écran SecMet pour tout écran : les fonds XFCE par défaut sont remplacés
 # (xfdesktop les prend pour un moniteur qu'il ne connaît pas encore).
@@ -301,7 +301,7 @@ in_chroot chown -R secmet:secmet /home/secmet
 # NetworkManager gère les interfaces (pas de netplan).
 mkdir -p "$ROOTFS/etc/NetworkManager/conf.d"
 printf '[keyfile]\nunmanaged-devices=none\n' > "$ROOTFS/etc/NetworkManager/conf.d/10-globally-managed-devices.conf"
-in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journal-sync.timer secmet-journal-final secmet-first-boot secmet-app-update secmet-image-check >/dev/null 2>&1 || true
+in_chroot systemctl enable NetworkManager lightdm systemd-timesyncd secmet-journal-sync.timer secmet-journal-final secmet-first-boot secmet-app-update secmet-image-check secmet-key-watch >/dev/null 2>&1 || true
 in_chroot systemctl set-default graphical.target >/dev/null 2>&1 || true
 # Police de la console texte : 9 s au démarrage (setfont échoue cinq fois
 # avec ce noyau) pour un poste graphique ; la disposition clavier des

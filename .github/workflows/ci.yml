@@ -84,7 +84,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y shellcheck
           shellcheck -S warning scripts/*.sh packaging/*.sh packaging/tests/*.sh packaging/live/*.sh packaging/live/tests/*.sh
-          shellcheck -S warning -s sh packaging/live/overlay/usr/local/bin/*
+          shellcheck -S warning -s sh packaging/live/overlay/usr/local/bin/* packaging/live/overlay/usr/local/sbin/*
       - name: Scripts de démarrage de la clé (doublures)
         run: |
           ./packaging/live/tests/app-update.sh

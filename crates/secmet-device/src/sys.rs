@@ -250,6 +250,54 @@ pub fn try_lock_exclusive(fd: BorrowedFd<'_>) -> io::Result<bool> {
     }
 }
 
+/// `LOOP_CHANGE_FD` (`linux/loop.h`).
+pub const LOOP_CHANGE_FD: libc::c_ulong = 0x4C06;
+
+/// Remplace le fichier sous un périphérique loop en lecture seule par
+/// `file` (même taille exigée par le noyau) : clé live revenue sous un autre
+/// nom après une veille qui l'a déconnectée.
+pub fn loop_change_fd(loop_fd: BorrowedFd<'_>, file: BorrowedFd<'_>) -> io::Result<()> {
+    // SAFETY: `LOOP_CHANGE_FD` prend un numéro de descripteur par valeur, rien
+    // n'est lu ni écrit en mémoire ; deux descripteurs empruntés valides.
+    check(unsafe {
+        libc::ioctl(
+            loop_fd.as_raw_fd(),
+            LOOP_CHANGE_FD as _,
+            libc::c_ulong::try_from(file.as_raw_fd())
+                .map_err(|_| io::Error::other("fd négatif"))?,
+        )
+    })?;
+    Ok(())
+}
+
+/// `mount(source, target, fstype, MS_RDONLY | MS_NOATIME, data)`.
+pub fn mount_read_only(
+    source: &std::ffi::CStr,
+    target: &std::ffi::CStr,
+    fstype: &std::ffi::CStr,
+    data: &std::ffi::CStr,
+) -> io::Result<()> {
+    // SAFETY: quatre chaînes C empruntées, terminées par NUL, vivantes pendant
+    // l'appel ; le noyau ne les conserve pas.
+    check(unsafe {
+        libc::mount(
+            source.as_ptr(),
+            target.as_ptr(),
+            fstype.as_ptr(),
+            libc::MS_RDONLY | libc::MS_NOATIME,
+            data.as_ptr().cast(),
+        )
+    })?;
+    Ok(())
+}
+
+/// `umount2(target, MNT_DETACH)` : démontage paresseux.
+pub fn umount_detach(target: &std::ffi::CStr) -> io::Result<()> {
+    // SAFETY: chaîne C empruntée, terminée par NUL, vivante pendant l'appel.
+    check(unsafe { libc::umount2(target.as_ptr(), libc::MNT_DETACH) })?;
+    Ok(())
+}
+
 /// Le périphérique est-il en lecture seule (`BLKROGET`) ?
 pub fn block_device_read_only(fd: BorrowedFd<'_>) -> io::Result<bool> {
     let mut ro: libc::c_int = 0;

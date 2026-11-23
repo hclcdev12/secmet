@@ -1,11 +1,17 @@
 //! Binaire privilégié SecMet : `secmet-helper serve [--socket-dir DIR] [--allow-uid UID]`.
 //!
+//! `secmet-helper key-watch` : clé live seulement, veilleur lancé en root
+//! par le service `secmet-key-watch` (voir [`secmet_helper::live_medium`]).
+//!
 //! Lancé par l'UI via `pkexec` (un seul prompt Polkit) ; voir [`secmet_helper::server`].
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let rest: &[String] = match args.get(1).map(String::as_str) {
         Some("serve") => &args[2..],
+        Some("key-watch") if args.len() == 2 => {
+            std::process::exit(secmet_helper::live_medium::main())
+        }
         Some("--help") | Some("-h") => {
             eprintln!("usage: secmet-helper serve [--socket-dir DIR] [--allow-uid UID] [--vault-dir DIR] [--ttl SECONDS]");
             std::process::exit(2);
