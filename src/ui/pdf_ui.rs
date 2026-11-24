@@ -91,11 +91,11 @@ pub(super) fn show_pdf_generation_dialog(
     format_box.set_margin_start(10);
     format_box.set_margin_end(10);
     format_box.set_margin_bottom(8);
+    // Choix exclusif : boutons radio (CheckButton groupés).
     let mode_per_disk = CheckButton::with_label(&tr("Une page par disque"));
-    mode_per_disk.add_css_class("disk-checkbox");
     mode_per_disk.set_active(true);
     let mode_grouped = CheckButton::with_label(&tr("Certificat groupé (lot)"));
-    mode_grouped.add_css_class("disk-checkbox");
+    mode_grouped.set_group(Some(&mode_per_disk));
     format_box.append(&mode_per_disk);
     format_box.append(&mode_grouped);
     format_frame.append(&format_label);
@@ -170,19 +170,6 @@ pub(super) fn show_pdf_generation_dialog(
     let dialog_for_cancel = dialog.clone();
     cancel_btn.connect_clicked(move |_| {
         dialog_for_cancel.close();
-    });
-
-    let mode_per_disk_for_exclusive = mode_per_disk.clone();
-    let mode_grouped_for_exclusive = mode_grouped.clone();
-    mode_per_disk.connect_toggled(move |cb| {
-        if cb.is_active() {
-            mode_grouped_for_exclusive.set_active(false);
-        }
-    });
-    mode_grouped.connect_toggled(move |cb| {
-        if cb.is_active() {
-            mode_per_disk_for_exclusive.set_active(false);
-        }
     });
 
     let dialog_for_generate = dialog.clone();
@@ -312,23 +299,26 @@ pub(super) fn show_pdf_created_dialog(
     export_note: Option<&str>,
 ) {
     let args = [
-        ("count", disk_count.to_string()),
+        (
+            "disks",
+            crate::i18n::count_text(disk_count, "{count} disque", "{count} disques"),
+        ),
         ("path", pdf_path.display().to_string()),
     ];
     let args: Vec<(&str, &str)> = args.iter().map(|(k, v)| (*k, v.as_str())).collect();
     let message = match mode {
         certificate::CertificatePdfMode::Grouped => trf(
-            "Certificat PDF groupé créé ({count} disque(s) dans le lot).\n\n\
+            "Certificat PDF groupé créé ({disks} dans le lot).\n\n\
              Fichier :\n{path}\n\n\
-             Un fichier JSON miroir unique pour ce lot est enregistré \
-             dans le même dossier.",
+             Sa version signée (fichier .json, pour une vérification \
+             automatique) est enregistrée dans le même dossier.",
             &args,
         ),
         certificate::CertificatePdfMode::PerDisk => trf(
-            "Certificat PDF créé ({count} disque(s)).\n\n\
+            "Certificat PDF créé ({disks}).\n\n\
              Fichier :\n{path}\n\n\
-             Des fichiers JSON miroir (métadonnées techniques) sont enregistrés \
-             dans le même dossier.",
+             La version signée de chaque certificat (fichier .json, pour une \
+             vérification automatique) est enregistrée dans le même dossier.",
             &args,
         ),
     };

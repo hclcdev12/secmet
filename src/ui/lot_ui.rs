@@ -53,12 +53,12 @@ pub(super) fn scope_here() -> LotScope {
     }
 }
 
-/// « 7 machine(s) » ou « 16 disque(s) » selon la portée du lot.
+/// « 7 machines » ou « 16 disques » selon la portée du lot.
 fn units_text(lot: &Lot) -> String {
-    let count = lot.units_count().to_string();
+    let count = lot.units_count() as usize;
     match lot.state().scope {
-        LotScope::Machines => trf("{count} machine(s)", &[("count", &count)]),
-        LotScope::Disks => trf("{count} disque(s)", &[("count", &count)]),
+        LotScope::Machines => crate::i18n::count_text(count, "{count} machine", "{count} machines"),
+        LotScope::Disks => crate::i18n::count_text(count, "{count} disque", "{count} disques"),
     }
 }
 

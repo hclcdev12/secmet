@@ -26,6 +26,16 @@ pub use secmet_helper::ipc::Progress;
 pub use secmet_helper::runner::{JobReport, Outcome, StepReport};
 pub use secmet_helper::testdisk::TestdiskRun;
 
+/// Erreur de démarrage quand la fenêtre d'authentification a été annulée
+/// ou le mot de passe refusé (pkexec sort en 126/127).
+pub const AUTH_CANCELLED: &str = "Authentification annulée ou refusée.\n\
+     Validez le mot de passe administrateur puis réessayez.";
+
+/// L'erreur vient-elle d'une authentification annulée (à reproposer) ?
+pub fn is_auth_cancelled(error: &str) -> bool {
+    error == AUTH_CANCELLED
+}
+
 /// Attente maximale de la ligne `ready` (le prompt Polkit est compris).
 const READY_TIMEOUT: Duration = Duration::from_secs(300);
 /// Délai de lecture sur la connexion de contrôle.
@@ -52,7 +62,7 @@ impl CallError {
         };
         Self {
             kind: kind.into(),
-            message: format!("Liaison avec le helper interrompue : {e}"),
+            message: format!("Liaison avec le composant système interrompue : {e}"),
         }
     }
 
@@ -61,11 +71,11 @@ impl CallError {
         match e {
             ipc::FrameError::Io(e) => Self::io(e),
             ipc::FrameError::Json(e) => {
-                Self::protocol(format!("réponse du helper illisible : {e}"))
+                Self::protocol(format!("réponse du composant système illisible : {e}"))
             }
             other => Self {
                 kind: "transport".into(),
-                message: format!("Liaison avec le helper interrompue : {other}"),
+                message: format!("Liaison avec le composant système interrompue : {other}"),
             },
         }
     }
@@ -206,21 +216,62 @@ impl Helper {
     /// Lance le helper via pkexec (un prompt) et ouvre la connexion de contrôle.
     pub fn start() -> Result<Arc<Self>, String> {
         let helper = crate::paths::helper_path();
-        let mut child =
-            crate::pkexec_gate::pkexec_spawn(&[helper.as_str(), "serve"]).map_err(|e| {
-                format!(
-                    "Impossible de démarrer le helper privilégié (pkexec).\n\
-                     Détail : {e}"
-                )
-            })?;
+        Self::start_with(&[helper.as_str(), "serve"], None)
+    }
+
+    /// AppImage : installation (ou mise à jour) du composant système puis
+    /// démarrage du helper, sous une seule invite Polkit. Le script passe
+    /// par l'entrée standard de `bash -s` : la fenêtre d'authentification
+    /// affiche une ligne courte au lieu du script entier.
+    pub fn start_installing(appimage: &Path) -> Result<Arc<Self>, String> {
+        let appimage = appimage.to_string_lossy();
+        Self::start_with(
+            &[
+                "/bin/bash",
+                "-s",
+                "--",
+                appimage.as_ref(),
+                crate::system_install::INSTALL_AND_SERVE,
+            ],
+            Some(crate::system_install::INSTALLER_SCRIPT),
+        )
+    }
+
+    fn start_with(args: &[&str], script: Option<&'static str>) -> Result<Arc<Self>, String> {
+        let mut child = crate::pkexec_gate::pkexec_spawn(args).map_err(|e| {
+            format!(
+                "Impossible de démarrer le helper privilégié (pkexec).\n\
+                 Détail : {e}"
+            )
+        })?;
+        if let Some(script) = script {
+            // Écrit sur un autre fil : bash ne lit le script qu'après
+            // l'authentification, le tube ne doit pas bloquer l'appelant.
+            if let Some(mut stdin) = child.stdin.take() {
+                std::thread::spawn(move || {
+                    use std::io::Write;
+                    let _ = stdin.write_all(script.as_bytes());
+                });
+            }
+        }
         let stdout = child
             .stdout
             .take()
             .ok_or_else(|| "Helper : sortie standard manquante".to_string())?;
+        // Lignes « ERREUR: » du script d'installation, reprises si le
+        // composant s'arrête avant d'être prêt.
+        let errors: Arc<Mutex<Vec<String>>> = Arc::default();
         if let Some(stderr) = child.stderr.take() {
+            let errors = Arc::clone(&errors);
             std::thread::spawn(move || {
                 for line in BufReader::new(stderr).lines().map_while(Result::ok) {
                     eprintln!("[secmet-helper] {line}");
+                    if let Some(msg) = line.strip_prefix("ERREUR: ") {
+                        errors
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .push(msg.to_string());
+                    }
                 }
             });
         }
@@ -242,9 +293,7 @@ impl Helper {
                 let code = child.try_wait().ok().flatten().and_then(|s| s.code());
                 let _ = child.kill();
                 return Err(match code {
-                    Some(126) | Some(127) => "Authentification annulée ou refusée.\n\
-                         Validez le mot de passe administrateur puis réessayez."
-                        .to_string(),
+                    Some(126) | Some(127) => AUTH_CANCELLED.to_string(),
                     _ => "Helper : aucune réponse dans le délai imparti (5 min).\n\
                           La fenêtre d'authentification est restée sans réponse ? \
                           Relancez et validez le mot de passe."
@@ -255,13 +304,19 @@ impl Helper {
         if line.trim().is_empty() {
             let code = child.wait().ok().and_then(|s| s.code());
             return Err(match code {
-                Some(126) | Some(127) => "Authentification annulée ou refusée.\n\
-                     Validez le mot de passe administrateur puis réessayez."
-                    .to_string(),
-                other => format!(
-                    "Le helper s'est arrêté avant d'être prêt (code {other:?}).\n\
-                     Vérifiez l'installation : make verify-polkit"
-                ),
+                Some(126) | Some(127) => AUTH_CANCELLED.to_string(),
+                other => {
+                    // Laisse le fil stderr relayer les dernières lignes.
+                    std::thread::sleep(Duration::from_millis(100));
+                    let errors = errors.lock().unwrap_or_else(|e| e.into_inner()).join("\n");
+                    if errors.is_empty() {
+                        format!(
+                            "Le composant système s'est arrêté avant d'être prêt (code {other:?})."
+                        )
+                    } else {
+                        format!("Installation du composant système impossible :\n{errors}")
+                    }
+                }
             });
         }
         let ready: Ready = serde_json::from_str(line.trim())
@@ -654,7 +709,7 @@ pub struct UnfreezeOutcome {
 
 fn decode<T: for<'de> Deserialize<'de>>(value: Value) -> Result<T, CallError> {
     serde_json::from_value(value)
-        .map_err(|e| CallError::protocol(format!("réponse du helper illisible : {e}")))
+        .map_err(|e| CallError::protocol(format!("réponse du composant système illisible : {e}")))
 }
 
 /// Préférences par défaut : passes HDD mémorisées, pas de firmware via USB.
@@ -798,6 +853,19 @@ pub fn ensure() -> Result<Arc<Helper>, String> {
         return Ok(h);
     }
     let helper = Helper::start()?;
+    *CURRENT.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::clone(&helper));
+    Ok(helper)
+}
+
+/// Comme [`ensure`], mais installe d'abord le composant système embarqué
+/// dans l'AppImage (même invite Polkit). Bloquant : hors du fil GTK.
+pub fn ensure_installing(appimage: &Path) -> Result<Arc<Helper>, String> {
+    let _starting = START_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(h) = current() {
+        h.shutdown();
+        *CURRENT.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+    let helper = Helper::start_installing(appimage)?;
     *CURRENT.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::clone(&helper));
     Ok(helper)
 }

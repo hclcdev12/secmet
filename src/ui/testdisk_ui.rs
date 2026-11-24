@@ -623,7 +623,7 @@ pub(super) fn show_testdisk_dialog(
 
     let hint = Label::new(Some(&tr(
         "Analyse optionnelle en lecture seule (avant ou après effacement). \
-         Ne remplace pas la vérification par relecture du helper. \
+         Ne remplace pas la vérification par relecture du composant système. \
          Cochez les disques à analyser ; le statut et les détails restent dans cette fenêtre.",
     )));
     hint.set_wrap(true);

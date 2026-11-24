@@ -168,7 +168,7 @@ pub(super) fn show_unlock_dialog<F>(
     instructions.set_xalign(0.0);
     instructions.set_text(&tr(
         "Ce disque porte un mot de passe ATA Security (verrouillé, ou simplement actif).\n\n\
-         Saisissez le mot de passe connu du propriétaire : le helper déverrouille le disque \
+         Saisissez le mot de passe connu du propriétaire : SecMet déverrouille le disque \
          puis lève ce mot de passe, afin de rendre l'effacement firmware possible. \
          Sans le bon mot de passe, le disque refuse et rien n'est modifié. Le compteur de \
          tentatives du disque peut se bloquer après cinq refus (cycle d'alimentation requis).",
@@ -274,7 +274,7 @@ pub(super) fn show_unlock_dialog<F>(
                 Err(std::sync::mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     btn.set_sensitive(true);
-                    feedback.set_text(&tr("Réponse du helper absente."));
+                    feedback.set_text(&tr("Le composant système n'a pas répondu."));
                     glib::ControlFlow::Break
                 }
             }
@@ -370,6 +370,14 @@ pub(super) fn show_condemn_dialog<F>(
     dialog.present();
 }
 
+/// Boutons Oui / Non traduits par SecMet : `ButtonsType::YesNo` prenait les
+/// libellés de GTK dans la langue du système (« Yes / No » sur un poste en
+/// anglais, au milieu d'un dialogue en français).
+fn add_answer_buttons(dialog: &MessageDialog, yes: &str, no: &str) {
+    dialog.add_button(no, ResponseType::No);
+    dialog.add_button(yes, ResponseType::Yes);
+}
+
 /// Question modale Oui/Non générique ; `on_confirm` est appelé si Oui.
 /// La réponse par défaut est « Non » : Entrée n'accepte pas par accident.
 pub(super) fn confirm_action<F>(
@@ -384,9 +392,10 @@ pub(super) fn confirm_action<F>(
         Some(parent),
         DialogFlags::MODAL,
         MessageType::Question,
-        ButtonsType::YesNo,
+        ButtonsType::None,
         message,
     );
+    add_answer_buttons(&dialog, &tr("Oui"), &tr("Non"));
     apply_color_scheme_class(&dialog);
     dialog.set_title(Some(title));
     dialog.set_default_response(ResponseType::No);
@@ -418,13 +427,37 @@ pub(super) fn confirm_action_dual<F, G>(
     F: FnOnce() + 'static,
     G: FnOnce() + 'static,
 {
+    confirm_choice(
+        parent,
+        title,
+        message,
+        (&tr("Oui"), &tr("Non")),
+        on_confirm,
+        on_decline,
+    );
+}
+
+/// Comme [`confirm_action_dual`], avec des libellés de boutons qui disent
+/// l'action (« Installer » / « Quitter ») : `answers` = (oui, non).
+pub(super) fn confirm_choice<F, G>(
+    parent: &ApplicationWindow,
+    title: &str,
+    message: &str,
+    answers: (&str, &str),
+    on_confirm: F,
+    on_decline: G,
+) where
+    F: FnOnce() + 'static,
+    G: FnOnce() + 'static,
+{
     let dialog = MessageDialog::new(
         Some(parent),
         DialogFlags::MODAL,
         MessageType::Question,
-        ButtonsType::YesNo,
+        ButtonsType::None,
         message,
     );
+    add_answer_buttons(&dialog, answers.0, answers.1);
     apply_color_scheme_class(&dialog);
     dialog.set_title(Some(title));
     dialog.set_default_response(ResponseType::No);
@@ -516,9 +549,10 @@ pub(super) fn show_confirmation_dialog_async(
         Some(&window),
         DialogFlags::MODAL,
         MessageType::Warning,
-        ButtonsType::YesNo,
+        ButtonsType::None,
         &message,
     );
+    add_answer_buttons(&dialog, &tr("Oui"), &tr("Non"));
     apply_color_scheme_class(&dialog);
     dialog.set_title(Some(&tr("⚠️ CONFIRMATION FINALE")));
     // La réponse par défaut (Entrée, focus initial) est « Non » :

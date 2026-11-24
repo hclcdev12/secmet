@@ -33,8 +33,10 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Batch {id} — {operator} — {units}, opened on {date}",
         "Charge {id} — {operator} — {units}, eröffnet am {date}",
     ),
-    ("{count} machine(s)", "{count} machine(s)", "{count} Rechner"),
-    ("{count} disque(s)", "{count} disk(s)", "{count} Datenträger"),
+    ("{count} machine", "{count} machine", "{count} Rechner"),
+    ("{count} machines", "{count} machines", "{count} Rechner"),
+    ("{count} disque", "{count} disk", "{count} Datenträger"),
+    ("{count} disques", "{count} disks", "{count} Datenträger"),
     (
         "{count} session(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : disques à refaire ou à consigner en échec.",
         "{count} session(s) interrupted (power loss or shutdown during erasure): disks to redo or to record as failed.",

@@ -2,20 +2,30 @@
 use gtk4::prelude::*;
 use gtk4::{Button, CssProvider};
 
+/// Nom de thème sombre (« Adwaita:dark », « Adwaita-dark », « Noir… »).
+fn theme_name_is_dark(name: &str) -> bool {
+    let t = name.to_lowercase();
+    t.contains("dark") || t.contains("noir")
+}
+
 pub(super) fn ui_prefers_dark_theme() -> bool {
+    // GTK_THEME a priorité sur les réglages : le lanceur de l'AppImage pose
+    // « Adwaita:dark » quand le bureau est en sombre, alors que
+    // gtk-theme-name reste « Adwaita » et prefer-dark à faux.
+    if let Ok(theme) = std::env::var("GTK_THEME") {
+        if !theme.is_empty() {
+            return theme_name_is_dark(&theme);
+        }
+    }
     let Some(settings) = gtk4::Settings::default() else {
         return false;
     };
     if settings.is_gtk_application_prefer_dark_theme() {
         return true;
     }
-    if let Some(theme) = settings.gtk_theme_name() {
-        let t = theme.to_lowercase();
-        if t.contains("dark") || t.contains("noir") {
-            return true;
-        }
-    }
-    false
+    settings
+        .gtk_theme_name()
+        .is_some_and(|theme| theme_name_is_dark(&theme))
 }
 
 /// GTK CSS n'accepte pas @media prefers-color-scheme : on pose une classe sur fenêtres/dialogues.

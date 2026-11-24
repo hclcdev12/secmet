@@ -28,17 +28,27 @@ use super::testdisk_ui::update_testdisk_button_state;
 use super::types::{CondemnContext, DiskWidget, JobRecord, JobState};
 use super::verify::{apply_job_validation, set_verification_message};
 
-pub(super) fn erase_method_description(disk: &Disk, passes: u8) -> String {
+pub(super) fn erase_method_description(disk: &Disk, _passes: u8) -> String {
     let base = disk.plan_description();
     if disk.is_ssd {
-        base
-    } else {
-        let key = if passes > 1 {
-            "{base} — {passes} passes pseudo-aléatoires + zéros"
-        } else {
-            "{base} — {passes} passe pseudo-aléatoire + zéros"
-        };
-        trf(key, &[("base", &base), ("passes", &passes.to_string())])
+        return base;
+    }
+    // Écriture hôte : le plan nomme son nombre de passes par défaut, que le
+    // choix sous la liste peut changer. Le récapitulatif ne le répète pas
+    // (il apparaissait deux fois, et pouvait contredire le choix).
+    let primary = disk
+        .verdict
+        .as_ref()
+        .and_then(|v| v.plan.as_ref())
+        .map(|p| p.primary.method.clone())
+        .filter(|m| m.starts_with("HOST_OVERWRITE_"));
+    match primary {
+        Some(method) => base.replacen(
+            &crate::certificate::method_label(&method),
+            &tr("Écriture hôte, passes choisies ci-dessous"),
+            1,
+        ),
+        None => base,
     }
 }
 
@@ -252,8 +262,25 @@ fn find_widget(widgets: &Rc<RefCell<Vec<DiskWidget>>>, disk_name: &str) -> Optio
         .cloned()
 }
 
+/// Étape en cours, en mots (le helper envoie des noms techniques).
+fn phase_label(phase: &str) -> String {
+    if let Some(rest) = phase.strip_prefix("pass ") {
+        return trf("Passe {n}", &[("n", rest)]);
+    }
+    match phase {
+        "canaries" => tr("Préparation des témoins"),
+        "firmware" => tr("Commande du disque"),
+        "zero" => tr("Passe de zéros"),
+        "verify" => tr("Vérification"),
+        "signatures" => tr("Recherche de données résiduelles"),
+        other => other.to_string(),
+    }
+}
+
+/// Ligne de progression : l'étape et les chiffres. La méthode, longue,
+/// reste dans le récapitulatif ; le code interne n'est plus affiché.
 fn progress_text(p: &Progress) -> String {
-    let mut text = format!("{} · {}", p.method, p.phase);
+    let mut text = phase_label(&p.phase);
     if p.bytes_total > 0 || p.percent > 0 {
         text.push_str(&format!(" · {} %", p.percent));
     }
@@ -395,6 +422,7 @@ pub(super) fn launch_erase_operations_with_passes(
             widget.stop_button.set_sensitive(false);
         }
     }
+    super::disk_list::refresh_action_buttons(&all_widgets.borrow());
 
     let (tx, rx): (EventSender, EventReceiver) = mpsc::channel();
     let tokens: Rc<RefCell<HashMap<String, String>>> = Rc::new(RefCell::new(HashMap::new()));
@@ -449,7 +477,9 @@ pub(super) fn launch_erase_operations_with_passes(
                 let outcome = match reply_rx.try_recv() {
                     Ok(outcome) => outcome,
                     Err(mpsc::TryRecvError::Empty) => return glib::ControlFlow::Continue,
-                    Err(mpsc::TryRecvError::Disconnected) => Err(tr("Réponse du helper absente")),
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        Err(tr("Le composant système n'a pas répondu."))
+                    }
                 };
                 let Some(widget) = find_widget(&all_widgets, &disk_name) else {
                     return glib::ControlFlow::Break;
@@ -818,7 +848,11 @@ pub(super) fn launch_erase_operations_with_passes(
             select_all_clone3.set_sensitive(true);
             update_retry_button_state(&job_states_clone, &retry_failed_button_clone);
             for widget in all_widgets_clone.borrow().iter() {
-                if !selected_disk_names_for_end.contains(&widget.disk.name) {
+                if selected_disk_names_for_end.contains(&widget.disk.name) {
+                    // Disque traité : décoché, il ne compte plus dans la
+                    // sélection (relance par « Relancer les échoués »).
+                    widget.checkbox.set_active(false);
+                } else {
                     // Même règle qu'à l'inventaire : le disque système et
                     // les disques indisponibles restent non cochables.
                     widget

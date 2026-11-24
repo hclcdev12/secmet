@@ -5,24 +5,134 @@
 pub(super) const TABLE: &[(&str, &str, &str)] = &[
     // ── auth.rs ──
     (
+        "Composant système plus récent",
+        "Newer system component",
+        "Neuere Systemkomponente",
+    ),
+    (
+        "Le composant système installé sur cet ordinateur ({installed}) est plus récent que cette version de SecMet ({bundled}). Utilisez de préférence la version la plus récente de SecMet.\n\nContinuer avec cette version remplace le composant par le sien, plus ancien (mot de passe administrateur demandé une fois).",
+        "The system component installed on this computer ({installed}) is newer than this version of SecMet ({bundled}). Preferably use the latest version of SecMet.\n\nContinuing with this version replaces the component with its own, older one (administrator password requested once).",
+        "Die auf diesem Computer installierte Systemkomponente ({installed}) ist neuer als diese SecMet-Version ({bundled}). Verwenden Sie vorzugsweise die neueste SecMet-Version.\n\nWenn Sie mit dieser Version fortfahren, wird die Komponente durch ihre eigene, ältere ersetzt (Administratorpasswort wird einmal abgefragt).",
+    ),
+    (
+        "Remplacer",
+        "Replace",
+        "Ersetzen",
+    ),
+    (
+        "Passe {n}",
+        "Pass {n}",
+        "Durchlauf {n}",
+    ),
+    (
+        "Préparation des témoins",
+        "Preparing canaries",
+        "Vorbereitung der Prüfmarken",
+    ),
+    (
+        "Commande du disque",
+        "Disk command",
+        "Datenträgerbefehl",
+    ),
+    (
+        "Passe de zéros",
+        "Zero pass",
+        "Nulldurchlauf",
+    ),
+    (
+        "Vérification",
+        "Verification",
+        "Prüfung",
+    ),
+    (
+        "Recherche de données résiduelles",
+        "Searching for residual data",
+        "Suche nach Restdaten",
+    ),
+    (
+        "Écriture hôte, passes choisies ci-dessous",
+        "Host write, passes chosen below",
+        "Host-Schreiben, Durchläufe unten gewählt",
+    ),
+    (
+        "Installation de SecMet",
+        "SecMet installation",
+        "SecMet-Installation",
+    ),
+    (
+        "Première utilisation de SecMet sur cet ordinateur : SecMet doit installer son composant système, qui donne accès aux disques et contient les outils d'effacement.\n\nLe mot de passe administrateur de l'ordinateur sera demandé une fois.",
+        "First use of SecMet on this computer: SecMet must install its system component, which gives access to the disks and contains the erasure tools.\n\nThe computer's administrator password will be requested once.",
+        "Erste Verwendung von SecMet auf diesem Computer: SecMet muss seine Systemkomponente installieren, die den Zugriff auf die Datenträger ermöglicht und die Löschwerkzeuge enthält.\n\nDas Administratorpasswort des Computers wird einmal abgefragt.",
+    ),
+    (
+        "Cette version de SecMet apporte une nouvelle version de son composant système, déjà installé sur cet ordinateur.\n\nLe mot de passe administrateur de l'ordinateur sera demandé une fois.",
+        "This version of SecMet brings a new version of its system component, already installed on this computer.\n\nThe computer's administrator password will be requested once.",
+        "Diese SecMet-Version bringt eine neue Version ihrer Systemkomponente mit, die bereits auf diesem Computer installiert ist.\n\nDas Administratorpasswort des Computers wird einmal abgefragt.",
+    ),
+    (
+        "Sans son composant système, SecMet ne peut pas accéder aux disques.\n\nL'application va se fermer.",
+        "Without its system component, SecMet cannot access the disks.\n\nThe application will close.",
+        "Ohne seine Systemkomponente kann SecMet nicht auf die Datenträger zugreifen.\n\nDie Anwendung wird geschlossen.",
+    ),
+    (
+        "Installation interrompue.",
+        "Installation interrupted.",
+        "Installation unterbrochen.",
+    ),
+    (
+        "Authentification annulée",
+        "Authentication cancelled",
+        "Authentifizierung abgebrochen",
+    ),
+    (
+        "SecMet a besoin du mot de passe administrateur de l'ordinateur pour accéder aux disques.",
+        "SecMet needs the computer's administrator password to access the disks.",
+        "SecMet benötigt das Administratorpasswort des Computers, um auf die Datenträger zuzugreifen.",
+    ),
+    (
+        "Oui",
+        "Yes",
+        "Ja",
+    ),
+    (
+        "Non",
+        "No",
+        "Nein",
+    ),
+    (
+        "Installer",
+        "Install",
+        "Installieren",
+    ),
+    (
+        "Quitter",
+        "Quit",
+        "Beenden",
+    ),
+    (
+        "Mettre à jour",
+        "Update",
+        "Aktualisieren",
+    ),
+    (
+        "Plus tard",
+        "Later",
+        "Später",
+    ),
+    (
+        "Réessayer",
+        "Retry",
+        "Erneut versuchen",
+    ),
+    (
         "Composant système requis",
         "System component required",
         "Systemkomponente erforderlich",
     ),
     (
-        "SecMet doit installer son composant système sur cette machine :\nhelper privilégié, policy PolicyKit et outils disque embarqués.\n\nMotif : {detail}\n\nInstaller maintenant ?\n(un mot de passe administrateur sera demandé)",
-        "SecMet must install its system component on this machine:\nprivileged helper, PolicyKit policy and bundled disk tools.\n\nReason: {detail}\n\nInstall now?\n(an administrator password will be requested)",
-        "SecMet muss seine Systemkomponente auf diesem Rechner installieren:\nprivilegierter Helper, PolicyKit-Richtlinie und mitgelieferte Datenträger-Werkzeuge.\n\nGrund: {detail}\n\nJetzt installieren?\n(ein Administratorpasswort wird abgefragt)",
-    ),
-    (
         "Mise à jour du composant système",
         "System component update",
         "Aktualisierung der Systemkomponente",
-    ),
-    (
-        "La version embarquée du composant système (helper, outils) diffère\nde celle installée sur cette machine.\n\nMettre à jour maintenant ?\n(un mot de passe administrateur sera demandé)",
-        "The bundled version of the system component (helper, tools) differs\nfrom the one installed on this machine.\n\nUpdate now?\n(an administrator password will be requested)",
-        "Die mitgelieferte Version der Systemkomponente (Helper, Werkzeuge) unterscheidet sich\nvon der auf diesem Rechner installierten.\n\nJetzt aktualisieren?\n(ein Administratorpasswort wird abgefragt)",
     ),
     (
         "Installation impossible",
@@ -38,11 +148,6 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Composant système absent",
         "System component missing",
         "Systemkomponente fehlt",
-    ),
-    (
-        "Sans le composant système, SecMet ne peut pas effectuer\nd'opérations sur les disques.\n\nL'application va se fermer.",
-        "Without the system component, SecMet cannot perform\nany operation on disks.\n\nThe application will now close.",
-        "Ohne die Systemkomponente kann SecMet keine\nVorgänge auf Datenträgern ausführen.\n\nDie Anwendung wird beendet.",
     ),
     (
         "Autorisation refusée",
@@ -96,15 +201,12 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Gesamt ausgewählt: 0 GB",
     ),
     (
-        "Total sélectionné : {size} To",
-        "Total selected: {size} TB",
-        "Gesamt ausgewählt: {size} TB",
+        "Total sélectionné : {size}",
+        "Total selected: {size}",
+        "Gesamt ausgewählt: {size}",
     ),
-    (
-        "Total sélectionné : {size} Go",
-        "Total selected: {size} GB",
-        "Gesamt ausgewählt: {size} GB",
-    ),
+    ("{n} Go", "{n} GB", "{n} GB"),
+    ("{n} To", "{n} TB", "{n} TB"),
     (
         "❌ Inventaire impossible : {error}",
         "❌ Inventory failed: {error}",
@@ -161,9 +263,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "ATA-Datenträger entsperren",
     ),
     (
-        "Ce disque porte un mot de passe ATA Security (verrouillé, ou simplement actif).\n\nSaisissez le mot de passe connu du propriétaire : le helper déverrouille le disque puis lève ce mot de passe, afin de rendre l'effacement firmware possible. Sans le bon mot de passe, le disque refuse et rien n'est modifié. Le compteur de tentatives du disque peut se bloquer après cinq refus (cycle d'alimentation requis).",
-        "This disk carries an ATA Security password (locked, or simply active).\n\nEnter the password known to the owner: the helper unlocks the disk and then lifts this password so that a firmware erase becomes possible. Without the correct password the disk refuses and nothing is changed. The disk's attempt counter may lock after five refusals (power cycle required).",
-        "Dieser Datenträger trägt ein ATA-Security-Passwort (gesperrt oder lediglich aktiv).\n\nGeben Sie das dem Eigentümer bekannte Passwort ein: der Helper entsperrt den Datenträger und hebt dieses Passwort anschließend auf, damit eine Firmware-Löschung möglich wird. Ohne das richtige Passwort lehnt der Datenträger ab und nichts wird verändert. Der Versuchszähler des Datenträgers kann nach fünf Ablehnungen sperren (Stromzyklus erforderlich).",
+        "Ce disque porte un mot de passe ATA Security (verrouillé, ou simplement actif).\n\nSaisissez le mot de passe connu du propriétaire : SecMet déverrouille le disque puis lève ce mot de passe, afin de rendre l'effacement firmware possible. Sans le bon mot de passe, le disque refuse et rien n'est modifié. Le compteur de tentatives du disque peut se bloquer après cinq refus (cycle d'alimentation requis).",
+        "This disk carries an ATA Security password (locked, or simply active).\n\nEnter the password known to the owner: SecMet unlocks the disk and then lifts this password so that a firmware erase becomes possible. Without the correct password the disk refuses and nothing is changed. The disk's attempt counter may lock after five refusals (power cycle required).",
+        "Dieser Datenträger trägt ein ATA-Security-Passwort (gesperrt oder lediglich aktiv).\n\nGeben Sie das dem Eigentümer bekannte Passwort ein: SecMet entsperrt den Datenträger und hebt dieses Passwort anschließend auf, damit eine Firmware-Löschung möglich wird. Ohne das richtige Passwort lehnt der Datenträger ab und nichts wird verändert. Der Versuchszähler des Datenträgers kann nach fünf Ablehnungen sperren (Stromzyklus erforderlich).",
     ),
     (
         "Mot de passe ATA (1 à 32 caractères ASCII)",
@@ -194,9 +296,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ),
     ("Refusé : {error}", "Refused: {error}", "Abgelehnt: {error}"),
     (
-        "Réponse du helper absente.",
-        "No response from the helper.",
-        "Keine Antwort vom Helper.",
+        "Le composant système n'a pas répondu.",
+        "The system component did not respond.",
+        "Die Systemkomponente hat nicht geantwortet.",
     ),
     // ── dialogs.rs : confirmation finale ──
     (

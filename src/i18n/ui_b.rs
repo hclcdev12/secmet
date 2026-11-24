@@ -42,7 +42,6 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         " · läuft (Dauer unbekannt)",
     ),
     ("Démarrage…", "Starting…", "Wird gestartet…"),
-    ("Réponse du helper absente", "No reply from the helper", "Keine Antwort vom Helper"),
     (
         "Arrêt demandé — interruption à la prochaine frontière",
         "Stop requested — interrupting at the next boundary",
@@ -193,9 +192,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Prüfung: OK — {checked} Blöcke erneut gelesen, {anomalies} Anomalie, keine Restsignatur",
     ),
     (
-        "Vérification : OK (validée par le helper)",
-        "Verification: OK (validated by the helper)",
-        "Prüfung: OK (vom Helper bestätigt)",
+        "Vérification : OK (validée par le composant système)",
+        "Verification: OK (validated by the system component)",
+        "Prüfung: OK (von der Systemkomponente bestätigt)",
     ),
     (
         "Vérification : non effectuée (interrompu)",
@@ -254,14 +253,14 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ),
     ("Échec génération PDF", "PDF generation failed", "PDF-Erzeugung fehlgeschlagen"),
     (
-        "Certificat PDF groupé créé ({count} disque(s) dans le lot).\n\nFichier :\n{path}\n\nUn fichier JSON miroir unique pour ce lot est enregistré dans le même dossier.",
-        "Grouped PDF certificate created ({count} disk(s) in the batch).\n\nFile:\n{path}\n\nA single mirror JSON file for this batch is saved in the same folder.",
-        "Sammel-PDF-Zertifikat erstellt ({count} Datenträger im Los).\n\nDatei:\n{path}\n\nEine einzelne JSON-Spiegeldatei für dieses Los wird im selben Ordner gespeichert.",
+        "Certificat PDF groupé créé ({disks} dans le lot).\n\nFichier :\n{path}\n\nSa version signée (fichier .json, pour une vérification automatique) est enregistrée dans le même dossier.",
+        "Grouped PDF certificate created ({disks} in the batch).\n\nFile:\n{path}\n\nIts signed version (.json file, for automated verification) is saved in the same folder.",
+        "Sammel-PDF-Zertifikat erstellt ({disks} im Los).\n\nDatei:\n{path}\n\nSeine signierte Fassung (.json-Datei, für die automatische Prüfung) wird im selben Ordner gespeichert.",
     ),
     (
-        "Certificat PDF créé ({count} disque(s)).\n\nFichier :\n{path}\n\nDes fichiers JSON miroir (métadonnées techniques) sont enregistrés dans le même dossier.",
-        "PDF certificate created ({count} disk(s)).\n\nFile:\n{path}\n\nMirror JSON files (technical metadata) are saved in the same folder.",
-        "PDF-Zertifikat erstellt ({count} Datenträger).\n\nDatei:\n{path}\n\nJSON-Spiegeldateien (technische Metadaten) werden im selben Ordner gespeichert.",
+        "Certificat PDF créé ({disks}).\n\nFichier :\n{path}\n\nLa version signée de chaque certificat (fichier .json, pour une vérification automatique) est enregistrée dans le même dossier.",
+        "PDF certificate created ({disks}).\n\nFile:\n{path}\n\nThe signed version of each certificate (.json file, for automated verification) is saved in the same folder.",
+        "PDF-Zertifikat erstellt ({disks}).\n\nDatei:\n{path}\n\nDie signierte Fassung jedes Zertifikats (.json-Datei, für die automatische Prüfung) wird im selben Ordner gespeichert.",
     ),
     ("Certificat PDF créé", "PDF certificate created", "PDF-Zertifikat erstellt"),
     ("Ouvrir le dossier", "Open folder", "Ordner öffnen"),
@@ -299,9 +298,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "TestDisk fehlt oder ist nicht verfügbar.\nInstallieren: apt install testdisk",
     ),
     (
-        "Analyse optionnelle en lecture seule (avant ou après effacement). Ne remplace pas la vérification par relecture du helper. Cochez les disques à analyser ; le statut et les détails restent dans cette fenêtre.",
-        "Optional read-only analysis (before or after erasure). It does not replace the helper's read-back verification. Tick the disks to analyse; status and details stay in this window.",
-        "Optionale schreibgeschützte Analyse (vor oder nach der Löschung). Ersetzt nicht die Rücklese-Prüfung des Helpers. Wählen Sie die zu analysierenden Datenträger; Status und Details bleiben in diesem Fenster.",
+        "Analyse optionnelle en lecture seule (avant ou après effacement). Ne remplace pas la vérification par relecture du composant système. Cochez les disques à analyser ; le statut et les détails restent dans cette fenêtre.",
+        "Optional read-only analysis (before or after erasure). It does not replace the system component's read-back verification. Tick the disks to analyse; status and details stay in this window.",
+        "Optionale schreibgeschützte Analyse (vor oder nach der Löschung). Ersetzt nicht die Rücklese-Prüfung der Systemkomponente. Wählen Sie die zu analysierenden Datenträger; Status und Details bleiben in diesem Fenster.",
     ),
     ("Afficher les détails", "Show details", "Details anzeigen"),
     (

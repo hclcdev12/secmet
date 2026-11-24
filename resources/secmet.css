@@ -310,6 +310,10 @@ progressbar > trough > progress {
     font-size: 13px;
     color: @theme_fg_color;
 }
+.global-status {
+    margin-top: 6px;
+    font-size: 13px;
+}
 
 /* ── Vérification post-effacement ─────────────────────────────── */
 .verify-label {
@@ -824,4 +828,20 @@ checkbutton.disk-checkbox check:disabled {
   background-color: alpha(#2563eb, 0.14);
   border: 1px solid #2563eb;
   font-weight: bold;
+}
+
+/* Dialogues de message (installation, confirmations, certificat créé) :
+   certains thèmes (Mint-Y, Yaru) collent les boutons aux bords de la
+   fenêtre, sans marge ni écart. */
+window.dialog.message .dialog-action-area {
+  margin: 4px 14px 14px 14px;
+  border-spacing: 8px;
+}
+window.dialog.message .dialog-action-area > button {
+  border-radius: 6px;
+  min-height: 32px;
+}
+window.dialog.message box.vertical > label {
+  margin-left: 6px;
+  margin-right: 6px;
 }

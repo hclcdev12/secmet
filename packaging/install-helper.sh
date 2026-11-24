@@ -2,7 +2,15 @@
 # Installation du composant système SecMet depuis une AppImage.
 #
 # Embarqué dans le binaire secmet (include_str!) et exécuté en root par
-# pkexec : `bash -c "<ce script>" secmet-install <fichier AppImage>`.
+# pkexec : `bash -s -- <fichier AppImage> [--serve] < ce script`. Le script
+# passe par l'entrée standard pour que la fenêtre d'authentification montre
+# une commande courte, pas le script entier.
+#
+# --serve : une fois le composant installé, le script se remplace par
+# `secmet-helper serve` (même processus root, même PKEXEC_UID) : SecMet
+# n'a demandé qu'un mot de passe pour installer et démarrer. La sortie
+# standard est réservée à la ligne « ready » du helper : tout ce que le
+# script écrit part sur la sortie d'erreur.
 #
 # Pourquoi extraire depuis le fichier et non lire le montage : le montage
 # FUSE d'une AppImage n'est lisible que par l'utilisateur qui l'a lancée
@@ -22,7 +30,11 @@ fail() {
     exit 3
 }
 
-APPIMAGE="${1:?usage: install-helper.sh <fichier AppImage>}"
+APPIMAGE="${1:?usage: install-helper.sh <fichier AppImage> [--serve]}"
+SERVE="${2:-}"
+[[ -z "$SERVE" || "$SERVE" == "--serve" ]] || fail "option inconnue : $SERVE"
+# Sortie standard d'origine gardée en 3 pour le helper, script sur stderr.
+exec 3>&1 1>&2
 [[ -f "$APPIMAGE" ]] || fail "AppImage introuvable : $APPIMAGE"
 [[ -x "$APPIMAGE" ]] || fail "AppImage non exécutable : $APPIMAGE"
 [[ "$(id -u)" -eq 0 ]] || fail "doit être exécuté en root (pkexec)"
@@ -73,3 +85,10 @@ echo "Composant système SecMet installé :"
 echo "  /usr/bin/secmet-helper"
 [[ -d "$BUNDLE_SRC" ]] && echo "  /usr/lib/secmet/ (outils disque embarqués)"
 echo "  /usr/share/polkit-1/actions/secmet.policy"
+
+if [[ "$SERVE" == "--serve" ]]; then
+    rm -rf "$WORK"
+    trap - EXIT
+    cd /
+    exec /usr/bin/secmet-helper serve 1>&3 3>&-
+fi

@@ -242,16 +242,23 @@ pub(super) fn build_ui(app: &Application) {
     // l'authentification lancerait un second chargement.
     refresh_button.set_sensitive(false);
 
+    // Message d'état (effacement en cours, lot, PDF) sur sa propre ligne,
+    // au-dessus des boutons : dans la barre de boutons, déjà pleine, il était
+    // réduit à « … » et élargissait la fenêtre. Caché tant qu'il est vide.
     let global_status_label = Label::new(Some(""));
-    // Barre de boutons : un message long (lot, PDF) ne doit pas élargir la
-    // fenêtre au-delà de l'écran ; coupé par des points de suspension.
-    global_status_label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-    global_status_label.set_max_width_chars(40);
+    global_status_label.add_css_class("global-status");
+    global_status_label.set_xalign(0.0);
+    global_status_label.set_wrap(true);
+    global_status_label.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
+    global_status_label.set_visible(false);
+    global_status_label.connect_label_notify(|label| {
+        label.set_visible(!label.label().is_empty());
+    });
+    main_box.append(&global_status_label);
 
     let bottom_row = GtkBox::new(Orientation::Horizontal, 8);
     bottom_row.set_margin_top(10);
     bottom_row.append(&refresh_button);
-    bottom_row.append(&global_status_label);
     let spacer_bottom = GtkBox::new(Orientation::Horizontal, 0);
     spacer_bottom.set_hexpand(true);
     bottom_row.append(&spacer_bottom);
@@ -263,6 +270,14 @@ pub(super) fn build_ui(app: &Application) {
     bottom_row.append(&start_button);
 
     main_box.append(&bottom_row);
+
+    super::disk_list::register_action_buttons(super::disk_list::ActionButtons {
+        start: start_button.clone(),
+        unlock: unlock_button.clone(),
+        defrozen: defrozen_button.clone(),
+        operations_active: operations_active.clone(),
+    });
+    super::disk_list::refresh_action_buttons(&[]);
 
     window.set_child(Some(&main_box));
 

@@ -130,6 +130,13 @@ pub fn tr_in(lang: Lang, key: &str) -> &str {
     }
 }
 
+/// Nombre accordé : `one` pour 1, `many` sinon, chacun avec `{count}`
+/// (« 1 disque », « 3 disques » au lieu de « disque(s) »).
+pub fn count_text(count: usize, one: &str, many: &str) -> String {
+    let key = if count == 1 { one } else { many };
+    trf(key, &[("count", &count.to_string())])
+}
+
 /// Traduction puis substitution des marqueurs `{nom}`.
 pub fn trf(key: &str, args: &[(&str, &str)]) -> String {
     trf_in(current(), key, args)

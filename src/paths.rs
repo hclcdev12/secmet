@@ -166,25 +166,21 @@ pub fn verify_polkit_policy() -> Result<(), String> {
     let helper_path = Path::new(&helper);
 
     if !helper_path.is_file() {
-        return Err(format!(
-            "Helper introuvable: {helper}\n\
-             Installez-le avec: make dev"
-        ));
+        return Err(format!("Composant système absent : {helper}"));
     }
 
     let meta =
         std::fs::metadata(helper_path).map_err(|e| format!("Impossible de lire {helper}: {e}"))?;
     #[cfg(unix)]
     if meta.permissions().mode() & 0o111 == 0 {
-        return Err(format!("Helper non exécutable: {helper}"));
+        return Err(format!("Composant système non exécutable : {helper}"));
     }
 
     let candidates = polkit_policy_candidates(&helper);
     let policy_path = candidates.iter().find(|p| p.is_file()).ok_or_else(|| {
         format!(
-            "Policy Polkit introuvable ({POLICY_FILENAME}).\n\
-                 Chemins testés:\n{}\n\
-                 Installez-la avec: make dev",
+            "Règle d'autorisation PolicyKit absente ({POLICY_FILENAME}).\n\
+                 Chemins testés :\n{}",
             candidates
                 .iter()
                 .map(|p| format!("  - {}", p.display()))
@@ -205,10 +201,9 @@ pub fn verify_polkit_policy() -> Result<(), String> {
 
     if exec_path != helper {
         return Err(format!(
-            "Policy Polkit incohérente:\n\
-             helper={helper}\n\
-             policy ({}) → exec.path={exec_path}\n\
-             Relancez: make dev",
+            "Règle d'autorisation PolicyKit incohérente :\n\
+             composant système = {helper}\n\
+             règle ({}) → exec.path = {exec_path}",
             policy_path.display()
         ));
     }

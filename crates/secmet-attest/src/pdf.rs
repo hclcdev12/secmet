@@ -563,6 +563,8 @@ fn pdf_text_string_utf16(text: &str) -> Vec<u8> {
 fn bounded_list(items: &[String], max: usize, t: &Texts) -> String {
     if items.len() <= max {
         items.join(", ")
+    } else if max == 0 {
+        fill(t.more_items, &[("n", &items.len().to_string())])
     } else {
         format!(
             "{} {}",
@@ -693,6 +695,8 @@ struct Row<'a> {
     value: String,
     font: Font,
     color: Rgb,
+    /// Empreinte hexadécimale en petit corps ([`Row::hash`]).
+    small: bool,
 }
 
 impl<'a> Row<'a> {
@@ -702,6 +706,7 @@ impl<'a> Row<'a> {
             value: value.into(),
             font: Font::Bold,
             color: INK,
+            small: false,
         }
     }
 
@@ -711,6 +716,20 @@ impl<'a> Row<'a> {
             value: value.into(),
             font: Font::Mono,
             color: INK,
+            small: false,
+        }
+    }
+
+    /// Empreinte ou clé hexadécimale : chasse fixe plus petite, pour qu'une
+    /// empreinte SHA-256 tienne sur une ligne et la signature sur deux
+    /// (la carte de validation débordait sur le pied de page).
+    fn hash(label: &'a str, value: impl Into<String>) -> Self {
+        Self {
+            label,
+            value: value.into(),
+            font: Font::Mono,
+            color: INK,
+            small: true,
         }
     }
 
@@ -718,9 +737,36 @@ impl<'a> Row<'a> {
         self.color = color;
         self
     }
+
+    fn size(&self) -> f64 {
+        if self.small {
+            HASH_SIZE
+        } else {
+            ROW_SIZE
+        }
+    }
+
+    fn line_step(&self) -> f64 {
+        if self.small {
+            8.5
+        } else {
+            11.0
+        }
+    }
+
+    fn lines(&self, value_w: f64) -> Vec<String> {
+        wrap(&self.value, self.font, self.size(), value_w)
+    }
+
+    fn height(&self, value_w: f64) -> f64 {
+        let lines = self.lines(value_w).len().max(1) as f64;
+        ROW_STEP + (lines - 1.0) * self.line_step()
+    }
 }
 
 const ROW_SIZE: f64 = 8.5;
+/// Corps des empreintes hexadécimales ([`Row::hash`]).
+const HASH_SIZE: f64 = 6.5;
 const ROW_STEP: f64 = 14.5;
 const CARD_HEAD_H: f64 = 24.0;
 const CARD_PAD: f64 = 12.0;
@@ -728,12 +774,7 @@ const LABEL_W: f64 = 92.0;
 
 /// Hauteur d'une colonne de lignes, valeurs repliées sur `value_w`.
 fn rows_height(rows: &[Row<'_>], value_w: f64) -> f64 {
-    rows.iter()
-        .map(|r| {
-            let lines = wrap(&r.value, r.font, ROW_SIZE, value_w).len().max(1) as f64;
-            ROW_STEP + (lines - 1.0) * 11.0
-        })
-        .sum()
+    rows.iter().map(|r| r.height(value_w)).sum()
 }
 
 /// Dessine des lignes à partir de (`x`, `top`) ; renvoie la hauteur occupée.
@@ -742,18 +783,17 @@ fn draw_rows(canvas: &mut Canvas, x: f64, top: f64, width: f64, rows: &[Row<'_>]
     let mut y = top - 10.0;
     for row in rows {
         canvas.text(x, y, Font::Regular, ROW_SIZE, MUTED, row.label);
-        let lines = wrap(&row.value, row.font, ROW_SIZE, value_w);
-        for (i, line) in lines.iter().enumerate() {
+        for (i, line) in row.lines(value_w).iter().enumerate() {
             canvas.text(
                 x + LABEL_W,
-                y - 11.0 * i as f64,
+                y - row.line_step() * i as f64,
                 row.font,
-                ROW_SIZE,
+                row.size(),
                 row.color,
                 line,
             );
         }
-        y -= ROW_STEP + (lines.len().max(1) as f64 - 1.0) * 11.0;
+        y -= row.height(value_w);
     }
     top - y - 10.0 + 4.0
 }
@@ -827,6 +867,12 @@ fn year_of(date: &str) -> String {
 }
 
 /// Dessine une page de certificat.
+///
+/// Les listes longues (réserves, signatures résiduelles) sont d'abord
+/// imprimées jusqu'à [`MAX_LIST_ITEMS`] éléments ; si la page déborde sur le
+/// pied de page, elles sont raccourcies (« + n autres, voir le JSON
+/// signé ») jusqu'à ce que tout tienne. Le JSON signé garde la liste
+/// complète.
 pub fn certificate_page(
     cert: &RenderedCertificate,
     logo: (u32, u32),
@@ -834,6 +880,26 @@ pub fn certificate_page(
     total: usize,
     lang: Lang,
 ) -> Result<Canvas> {
+    let mut budget = MAX_LIST_ITEMS;
+    loop {
+        let (canvas, fits) = certificate_page_with(cert, logo, page, total, lang, budget)?;
+        if fits || budget == 0 {
+            return Ok(canvas);
+        }
+        budget -= 1;
+    }
+}
+
+/// Page de certificat avec au plus `budget` éléments par liste ; le booléen
+/// dit si la carte de validation tient au-dessus du pied de page.
+fn certificate_page_with(
+    cert: &RenderedCertificate,
+    logo: (u32, u32),
+    page: usize,
+    total: usize,
+    lang: Lang,
+    budget: usize,
+) -> Result<(Canvas, bool)> {
     let t = lang.texts();
     let a: &Attestation = &cert.signed.payload;
     let mut canvas = Canvas::default();
@@ -962,15 +1028,17 @@ pub fn certificate_page(
             .erasure
             .caveats
             .iter()
-            .take(MAX_LIST_ITEMS)
+            .take(budget)
             .map(|c| truncate_chars(c, MAX_ITEM_CHARS))
             .collect();
         let mut text = shown.join(" · ");
-        if a.erasure.caveats.len() > MAX_LIST_ITEMS {
-            text.push_str(" · ");
+        if a.erasure.caveats.len() > budget {
+            if !text.is_empty() {
+                text.push_str(" · ");
+            }
             text.push_str(&fill(
                 t.more_items,
-                &[("n", &(a.erasure.caveats.len() - MAX_LIST_ITEMS).to_string())],
+                &[("n", &(a.erasure.caveats.len() - budget).to_string())],
             ));
         }
         caveats.push(Row::new(t.caveats, text));
@@ -1047,24 +1115,24 @@ pub fn certificate_page(
             if a.validation.residual_signatures.is_empty() {
                 t.none.to_string()
             } else {
-                bounded_list(&a.validation.residual_signatures, MAX_LIST_ITEMS, t)
+                bounded_list(&a.validation.residual_signatures, budget, t)
             },
         ),
-        Row::mono(t.evidence_digest, a.validation.evidence_sha256.clone()),
+        Row::hash(t.evidence_digest, a.validation.evidence_sha256.clone()),
     ];
     if let Some(seed) = &a.validation.seed {
-        rows.push(Row::mono(t.canary_seed, seed.clone()));
+        rows.push(Row::hash(t.canary_seed, seed.clone()));
     }
     rows.push(Row::new(
         t.independent_check,
         or_dash(&a.validation.verify_status),
     ));
     if let Some(report) = &a.report_sha256 {
-        rows.push(Row::mono(t.technical_report, report.clone()));
+        rows.push(Row::hash(t.technical_report, report.clone()));
     }
     rows.push(Row::new(t.signing_key, signing_key_value(&cert.signed, t)));
-    rows.push(Row::mono(t.public_key, cert.signed.public_key.clone()));
-    rows.push(Row::mono(t.signature, cert.signed.signature.clone()));
+    rows.push(Row::hash(t.public_key, cert.signed.public_key.clone()));
+    rows.push(Row::hash(t.signature, cert.signed.signature.clone()));
     rows.push(Row::new(t.verification, t.verification_value));
     let mut text_h = rows_height(&rows, text_w - LABEL_W);
     // Page chargée (sort du support et réserves longs) : la phrase fixe de
@@ -1073,6 +1141,7 @@ pub fn certificate_page(
         rows.pop();
         text_h = rows_height(&rows, text_w - LABEL_W);
     }
+    let fits = CARD_HEAD_H + 2.0 * CARD_PAD + text_h <= y - bottom;
     let h = (CARD_HEAD_H + CARD_PAD + text_h + CARD_PAD)
         .max(CARD_HEAD_H + qr_side + 2.0 * CARD_PAD)
         .min(available);
@@ -1090,7 +1159,7 @@ pub fn certificate_page(
         page,
         total,
     );
-    Ok(canvas)
+    Ok((canvas, fits))
 }
 
 /// Largeurs des colonnes du tableau de lot : n°, disque, type, modèle,
@@ -1859,6 +1928,51 @@ mod tests {
             "{} octets",
             pdf.len()
         );
+    }
+
+    /// Ordonnées des textes d'une page (opérateurs `x y Td`).
+    fn text_baselines(canvas: &Canvas) -> Vec<f64> {
+        let ops = String::from_utf8_lossy(&canvas.ops);
+        ops.lines()
+            .filter_map(|l| {
+                let start = l.find(" Tf ")? + 4;
+                let rest = &l[start..];
+                let mut it = rest.split_whitespace();
+                let _x: f64 = it.next()?.parse().ok()?;
+                it.next()?.parse().ok()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_fully_loaded_disk_page_stays_above_the_footer() {
+        // Pire cas : listes au maximum, éléments à la longueur maximale,
+        // sort du support avec raisons, rapport technique et graine.
+        let id = SigningIdentity::from_seed(&[3u8; 32]);
+        let mut a = sample();
+        let long = "x".repeat(MAX_ITEM_CHARS);
+        a.erasure.caveats = vec![long.clone(); MAX_LIST_ITEMS + 3];
+        a.validation.residual_signatures = vec![long.clone(); MAX_LIST_ITEMS + 3];
+        a.erasure.disposition = Some(Disposition::DestroyRecommended);
+        a.erasure.disposition_reasons =
+            vec!["SmartFailing".into(), "ReallocatedNotOverwritten".into()];
+        a.validation.seed = Some("ab".repeat(32));
+        a.report_sha256 = Some("cd".repeat(32));
+        let cert = RenderedCertificate::new(id.sign(&a.bounded()).unwrap()).unwrap();
+        for lang in [Lang::Fr, Lang::En, Lang::De] {
+            let page = certificate_page(&cert, (300, 80), 1, 1, lang).unwrap();
+            // Le pied de page écrit à y-4 et y-15 sous son filet (y+8).
+            let footer_rule = MARGIN + FOOTER_H - 2.0;
+            let body: Vec<f64> = text_baselines(&page)
+                .into_iter()
+                .filter(|y| *y > MARGIN + FOOTER_H - 13.0)
+                .collect();
+            let lowest = body.iter().cloned().fold(f64::MAX, f64::min);
+            assert!(
+                lowest >= footer_rule + 4.0,
+                "{lang:?} : texte à y={lowest} sur le pied de page (filet à {footer_rule})"
+            );
+        }
     }
 
     #[test]

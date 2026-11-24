@@ -135,7 +135,7 @@ pub(super) fn apply_job_validation(
             ),
             (Outcome::Success, None) => (
                 VerifyState::Ok,
-                "Vérification : OK (validée par le helper)",
+                "Vérification : OK (validée par le composant système)",
                 Vec::new(),
                 "verify-ok",
                 true,

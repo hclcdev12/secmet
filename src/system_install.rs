@@ -9,9 +9,12 @@
 //!
 //! Le montage FUSE d'une AppImage n'est lisible que par l'utilisateur qui
 //! l'a lancée : root ne peut y lire ni script ni binaire. Le script
-//! d'installation est donc embarqué ici ([`INSTALLER_SCRIPT`]) et passé à
-//! `bash -c` ; il extrait lui-même le composant depuis le fichier AppImage
-//! (`$APPIMAGE`, un fichier ordinaire) dans un répertoire appartenant à root.
+//! d'installation est donc embarqué ici ([`INSTALLER_SCRIPT`]) et passé sur
+//! l'entrée standard de `bash -s` ; il extrait lui-même le composant depuis
+//! le fichier AppImage (`$APPIMAGE`, un fichier ordinaire) dans un
+//! répertoire appartenant à root, puis se remplace par `secmet-helper serve`
+//! ([`INSTALL_AND_SERVE`]) : un seul mot de passe pour installer et démarrer
+//! (voir `helper_client::ensure_installing`).
 
 use crate::app_identity::HELPER_ENV;
 use crate::paths;
@@ -26,6 +29,9 @@ pub const HELPER_REL: &str = "usr/bin/secmet-helper";
 
 /// Script d'installation exécuté en root (voir `packaging/install-helper.sh`).
 pub const INSTALLER_SCRIPT: &str = include_str!("../packaging/install-helper.sh");
+
+/// Option du script : démarrer le helper une fois le composant installé.
+pub const INSTALL_AND_SERVE: &str = "--serve";
 
 /// Composant système embarqué dans l'AppImage courante.
 #[derive(Debug, Clone)]
@@ -58,6 +64,47 @@ pub enum InstallNeed {
     Install,
     /// Composant présent mais différent du binaire embarqué (AppImage mise à jour).
     Update,
+    /// Composant installé plus récent que celui de cette AppImage : le
+    /// remplacer ferait revenir la machine en arrière.
+    Downgrade,
+}
+
+/// Version du composant embarqué (même version que l'application).
+pub const BUNDLED_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Version du helper installé (`secmet-helper version`, sans privilège) ;
+/// `None` pour un helper antérieur à la 0.5.1, qui ne la donne pas.
+pub fn installed_version() -> Option<String> {
+    let out = std::process::Command::new(paths::helper_path())
+        .arg("version")
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    let v = String::from_utf8(out.stdout).ok()?.trim().to_string();
+    (out.status.success() && !v.is_empty()).then_some(v)
+}
+
+/// `a` est-elle strictement plus récente que `b` ? Compare les nombres de
+/// `X.Y.Z` ; une préversion (`-rc1`) précède la version finale.
+pub fn version_newer(a: &str, b: &str) -> bool {
+    fn parse(v: &str) -> (Vec<u64>, bool) {
+        let (core, pre) = match v.split_once('-') {
+            Some((c, _)) => (c, true),
+            None => (v, false),
+        };
+        (
+            core.split('.').map(|n| n.parse().unwrap_or(0)).collect(),
+            pre,
+        )
+    }
+    let (na, pa) = parse(a);
+    let (nb, pb) = parse(b);
+    match na.cmp(&nb) {
+        std::cmp::Ordering::Greater => true,
+        std::cmp::Ordering::Less => false,
+        std::cmp::Ordering::Equal => pb && !pa,
+    }
 }
 
 /// Détermine l'action requise. Ne retourne `Update` que si le helper résolu
@@ -73,36 +120,11 @@ pub fn check_install_needed(components: &BundleComponents) -> InstallNeed {
     let bundled = file_sha256(&components.helper);
     if installed.is_some() && installed == bundled {
         InstallNeed::UpToDate
+    } else if installed_version().is_some_and(|v| version_newer(&v, BUNDLED_VERSION)) {
+        InstallNeed::Downgrade
     } else {
         InstallNeed::Update
     }
-}
-
-/// Installe le composant système via pkexec (bloquant : prompt PolicyKit,
-/// plafonné par le timeout de `pkexec_gate`). Le script embarqué reçoit le
-/// chemin du fichier AppImage et en extrait le composant en root.
-pub fn run_installer(components: &BundleComponents) -> Result<(), String> {
-    let appimage = components.appimage.to_string_lossy().to_string();
-    let output = crate::pkexec_gate::pkexec_output(&[
-        "/bin/bash",
-        "-c",
-        INSTALLER_SCRIPT,
-        "secmet-install",
-        &appimage,
-    ])
-    .map_err(|e| format!("pkexec indisponible : {e}"))?;
-
-    if !output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "Échec de l'installation du composant système (code {:?}).\n{}{}",
-            output.status.code(),
-            stdout.trim(),
-            stderr.trim()
-        ));
-    }
-    Ok(())
 }
 
 fn file_sha256(path: &Path) -> Option<String> {
@@ -115,6 +137,16 @@ fn file_sha256(path: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn version_order() {
+        assert!(version_newer("0.6.0", "0.5.1"));
+        assert!(version_newer("0.5.10", "0.5.9"));
+        assert!(version_newer("0.5.1", "0.5.1-rc2"));
+        assert!(!version_newer("0.5.1-rc2", "0.5.1"));
+        assert!(!version_newer("0.5.1", "0.5.1"));
+        assert!(!version_newer("0.4.9", "0.5.0"));
+    }
 
     #[test]
     fn test_file_sha256_missing_file_is_none() {
@@ -155,6 +187,11 @@ mod tests {
         assert!(INSTALLER_SCRIPT.contains("--appimage-extract"));
         assert!(INSTALLER_SCRIPT.contains("/usr/bin/secmet-helper"));
         assert!(INSTALLER_SCRIPT.contains("/usr/share/polkit-1/actions/secmet.policy"));
+        // Installation puis démarrage du helper sous la même invite, sortie
+        // standard réservée à sa ligne « ready ».
+        assert!(INSTALLER_SCRIPT.contains(INSTALL_AND_SERVE));
+        assert!(INSTALLER_SCRIPT.contains("exec 3>&1 1>&2"));
+        assert!(INSTALLER_SCRIPT.contains("exec /usr/bin/secmet-helper serve 1>&3"));
         assert!(
             !INSTALLER_SCRIPT.contains("$APPDIR"),
             "le script ne doit rien lire dans le montage FUSE"

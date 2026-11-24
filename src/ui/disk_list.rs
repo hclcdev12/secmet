@@ -230,7 +230,7 @@ pub(super) fn get_selected_disks(widgets: &[DiskWidget]) -> Vec<(DiskWidget, Dis
 }
 
 pub(super) fn disk_trace_subtitle(disk: &Disk) -> String {
-    let mut text = format!("{} {}", disk.kind.label(), disk.size);
+    let mut text = format!("{} {}", disk.kind.label(), disk_size_text(disk));
     if !disk.model.is_empty() && disk.model != "Unknown" {
         text.push(' ');
         text.push_str(&disk.model);
@@ -240,6 +240,7 @@ pub(super) fn disk_trace_subtitle(disk: &Disk) -> String {
 
 pub(super) fn disk_subtitle_text(disk: &Disk, can_shred: bool, reason: &str) -> String {
     let media_type = disk.kind.label();
+    let size = disk_size_text(disk);
     // Parenthèse « modèle - S/N » : le S/N complète le modèle quand il est connu.
     let model_sn = if disk.serial.is_empty() {
         disk.model.clone()
@@ -247,9 +248,9 @@ pub(super) fn disk_subtitle_text(disk: &Disk, can_shred: bool, reason: &str) -> 
         format!("{} - {}", disk.model, disk.serial)
     };
     let mut text = if can_shred {
-        format!("{} • {} ({})", media_type, disk.size, model_sn)
+        format!("{} • {} ({})", media_type, size, model_sn)
     } else {
-        format!("{} • {} ({}) — {}", media_type, disk.size, model_sn, reason)
+        format!("{} • {} ({}) — {}", media_type, size, model_sn, reason)
     };
     if disk.is_usb {
         text.push_str(&tr(" — USB (écriture hôte)"));
@@ -341,52 +342,113 @@ pub(super) fn update_select_all_state(
         .filter(|w| w.checkbox.is_sensitive())
         .collect();
 
-    if selectable.is_empty() {
-        updating.set(true);
-        select_all.set_active(false);
-        updating.set(false);
-        select_all.set_sensitive(false);
-        selected_total_label.set_text(&tr("Total sélectionné : 0 Go"));
-        return;
-    }
-
-    let all_selected = selectable.iter().all(|w| w.checkbox.is_active());
     updating.set(true);
-    select_all.set_active(all_selected);
+    select_all
+        .set_active(!selectable.is_empty() && selectable.iter().all(|w| w.checkbox.is_active()));
     updating.set(false);
-    select_all.set_sensitive(true);
+    select_all.set_sensitive(!selectable.is_empty());
 
-    let selected_bytes = widgets
+    // Total des disques cochés et encore sélectionnables : un disque traité
+    // (grisé) ne compte plus.
+    let selected_bytes = selectable
         .iter()
         .filter(|w| w.checkbox.is_active())
-        .map(|w| {
-            if w.disk.size_bytes > 0 {
-                Some(w.disk.size_bytes)
-            } else {
-                parse_size_to_bytes(&w.disk.size)
-            }
-        })
-        .map(|b| b.unwrap_or(0))
+        .map(|w| disk_bytes(&w.disk).unwrap_or(0))
         .sum::<u64>();
+    selected_total_label.set_text(&trf(
+        "Total sélectionné : {size}",
+        &[("size", &capacity_text(selected_bytes))],
+    ));
+    refresh_action_buttons(widgets);
+}
 
-    let text = if selected_bytes >= 1_000_000_000_000 {
-        trf(
-            "Total sélectionné : {size} To",
-            &[(
-                "size",
-                &format!("{:.2}", selected_bytes as f64 / 1_000_000_000_000.0),
-            )],
-        )
+/// Taille en octets : celle de l'inventaire, sinon déduite du libellé lsblk.
+fn disk_bytes(disk: &Disk) -> Option<u64> {
+    if disk.size_bytes > 0 {
+        Some(disk.size_bytes)
     } else {
-        trf(
-            "Total sélectionné : {size} Go",
-            &[(
-                "size",
-                &format!("{:.0}", selected_bytes as f64 / 1_000_000_000.0),
-            )],
-        )
+        parse_size_to_bytes(&disk.size)
+    }
+}
+
+/// Taille d'un disque pour l'écran, dans la même unité que le total
+/// sélectionné (Go décimaux) ; libellé lsblk brut si la taille est inconnue.
+pub(super) fn disk_size_text(disk: &Disk) -> String {
+    match disk_bytes(disk) {
+        Some(bytes) if bytes > 0 => capacity_text(bytes),
+        _ => disk.size.clone(),
+    }
+}
+
+/// Capacité en unités décimales (Mo, Go, To), comme les fabricants : une
+/// décimale sous 100, aucune au-delà ; « 0 Go » pour rien.
+pub(super) fn capacity_text(bytes: u64) -> String {
+    if bytes == 0 {
+        return trf("{n} Go", &[("n", "0")]);
+    }
+    let b = bytes as f64;
+    let (value, key) = if b >= 1e12 {
+        (b / 1e12, "{n} To")
+    } else if b >= 1e9 {
+        (b / 1e9, "{n} Go")
+    } else {
+        (b / 1e6, "{n} Mo")
     };
-    selected_total_label.set_text(&text);
+    let mut n = if value < 100.0 {
+        format!("{value:.1}")
+    } else {
+        format!("{value:.0}")
+    };
+    if let Some(stripped) = n.strip_suffix(".0") {
+        n = stripped.to_string();
+    }
+    if crate::i18n::current() != crate::i18n::Lang::En {
+        n = n.replace('.', ",");
+    }
+    trf(key, &[("n", &n)])
+}
+
+/// Boutons d'action dont l'état dépend de la liste des disques.
+pub(super) struct ActionButtons {
+    pub start: Button,
+    pub unlock: Button,
+    pub defrozen: Button,
+    pub operations_active: Rc<Cell<bool>>,
+}
+
+thread_local! {
+    static ACTION_BUTTONS: RefCell<Option<ActionButtons>> = const { RefCell::new(None) };
+}
+
+pub(super) fn register_action_buttons(buttons: ActionButtons) {
+    ACTION_BUTTONS.with(|b| *b.borrow_mut() = Some(buttons));
+}
+
+/// Actifs seulement quand ils ont un objet : Lancer avec un disque coché,
+/// Déverrouiller avec un mot de passe ATA rapporté, Dégeler avec un disque
+/// gelé ; tous inactifs pendant un effacement.
+pub(super) fn refresh_action_buttons(widgets: &[DiskWidget]) {
+    ACTION_BUTTONS.with(|b| {
+        let Some(b) = b.borrow().as_ref().map(|b| {
+            (
+                b.start.clone(),
+                b.unlock.clone(),
+                b.defrozen.clone(),
+                b.operations_active.get(),
+            )
+        }) else {
+            return;
+        };
+        let (start, unlock, defrozen, busy) = b;
+        start.set_sensitive(
+            !busy
+                && widgets
+                    .iter()
+                    .any(|w| w.checkbox.is_sensitive() && w.checkbox.is_active()),
+        );
+        unlock.set_sensitive(!busy && widgets.iter().any(|w| w.disk.has_ata_password()));
+        defrozen.set_sensitive(!busy && widgets.iter().any(|w| w.disk.is_frozen == Some(true)));
+    });
 }
 
 /// Issue d'un chargement de la liste.
@@ -498,9 +560,9 @@ pub(super) fn load_disks_into_list(
         let result = match rx.try_recv() {
             Ok(result) => result,
             Err(mpsc::TryRecvError::Empty) => return glib::ControlFlow::Continue,
-            Err(mpsc::TryRecvError::Disconnected) => {
-                Err(LoadOutcome::AuthFailed(tr("Réponse du helper absente")))
-            }
+            Err(mpsc::TryRecvError::Disconnected) => Err(LoadOutcome::AuthFailed(tr(
+                "Le composant système n'a pas répondu.",
+            ))),
         };
         if LOAD_GENERATION.with(|g| g.get()) != generation {
             return glib::ControlFlow::Break;
@@ -565,6 +627,7 @@ fn render_disks(
             show_list_notice(disk_list_box, &text, false);
             select_all_button.set_sensitive(false);
             selected_total_label.set_text(&tr("Total sélectionné : 0 Go"));
+            refresh_action_buttons(&disk_widgets.borrow());
             smart_auth_ok.set(false);
             return outcome;
         }
@@ -577,6 +640,7 @@ fn render_disks(
         select_all_button.set_sensitive(false);
         select_all_button.set_active(false);
         selected_total_label.set_text(&tr("Total sélectionné : 0 Go"));
+        refresh_action_buttons(&disk_widgets.borrow());
         smart_auth_ok.set(crate::helper_client::is_active());
     } else {
         for disk in disks {
@@ -664,4 +728,20 @@ pub(super) fn parse_size_to_bytes(size: &str) -> Option<u64> {
     };
 
     Some((value * multiplier) as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::capacity_text;
+
+    #[test]
+    fn capacities_use_one_decimal_unit_system() {
+        crate::i18n::set_current(crate::i18n::Lang::Fr);
+        // 20 Gio (lsblk « 20G ») : même valeur que le total sélectionné.
+        assert_eq!(capacity_text(21_474_836_480), "21,5 Go");
+        assert_eq!(capacity_text(500_107_862_016), "500 Go");
+        assert_eq!(capacity_text(2_000_398_934_016), "2 To");
+        assert_eq!(capacity_text(31_037_440), "31 Mo");
+        assert_eq!(capacity_text(0), "0 Go");
+    }
 }

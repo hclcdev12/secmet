@@ -25,7 +25,7 @@ use super::{
 /// ou un lecteur PDF peut vivre aussi longtemps que sa fenêtre, et l'attendre
 /// bloquerait le fil GTK. Le fils est récolté sur un fil dédié (pas de zombie).
 fn launch_detached(program: &str, path: &Path) -> Result<(), String> {
-    let mut child = Command::new(program)
+    let mut child = crate::host_env::host_command(program)
         .arg(path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -74,9 +74,7 @@ pub fn open_pdf(path: &Path) -> Result<(), String> {
 
     let uri = path_to_file_uri(path)?;
 
-    if gtk4::gio::AppInfo::launch_default_for_uri(&uri, None::<&gtk4::gio::AppLaunchContext>)
-        .is_ok()
-    {
+    if crate::host_env::launch_default_for_uri(&uri).is_ok() {
         return Ok(());
     }
 
@@ -99,9 +97,7 @@ fn open_folder_in_file_manager(path: &Path) -> Result<(), String> {
     // Gestionnaire par défaut du bureau d'abord (asynchrone, comme pour le
     // PDF), puis un gestionnaire connu lancé sans attente, puis xdg-open.
     if let Ok(uri) = path_to_file_uri(path) {
-        if gtk4::gio::AppInfo::launch_default_for_uri(&uri, None::<&gtk4::gio::AppLaunchContext>)
-            .is_ok()
-        {
+        if crate::host_env::launch_default_for_uri(&uri).is_ok() {
             return Ok(());
         }
     }
@@ -396,9 +392,8 @@ pub(crate) fn attestation_from_record(
     }
     if rec.root_traced == Some(false) {
         caveats.push(caveat(
-            "disque système de l'hôte non identifié lors de l'inventaire (racine non \
-             rattachée à un disque local : média live ou ZFS) ; protection du disque \
-             système par verrou exclusif du noyau uniquement",
+            "disque système de l'hôte non identifié (système démarré sur média live ou \
+             ZFS) : protégé par le seul verrou exclusif du noyau",
         ));
     }
     let (validation_kind, samples, anomalies, seed, residual) = match job {
@@ -514,6 +509,42 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use keystore::KeyState;
+
+    /// Toute réserve tient dans la limite du certificat signé, dans chaque
+    /// langue : au-delà, le texte était coupé (« … ») sur le PDF.
+    #[test]
+    fn every_caveat_fits_the_signed_item_limit() {
+        use crate::system_integrity::{CAVEAT_ALTERED, CAVEAT_UNCHECKED, CAVEAT_UNSIGNED};
+        let keys = [
+            "aucune catégorie NIST rapportée par le moteur",
+            "disque derrière un pont USB : aucune commande firmware envoyée",
+            "contrôleur NVMe à plusieurs espaces de noms : seul l'espace de noms effacé est \
+             couvert par l'étape exécutée, les autres restent à traiter",
+            "disque système de l'hôte non identifié (système démarré sur média live ou \
+             ZFS) : protégé par le seul verrou exclusif du noyau",
+            "aucune relecture enregistrée : catégorie NIST non revendiquée",
+            "numéro de série non exposé par le disque : identification par modèle, \
+             capacité et nom de périphérique",
+            "horloge du poste non synchronisée (aucune source de temps réseau) : dates fournies \
+             par le poste",
+            "horloge du poste douteuse (antérieure à une référence connue), conservée sur \
+             confirmation de l'opérateur",
+            "date et heure saisies par l'opérateur : horloge du poste non fiable",
+            CAVEAT_ALTERED,
+            CAVEAT_UNSIGNED,
+            CAVEAT_UNCHECKED,
+        ];
+        for key in keys {
+            for lang in Lang::ALL {
+                let text = tr_in(lang, key);
+                assert!(
+                    text.chars().count() <= secmet_attest::model::MAX_ITEM_CHARS,
+                    "{lang:?} ({} car.) : {text}",
+                    text.chars().count()
+                );
+            }
+        }
+    }
 
     #[test]
     fn a_missing_key_is_created_alone_only_for_the_first_key_of_a_workstation() {

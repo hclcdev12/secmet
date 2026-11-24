@@ -17,6 +17,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
+# ibus-gtk4 : module de saisie embarqué dans l'AppImage (accents, saisie
+# asiatique). Sans lui, GTK_IM_MODULE=ibus (Mint, Ubuntu) ne trouve aucun
+# module : « No IM module matching GTK_IM_MODULE=ibus found ».
+#
 # Miroir Ubuntu au choix (CI : celui d'Azure, voisin des runners GitHub ;
 # archive.ubuntu.com a mis 40 min à servir les paquets de la 0.5.0-rc3) et
 # nouvelles tentatives sur une connexion qui cale.
@@ -31,6 +35,7 @@ RUN if [ -n "$APT_MIRROR" ]; then \
         libgtk-4-dev libglib2.0-dev libglib2.0-bin libgdk-pixbuf2.0-bin \
         desktop-file-utils gtk-update-icon-cache squashfs-tools patchelf \
         librsvg2-common testdisk \
+        ibus-gtk4 \
         gcc-mingw-w64-x86-64 \
  && rm -rf /var/lib/apt/lists/* \
  # Backends d'impression GTK : inutiles à SecMet, et ils tirent libcolord /

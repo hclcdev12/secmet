@@ -39,9 +39,9 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "NVMe-Controller mit mehreren Namespaces: Nur der gelöschte Namespace ist durch den ausgeführten Schritt abgedeckt, die anderen sind noch zu behandeln",
     ),
     (
-        "disque système de l'hôte non identifié lors de l'inventaire (racine non rattachée à un disque local : média live ou ZFS) ; protection du disque système par verrou exclusif du noyau uniquement",
-        "host system disk not identified during inventory (root not attached to a local disk: live media or ZFS); system disk protected by the kernel exclusive lock only",
-        "Systemdatenträger des Hosts bei der Bestandsaufnahme nicht erkannt (Root keinem lokalen Datenträger zugeordnet: Live-Medium oder ZFS); Schutz des Systemdatenträgers nur durch die exklusive Kernel-Sperre",
+        "disque système de l'hôte non identifié (système démarré sur média live ou ZFS) : protégé par le seul verrou exclusif du noyau",
+        "host system disk not identified (system booted from live media or ZFS): protected by the kernel exclusive lock only",
+        "Systemdatenträger des Hosts nicht erkannt (System von Live-Medium oder ZFS gestartet): nur durch die exklusive Kernel-Sperre geschützt",
     ),
     (
         "aucune relecture enregistrée : catégorie NIST non revendiquée",

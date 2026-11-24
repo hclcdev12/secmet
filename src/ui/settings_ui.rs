@@ -876,10 +876,7 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
             let Some(url) = btn.tooltip_text() else {
                 return;
             };
-            if let Err(e) = gtk4::gio::AppInfo::launch_default_for_uri(
-                &url,
-                None::<&gtk4::gio::AppLaunchContext>,
-            ) {
+            if let Err(e) = crate::host_env::launch_default_for_uri(&url) {
                 status.set_text(&trf(
                     "Impossible d'ouvrir le navigateur : {error}",
                     &[("error", &e.to_string())],
