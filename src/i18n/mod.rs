@@ -133,8 +133,26 @@ pub fn tr_in(lang: Lang, key: &str) -> &str {
 /// Nombre accordé : `one` pour 1, `many` sinon, chacun avec `{count}`
 /// (« 1 disque », « 3 disques » au lieu de « disque(s) »).
 pub fn count_text(count: usize, one: &str, many: &str) -> String {
-    let key = if count == 1 { one } else { many };
-    trf(key, &[("count", &count.to_string())])
+    count_text_in(current(), count, one, many)
+}
+
+/// [`count_text`] dans une langue donnée.
+pub fn count_text_in(lang: Lang, count: usize, one: &str, many: &str) -> String {
+    trf_in(
+        lang,
+        plural_key(count, one, many),
+        &[("count", &count.to_string())],
+    )
+}
+
+/// Clé à employer pour `count` : `one` pour 1, `many` sinon (phrases dont
+/// l'accord dépasse le nom compté).
+pub fn plural_key<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
+    if count == 1 {
+        one
+    } else {
+        many
+    }
 }
 
 /// Traduction puis substitution des marqueurs `{nom}`.
@@ -214,6 +232,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn counts_agree_in_every_language() {
+        let one = "{count} disque";
+        let many = "{count} disques";
+        assert_eq!(count_text_in(Lang::Fr, 1, one, many), "1 disque");
+        assert_eq!(count_text_in(Lang::Fr, 3, one, many), "3 disques");
+        assert_eq!(count_text_in(Lang::En, 1, one, many), "1 disk");
+        assert_eq!(count_text_in(Lang::En, 0, one, many), "0 disks");
+        assert_eq!(count_text_in(Lang::De, 2, one, many), "2 Datenträger");
     }
 
     #[test]

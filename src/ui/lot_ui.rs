@@ -23,7 +23,7 @@ use secmet_attest::{export, manifest, sha256_hex};
 
 use crate::certificate::{self, CertificatePdfMode};
 use crate::disk::Disk;
-use crate::i18n::{self, tr, trf};
+use crate::i18n::{self, count_text, plural_key, tr, trf};
 use crate::lot::{self, CertificateRef, DiskIdentity, EntryStatus, Lot, LotScope, MachineIdentity};
 use crate::{helper_client, paths, pdf_logo, settings};
 
@@ -57,8 +57,8 @@ pub(super) fn scope_here() -> LotScope {
 fn units_text(lot: &Lot) -> String {
     let count = lot.units_count() as usize;
     match lot.state().scope {
-        LotScope::Machines => crate::i18n::count_text(count, "{count} machine", "{count} machines"),
-        LotScope::Disks => crate::i18n::count_text(count, "{count} disque", "{count} disques"),
+        LotScope::Machines => count_text(count, "{count} machine", "{count} machines"),
+        LotScope::Disks => count_text(count, "{count} disque", "{count} disques"),
     }
 }
 
@@ -100,8 +100,11 @@ pub(super) fn show_already_registered_dialog(window: &ApplicationWindow, count: 
     let (dialog, content, buttons) = dialog_frame(window, &tr("Certificats déjà produits"));
     content.append(&note(&trf(
         "Les certificats de cette machine ont déjà été produits et enregistrés au lot \
-         ({count} fichier(s)). Les régénérer les rendrait différents de ceux du journal du lot.",
-        &[("count", &count.to_string())],
+         ({files}). Les régénérer les rendrait différents de ceux du journal du lot.",
+        &[(
+            "files",
+            &count_text(count, "{count} fichier", "{count} fichiers"),
+        )],
     )));
     let open = Button::with_label(&tr("Ouvrir le dossier"));
     let close = Button::with_label(&tr("Fermer"));
@@ -491,17 +494,20 @@ fn show_resume_dialog(
         )));
     }
     if interrupted > 0 {
-        let count = interrupted.to_string();
         let text = match lot.state().scope {
-            LotScope::Machines => trf(
-                "{count} machine(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : à \
+            LotScope::Machines => count_text(
+                interrupted,
+                "{count} machine interrompue (coupure ou arrêt pendant l'effacement) : à \
                  refaire ou à consigner en échec.",
-                &[("count", &count)],
+                "{count} machines interrompues (coupure ou arrêt pendant l'effacement) : à \
+                 refaire ou à consigner en échec.",
             ),
-            LotScope::Disks => trf(
-                "{count} session(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : \
+            LotScope::Disks => count_text(
+                interrupted,
+                "{count} session interrompue (coupure ou arrêt pendant l'effacement) : \
                  disques à refaire ou à consigner en échec.",
-                &[("count", &count)],
+                "{count} sessions interrompues (coupure ou arrêt pendant l'effacement) : \
+                 disques à refaire ou à consigner en échec.",
             ),
         };
         let warn = note(&text);
@@ -732,8 +738,14 @@ pub(super) fn register_end(window: &ApplicationWindow, status: &Label) {
         });
         match (result, recorded) {
             (Ok(_), Some(Ok(id))) => status.set_text(&trf(
-                "Machine enregistrée au lot {id} ({count} certificat(s))",
-                &[("id", &id), ("count", &refs.len().to_string())],
+                "Machine enregistrée au lot {id} ({certificates})",
+                &[
+                    ("id", &id),
+                    (
+                        "certificates",
+                        &count_text(refs.len(), "{count} certificat", "{count} certificats"),
+                    ),
+                ],
             )),
             (Err(e), _) | (_, Some(Err(e))) => {
                 status.set_text("");
@@ -898,10 +910,24 @@ pub(super) fn export_archived_text(only: Option<&str>) -> String {
     };
     let sync = lot::export_archived(&paths::archive_dir(), &mount, only);
     let mut parts = vec![trf(
-        "{copied} lot(s) copié(s), {present} déjà présent(s) sur {mount}",
+        "{copied}, {present} sur {mount}",
         &[
-            ("copied", &sync.copied.len().to_string()),
-            ("present", &sync.present.len().to_string()),
+            (
+                "copied",
+                &count_text(
+                    sync.copied.len(),
+                    "{count} lot copié",
+                    "{count} lots copiés",
+                ),
+            ),
+            (
+                "present",
+                &count_text(
+                    sync.present.len(),
+                    "{count} déjà présent",
+                    "{count} déjà présents",
+                ),
+            ),
             ("mount", &mount.display().to_string()),
         ],
     )];
@@ -932,16 +958,22 @@ pub(super) fn close_dialog(window: &ApplicationWindow, after: Option<Box<dyn FnO
     let (id, units, certificates, failed, interrupted) = summary;
     let (dialog, content, buttons) = dialog_frame(window, &tr("Clôturer le lot"));
     content.append(&note(&trf(
-        "Lot {id} : {units}, {certificates} certificat(s), {failed} en échec, \
-         {interrupted} interrompue(s).\n\nLa clôture produit le certificat groupé et le \
+        "Lot {id} : {units}, {certificates}, {failed} en échec, \
+         {interrupted}.\n\nLa clôture produit le certificat groupé et le \
          manifeste signé, copie les livrables sur la partition d'export si elle est présente, \
          puis archive le lot. Plus rien ne pourra y être ajouté.",
         &[
             ("id", &id),
             ("units", &units),
-            ("certificates", &certificates.to_string()),
+            (
+                "certificates",
+                &count_text(certificates, "{count} certificat", "{count} certificats"),
+            ),
             ("failed", &failed.to_string()),
-            ("interrupted", &interrupted.to_string()),
+            (
+                "interrupted",
+                &count_text(interrupted, "{count} interrompue", "{count} interrompues"),
+            ),
         ],
     )));
     let cancel = Button::with_label(&tr("Annuler"));
@@ -1064,10 +1096,17 @@ fn stale_dialog(window: &ApplicationWindow, stale: Vec<StaleCertificate>, after:
     let (dialog, content, buttons) = dialog_frame(window, &tr("Certificats régénérés"));
     let list: Vec<String> = stale.iter().map(|s| format!("• {}", s.file)).collect();
     content.append(&note(&trf(
-        "{count} certificat(s) ont été régénérés après leur enregistrement au lot \
-         (bouton « Générer le PDF ») :\n{list}\n\nIls sont signés par la clé de ce poste et \
-         désignent les mêmes machines. Les enregistrer à nouveau au journal du lot, puis \
-         clôturer ?",
+        plural_key(
+            stale.len(),
+            "{count} certificat a été régénéré après son enregistrement au lot \
+             (bouton « Générer le PDF ») :\n{list}\n\nIl est signé par la clé de ce poste et \
+             désigne la même machine. L'enregistrer à nouveau au journal du lot, puis \
+             clôturer ?",
+            "{count} certificats ont été régénérés après leur enregistrement au lot \
+             (bouton « Générer le PDF ») :\n{list}\n\nIls sont signés par la clé de ce poste et \
+             désignent les mêmes machines. Les enregistrer à nouveau au journal du lot, puis \
+             clôturer ?",
+        ),
         &[
             ("count", &stale.len().to_string()),
             ("list", &list.join("\n")),

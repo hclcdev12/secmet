@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::busy::{self, Blocker, BusyKind};
-use crate::i18n::{self, tr, trf, Lang};
+use crate::i18n::{self, count_text, plural_key, tr, trf, Lang};
 use crate::update::{self, UpdateState};
 use crate::{key_cleanup, pdf_logo, settings};
 
@@ -55,8 +55,11 @@ fn relabel_groups(
         &[("count", &inv.archived.len().to_string())],
     )));
     exports.set_label(Some(&trf(
-        "Livrables sur la partition d'export ({count} dossier(s))",
-        &[("count", &inv.exports.len().to_string())],
+        "Livrables sur la partition d'export ({folders})",
+        &[(
+            "folders",
+            &count_text(inv.exports.len(), "{count} dossier", "{count} dossiers"),
+        )],
     )));
     standalone.set_label(Some(&trf(
         "Certificats hors lot, rapports et journaux de session ({count})",
@@ -92,8 +95,11 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
         &[("count", &inv.archived.len().to_string())],
     ));
     let exports = CheckButton::with_label(&trf(
-        "Livrables sur la partition d'export ({count} dossier(s))",
-        &[("count", &inv.exports.len().to_string())],
+        "Livrables sur la partition d'export ({folders})",
+        &[(
+            "folders",
+            &count_text(inv.exports.len(), "{count} dossier", "{count} dossiers"),
+        )],
     ));
     let standalone = CheckButton::with_label(&trf(
         "Certificats hors lot, rapports et journaux de session ({count})",
@@ -145,32 +151,40 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
         // Les comptes ont pu changer depuis l'ouverture des Réglages (recopie
         // sur l'export, par exemple) : on les rafraîchit avant de décider.
         relabel_groups(&archived, &exports, &standalone, &inv);
+        let archived_n = if choice.archived {
+            inv.archived.len()
+        } else {
+            0
+        };
+        let exports_n = if choice.exports { inv.exports.len() } else { 0 };
+        let standalone_n = if choice.standalone {
+            inv.standalone_files
+        } else {
+            0
+        };
         let message = trf(
-            "Supprimer définitivement de la clé : {archived} lot(s) archivé(s), {exports} \
-             dossier(s) sur la partition d'export, {standalone} fichier(s) hors lot, soit \
+            "Supprimer définitivement de la clé : {archived}, {exports}, {standalone}, soit \
              {size} ?",
             &[
                 (
                     "archived",
-                    &if choice.archived {
-                        inv.archived.len()
-                    } else {
-                        0
-                    }
-                    .to_string(),
+                    &count_text(archived_n, "{count} lot archivé", "{count} lots archivés"),
                 ),
                 (
                     "exports",
-                    &if choice.exports { inv.exports.len() } else { 0 }.to_string(),
+                    &count_text(
+                        exports_n,
+                        "{count} dossier sur la partition d'export",
+                        "{count} dossiers sur la partition d'export",
+                    ),
                 ),
                 (
                     "standalone",
-                    &if choice.standalone {
-                        inv.standalone_files
-                    } else {
-                        0
-                    }
-                    .to_string(),
+                    &count_text(
+                        standalone_n,
+                        "{count} fichier hors lot",
+                        "{count} fichiers hors lot",
+                    ),
                 ),
                 ("size", &human_size(inv.bytes)),
             ],
@@ -179,10 +193,17 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
         // est sa seule copie signée tant que son manifeste manque sur l'export.
         if choice.archived && !inv.not_exported.is_empty() {
             status.set_text(&trf(
-                "Refusé : {count} lot(s) clôturé(s) n'ont pas leur copie sur la partition \
-                 d'export ({list}). Leur archive sur la clé est la seule copie signée : \
-                 utilisez d'abord « Recopier les lots clôturés sur la partition d'export », \
-                 ou décochez les lots archivés.",
+                plural_key(
+                    inv.not_exported.len(),
+                    "Refusé : {count} lot clôturé n'a pas sa copie sur la partition \
+                     d'export ({list}). Son archive sur la clé est la seule copie signée : \
+                     utilisez d'abord « Recopier les lots clôturés sur la partition d'export », \
+                     ou décochez les lots archivés.",
+                    "Refusé : {count} lots clôturés n'ont pas leur copie sur la partition \
+                     d'export ({list}). Leur archive sur la clé est la seule copie signée : \
+                     utilisez d'abord « Recopier les lots clôturés sur la partition d'export », \
+                     ou décochez les lots archivés.",
+                ),
                 &[
                     ("count", &inv.not_exported.len().to_string()),
                     ("list", &inv.not_exported.join(", ")),
@@ -204,9 +225,16 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
             move || {
                 let report = key_cleanup::clean(&places, choice);
                 let mut text = trf(
-                    "{removed} élément(s) supprimé(s), {size} libérés.",
+                    "{removed}, {size} libérés.",
                     &[
-                        ("removed", &report.removed.to_string()),
+                        (
+                            "removed",
+                            &count_text(
+                                report.removed,
+                                "{count} élément supprimé",
+                                "{count} éléments supprimés",
+                            ),
+                        ),
                         ("size", &human_size(report.bytes)),
                     ],
                 );

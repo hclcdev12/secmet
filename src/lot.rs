@@ -913,8 +913,13 @@ impl Lot {
         self.ensure_open()?;
         let certificates = self.certificates().len();
         if certificates > 0 {
+            let registered = if certificates == 1 {
+                "certificat enregistré"
+            } else {
+                "certificats enregistrés"
+            };
             return Err(format!(
-                "Lot {} : {certificates} certificat(s) enregistré(s), abandon impossible",
+                "Lot {} : {certificates} {registered}, abandon impossible",
                 self.state.id
             ));
         }

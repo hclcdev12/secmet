@@ -79,7 +79,11 @@ pub(super) fn validation_details_in(lang: Lang, report: &JobReport) -> String {
         if let Some(v) = &step.validation {
             lines.push(trf_in(
                 lang,
-                "  {checked} blocs relus, {anomalies} anomalie(s) : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
+                i18n::plural_key(
+                    v.anomalies,
+                    "  {checked} blocs relus, {anomalies} anomalie : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
+                    "  {checked} blocs relus, {anomalies} anomalies : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
+                ),
                 &[
                     ("checked", &v.checked.to_string()),
                     ("anomalies", &v.anomalies.to_string()),
@@ -149,7 +153,11 @@ pub(super) fn apply_job_validation(
             ),
             (Outcome::Failed, Some(v)) if v.anomalies > 0 || !signatures.is_empty() => (
                 VerifyState::Ko,
-                "Vérification : KO — {anomalies} anomalie(s){signatures}",
+                i18n::plural_key(
+                    v.anomalies,
+                    "Vérification : KO — {anomalies} anomalie{signatures}",
+                    "Vérification : KO — {anomalies} anomalies{signatures}",
+                ),
                 vec![
                     ("anomalies", v.anomalies.to_string()),
                     (

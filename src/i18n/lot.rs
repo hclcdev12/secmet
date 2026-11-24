@@ -38,9 +38,14 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("{count} disque", "{count} disk", "{count} Datenträger"),
     ("{count} disques", "{count} disks", "{count} Datenträger"),
     (
-        "{count} session(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : disques à refaire ou à consigner en échec.",
-        "{count} session(s) interrupted (power loss or shutdown during erasure): disks to redo or to record as failed.",
-        "{count} Sitzung(en) unterbrochen (Stromausfall oder Herunterfahren während des Löschens): Datenträger erneut bearbeiten oder als fehlgeschlagen erfassen.",
+        "{count} session interrompue (coupure ou arrêt pendant l'effacement) : disques à refaire ou à consigner en échec.",
+        "{count} session interrupted (power loss or shutdown during erasure): disks to redo or to record as failed.",
+        "{count} Sitzung unterbrochen (Stromausfall oder Herunterfahren während des Löschens): Datenträger erneut bearbeiten oder als fehlgeschlagen erfassen.",
+    ),
+    (
+        "{count} sessions interrompues (coupure ou arrêt pendant l'effacement) : disques à refaire ou à consigner en échec.",
+        "{count} sessions interrupted (power loss or shutdown during erasure): disks to redo or to record as failed.",
+        "{count} Sitzungen unterbrochen (Stromausfall oder Herunterfahren während des Löschens): Datenträger erneut bearbeiten oder als fehlgeschlagen erfassen.",
     ),
     (
         "Un lot regroupe les disques effacés sur ce poste, par sessions successives (brancher, effacer, débrancher, recommencer). Les certificats de chaque disque y sont enregistrés ; à la clôture, un certificat groupé et un manifeste signé sont produits.",
@@ -58,8 +63,13 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Referenz: {reference}",
     ),
     (
-        "{count} machine(s) interrompue(s) (coupure ou arrêt pendant l'effacement) : à refaire ou à consigner en échec.",
-        "{count} machine(s) interrupted (power loss or shutdown during erasure): to redo or to record as failed.",
+        "{count} machine interrompue (coupure ou arrêt pendant l'effacement) : à refaire ou à consigner en échec.",
+        "{count} machine interrupted (power loss or shutdown during erasure): to redo or to record as failed.",
+        "{count} Rechner unterbrochen (Stromausfall oder Abschaltung während des Löschens): erneut bearbeiten oder als fehlgeschlagen erfassen.",
+    ),
+    (
+        "{count} machines interrompues (coupure ou arrêt pendant l'effacement) : à refaire ou à consigner en échec.",
+        "{count} machines interrupted (power loss or shutdown during erasure): to redo or to record as failed.",
         "{count} Rechner unterbrochen (Stromausfall oder Abschaltung während des Löschens): erneut bearbeiten oder als fehlgeschlagen erfassen.",
     ),
     ("Continuer", "Continue", "Fortsetzen"),
@@ -98,9 +108,19 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Zertifikate der Charge werden erstellt…",
     ),
     (
-        "Machine enregistrée au lot {id} ({count} certificat(s))",
-        "Machine recorded in batch {id} ({count} certificate(s))",
-        "Rechner in Charge {id} erfasst ({count} Zertifikat(e))",
+        "Machine enregistrée au lot {id} ({certificates})",
+        "Machine recorded in batch {id} ({certificates})",
+        "Rechner in Charge {id} erfasst ({certificates})",
+    ),
+    (
+        "{count} certificat",
+        "{count} certificate",
+        "{count} Zertifikat",
+    ),
+    (
+        "{count} certificats",
+        "{count} certificates",
+        "{count} Zertifikate",
     ),
     (
         "Enregistrement au lot impossible : {error}",
@@ -109,9 +129,19 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ),
     ("Clôturer le lot", "Close the batch", "Charge abschließen"),
     (
-        "Lot {id} : {units}, {certificates} certificat(s), {failed} en échec, {interrupted} interrompue(s).\n\nLa clôture produit le certificat groupé et le manifeste signé, copie les livrables sur la partition d'export si elle est présente, puis archive le lot. Plus rien ne pourra y être ajouté.",
-        "Batch {id}: {units}, {certificates} certificate(s), {failed} failed, {interrupted} interrupted.\n\nClosing produces the grouped certificate and the signed manifest, copies the deliverables to the export partition if present, then archives the batch. Nothing more can be added to it.",
-        "Charge {id}: {units}, {certificates} Zertifikat(e), {failed} fehlgeschlagen, {interrupted} unterbrochen.\n\nDer Abschluss erzeugt das Sammelzertifikat und das signierte Manifest, kopiert die Ergebnisse auf die Exportpartition, falls vorhanden, und archiviert die Charge. Danach kann nichts mehr hinzugefügt werden.",
+        "Lot {id} : {units}, {certificates}, {failed} en échec, {interrupted}.\n\nLa clôture produit le certificat groupé et le manifeste signé, copie les livrables sur la partition d'export si elle est présente, puis archive le lot. Plus rien ne pourra y être ajouté.",
+        "Batch {id}: {units}, {certificates}, {failed} failed, {interrupted}.\n\nClosing produces the grouped certificate and the signed manifest, copies the deliverables to the export partition if present, then archives the batch. Nothing more can be added to it.",
+        "Charge {id}: {units}, {certificates}, {failed} fehlgeschlagen, {interrupted}.\n\nDer Abschluss erzeugt das Sammelzertifikat und das signierte Manifest, kopiert die Ergebnisse auf die Exportpartition, falls vorhanden, und archiviert die Charge. Danach kann nichts mehr hinzugefügt werden.",
+    ),
+    (
+        "{count} interrompue",
+        "{count} interrupted",
+        "{count} unterbrochen",
+    ),
+    (
+        "{count} interrompues",
+        "{count} interrupted",
+        "{count} unterbrochen",
     ),
     (
         "Aucun certificat dans ce lot : clôture impossible.",
@@ -131,9 +161,29 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Kopie auf die Exportpartition erneut versuchen",
     ),
     (
-        "{copied} lot(s) copié(s), {present} déjà présent(s) sur {mount}",
-        "{copied} batch(es) copied, {present} already present on {mount}",
-        "{copied} Charge(n) kopiert, {present} bereits vorhanden auf {mount}",
+        "{copied}, {present} sur {mount}",
+        "{copied}, {present} on {mount}",
+        "{copied}, {present} auf {mount}",
+    ),
+    (
+        "{count} lot copié",
+        "{count} batch copied",
+        "{count} Charge kopiert",
+    ),
+    (
+        "{count} lots copiés",
+        "{count} batches copied",
+        "{count} Chargen kopiert",
+    ),
+    (
+        "{count} déjà présent",
+        "{count} already present",
+        "{count} bereits vorhanden",
+    ),
+    (
+        "{count} déjà présents",
+        "{count} already present",
+        "{count} bereits vorhanden",
     ),
     ("Lot abandonné", "Batch abandoned", "Charge aufgegeben"),
     (
@@ -188,9 +238,19 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Zertifikate bereits erstellt",
     ),
     (
-        "Les certificats de cette machine ont déjà été produits et enregistrés au lot ({count} fichier(s)). Les régénérer les rendrait différents de ceux du journal du lot.",
-        "This machine's certificates have already been produced and recorded in the batch ({count} file(s)). Regenerating them would make them differ from the batch journal.",
-        "Die Zertifikate dieses Rechners wurden bereits erstellt und in der Charge erfasst ({count} Datei(en)). Eine Neuerstellung würde sie vom Chargenjournal abweichen lassen.",
+        "Les certificats de cette machine ont déjà été produits et enregistrés au lot ({files}). Les régénérer les rendrait différents de ceux du journal du lot.",
+        "This machine's certificates have already been produced and recorded in the batch ({files}). Regenerating them would make them differ from the batch journal.",
+        "Die Zertifikate dieses Rechners wurden bereits erstellt und in der Charge erfasst ({files}). Eine Neuerstellung würde sie vom Chargenjournal abweichen lassen.",
+    ),
+    (
+        "{count} fichier",
+        "{count} file",
+        "{count} Datei",
+    ),
+    (
+        "{count} fichiers",
+        "{count} files",
+        "{count} Dateien",
     ),
     ("Fermer", "Close", "Schließen"),
     (
@@ -199,9 +259,14 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Neu erstellte Zertifikate",
     ),
     (
-        "{count} certificat(s) ont été régénérés après leur enregistrement au lot (bouton « Générer le PDF ») :\n{list}\n\nIls sont signés par la clé de ce poste et désignent les mêmes machines. Les enregistrer à nouveau au journal du lot, puis clôturer ?",
-        "{count} certificate(s) were regenerated after being recorded in the batch (\"Generate PDF\" button):\n{list}\n\nThey are signed by this machine's key and refer to the same machines. Record them again in the batch journal, then close?",
-        "{count} Zertifikat(e) wurden nach ihrer Erfassung in der Charge neu erstellt (Schaltfläche „PDF erzeugen“):\n{list}\n\nSie sind mit dem Schlüssel dieses Rechners signiert und bezeichnen dieselben Rechner. Erneut im Chargenjournal erfassen und dann abschließen?",
+        "{count} certificat a été régénéré après son enregistrement au lot (bouton « Générer le PDF ») :\n{list}\n\nIl est signé par la clé de ce poste et désigne la même machine. L'enregistrer à nouveau au journal du lot, puis clôturer ?",
+        "{count} certificate was regenerated after being recorded in the batch (\"Generate PDF\" button):\n{list}\n\nIt is signed by this machine's key and refers to the same machine. Record it again in the batch journal, then close?",
+        "{count} Zertifikat wurde nach seiner Erfassung in der Charge neu erstellt (Schaltfläche „PDF erzeugen“):\n{list}\n\nEs ist mit dem Schlüssel dieses Rechners signiert und bezeichnet denselben Rechner. Erneut im Chargenjournal erfassen und dann abschließen?",
+    ),
+    (
+        "{count} certificats ont été régénérés après leur enregistrement au lot (bouton « Générer le PDF ») :\n{list}\n\nIls sont signés par la clé de ce poste et désignent les mêmes machines. Les enregistrer à nouveau au journal du lot, puis clôturer ?",
+        "{count} certificates were regenerated after being recorded in the batch (\"Generate PDF\" button):\n{list}\n\nThey are signed by this machine's key and refer to the same machines. Record them again in the batch journal, then close?",
+        "{count} Zertifikate wurden nach ihrer Erfassung in der Charge neu erstellt (Schaltfläche „PDF erzeugen“):\n{list}\n\nSie sind mit dem Schlüssel dieses Rechners signiert und bezeichnen dieselben Rechner. Erneut im Chargenjournal erfassen und dann abschließen?",
     ),
     ("Clôture du lot", "Closing the batch", "Abschluss der Charge"),
     (

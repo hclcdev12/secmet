@@ -202,9 +202,14 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Prüfung: nicht durchgeführt (unterbrochen)",
     ),
     (
-        "Vérification : KO — {anomalies} anomalie(s){signatures}",
-        "Verification: FAILED — {anomalies} anomaly(ies){signatures}",
-        "Prüfung: FEHLER — {anomalies} Anomalie(n){signatures}",
+        "Vérification : KO — {anomalies} anomalie{signatures}",
+        "Verification: FAILED — {anomalies} anomaly{signatures}",
+        "Prüfung: FEHLER — {anomalies} Anomalie{signatures}",
+    ),
+    (
+        "Vérification : KO — {anomalies} anomalies{signatures}",
+        "Verification: FAILED — {anomalies} anomalies{signatures}",
+        "Prüfung: FEHLER — {anomalies} Anomalien{signatures}",
     ),
     (
         "Vérification : non effectuée (échec de l'effacement)",
@@ -367,9 +372,14 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Schritt {n} — {method} ({level}): {outcome}{criterion}",
     ),
     (
-        "  {checked} blocs relus, {anomalies} anomalie(s) : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
-        "  {checked} blocks re-read, {anomalies} anomaly(ies): unreadable {unreadable}, canaries {canaries}, patterns {patterns}, non-zero {nonzero}",
-        "  {checked} Blöcke erneut gelesen, {anomalies} Anomalie(n): unlesbar {unreadable}, Kanarienvögel {canaries}, Muster {patterns}, nicht null {nonzero}",
+        "  {checked} blocs relus, {anomalies} anomalie : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
+        "  {checked} blocks re-read, {anomalies} anomaly: unreadable {unreadable}, canaries {canaries}, patterns {patterns}, non-zero {nonzero}",
+        "  {checked} Blöcke erneut gelesen, {anomalies} Anomalie: unlesbar {unreadable}, Kanarienvögel {canaries}, Muster {patterns}, nicht null {nonzero}",
+    ),
+    (
+        "  {checked} blocs relus, {anomalies} anomalies : illisibles {unreadable}, canaris {canaries}, motifs {patterns}, non nuls {nonzero}",
+        "  {checked} blocks re-read, {anomalies} anomalies: unreadable {unreadable}, canaries {canaries}, patterns {patterns}, non-zero {nonzero}",
+        "  {checked} Blöcke erneut gelesen, {anomalies} Anomalien: unlesbar {unreadable}, Kanarienvögel {canaries}, Muster {patterns}, nicht null {nonzero}",
     ),
     (
         "  Signatures résiduelles : {list}",

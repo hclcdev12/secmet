@@ -39,7 +39,8 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "USB: host overwrite (Clear), no firmware command",
         "USB: Host-Überschreibung (Clear), kein Firmware-Befehl",
     ),
-    (", {n} repli(s)", ", {n} fallback(s)", ", {n} Ausweichmethode(n)"),
+    (", {count} repli", ", {count} fallback", ", {count} Ausweichmethode"),
+    (", {count} replis", ", {count} fallbacks", ", {count} Ausweichmethoden"),
     (
         " — dégradé {from} → {to}",
         " — downgraded {from} → {to}",

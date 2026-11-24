@@ -303,9 +303,10 @@ impl Disk {
                     plan.target_level
                 );
                 if !plan.fallbacks.is_empty() {
-                    text.push_str(&trf(
-                        ", {n} repli(s)",
-                        &[("n", &plan.fallbacks.len().to_string())],
+                    text.push_str(&crate::i18n::count_text(
+                        plan.fallbacks.len(),
+                        ", {count} repli",
+                        ", {count} replis",
                     ));
                 }
                 if let Some(d) = &plan.degradation {
