@@ -1,6 +1,6 @@
 # Contexte développeur SecMet
 
-Notes courtes pour travailler sur le dépôt (v0.5.0).
+Notes courtes pour travailler sur le dépôt (v0.5.1).
 
 ## Workspace Cargo
 
