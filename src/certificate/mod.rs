@@ -202,9 +202,12 @@ pub fn logs_dir() -> PathBuf {
 }
 
 pub fn certificates_dir() -> PathBuf {
-    // Lot actif (annexe M) : les certificats vont dans son dossier.
-    let mut path = crate::lot::active_dir().unwrap_or_else(logs_dir);
-    path.push("certificates");
+    // Lot actif (annexe M) : les certificats vont dans son dossier ; sinon
+    // le dossier visible du poste (ou `logs/certificates` sur la clé).
+    let path = match crate::lot::active_dir() {
+        Some(lot) => lot.join("certificates"),
+        None => crate::paths::certificates_dir(),
+    };
     let _ = create_private_dir(&path);
     path
 }

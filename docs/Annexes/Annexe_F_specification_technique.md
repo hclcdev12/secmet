@@ -137,7 +137,7 @@ flowchart TB
 | **UC-05** | Déverrouiller un disque ATA | Mot de passe connu | SECURITY UNLOCK puis DISABLE PASSWORD |
 | **UC-06** | Arrêter un effacement | Écriture hôte ou sanitize en cours | Arrêt entre deux blocs ou deux sondages ; firmware bloquant non interrompu |
 | **UC-07** | Consulter l'état d'un disque | Scan effectué | Identité, capacités, SMART, verdict |
-| **UC-08** | Générer le certificat | Tous les jobs terminés | PDF et attestations signées sous `~/.secmet_logs/certificates/` |
+| **UC-08** | Générer le certificat | Tous les jobs terminés | PDF et attestations signées sous `~/Documents/SecMet-Certificats/` (sur la clé : `logs/certificates/`) |
 | **UC-09** | Vérifier un certificat | JSON ou QR, clé de confiance | `secmet-verify` : signature et confiance de la clé |
 | **UC-10** | Valider par TestDisk | Au moins un succès | Verdict dans le dialogue, journal archivé |
 | **UC-11** | Régler langue, logo et opérateur | Aucune opération en cours | Fenêtre reconstruite ; PDF suivants rédigés dans la langue choisie, avec le logo choisi ; nom de l'opérateur pré-rempli |
@@ -436,12 +436,13 @@ Badges affichés : `INACTIF`, `ANALYSE…` (identification en cours), `EN ATTENT
 │   ├── journal.log                 # synthèse de session (fr)
 │   ├── <disque>.log                # rapport d'étapes, validation, TestDisk
 ├── session_report_<date>.json      # rapport structuré
-└── certificates/
-    ├── <SEC-…>.pdf                 # une page par disque
-    ├── <SEC-…>-<disque>.json       # attestation signée
-    ├── <SEC-…>-lot.pdf / -lot.json # format groupé
+├── certificates/                   # clé (SECMET_DATA_DIR/logs) ; sur un poste, certificats d'avant la 0.5.2
 ├── lots/<LOT-ID>/                  # mode lot : lot ouvert (lot.json, journal.ndjson, certificates/, sessions/)
 └── archive/<LOT-ID>/               # lots clôturés ou abandonnés
+~/Documents/SecMet-Certificats/     # poste, hors lot (dossier Documents XDG, 0700)
+├── <SEC-…>.pdf                     # une page par disque
+├── <SEC-…>-<disque>.json           # attestation signée
+└── <SEC-…>-lot.pdf / -lot.json     # format groupé
 ~/.config/secmet/                   # ou SECMET_DATA_DIR/config (clé live) ; ~/.secmet_logs devient SECMET_DATA_DIR/logs
 ├── settings.json                   # hdd_passes, language, pdf_logo, operator_name, check_updates, update_url, lots_enabled
 ├── update-state.json               # dernière vérification des mises à jour, dernier latest.json valide

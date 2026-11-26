@@ -42,7 +42,7 @@ Pour contrôler qu’aucune partition n’est récupérable après un effacement
 4. Cochez les disques à inclure → **Générer le PDF**.
 5. Attendez : une boîte de dialogue s’ouvre pour ouvrir le PDF ou le dossier.
 
-Le fichier se trouve dans `~/.secmet_logs/certificates/`.
+Le fichier se trouve dans `~/Documents/SecMet-Certificats/` (dossier Documents de l'utilisateur ; jusqu'à la 0.5.1 : `~/.secmet_logs/certificates/`, laissé en place).
 
 ## Sur la clé USB SecMet
 

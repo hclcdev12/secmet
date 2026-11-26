@@ -268,6 +268,17 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "PDF-Zertifikat erstellt ({disks}).\n\nDatei:\n{path}\n\nDie signierte Fassung jedes Zertifikats (.json-Datei, für die automatische Prüfung) wird im selben Ordner gespeichert.",
     ),
     ("Certificat PDF créé", "PDF certificate created", "PDF-Zertifikat erstellt"),
+    (
+        "Nouvel emplacement des certificats",
+        "New location for certificates",
+        "Neuer Speicherort der Zertifikate",
+    ),
+    (
+        "Les certificats sont désormais enregistrés dans :\n{new}\n\nCeux produits avant cette version restent dans un dossier caché :\n{old}",
+        "Certificates are now saved in:\n{new}\n\nThose produced before this version stay in a hidden folder:\n{old}",
+        "Zertifikate werden jetzt hier gespeichert:\n{new}\n\nDie vor dieser Version erstellten bleiben in einem versteckten Ordner:\n{old}",
+    ),
+    ("Ouvrir l'ancien dossier", "Open the old folder", "Alten Ordner öffnen"),
     ("Ouvrir le dossier", "Open folder", "Ordner öffnen"),
     ("Ouvrir le PDF", "Open PDF", "PDF öffnen"),
     ("Ouverture du PDF", "Opening the PDF", "PDF öffnen"),

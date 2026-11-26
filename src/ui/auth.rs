@@ -265,6 +265,7 @@ fn finish_startup(ctx: Startup) {
                 Box::new(move |outcome| match outcome {
                     LoadOutcome::Loaded { root_traced } => {
                         update_host_notice(&done.host_notice, root_traced);
+                        super::pdf_ui::notice_certificates_location(&done.window);
                         done.refresh_button.set_sensitive(true);
                         update_testdisk_button_state(
                             &done.testdisk_button,

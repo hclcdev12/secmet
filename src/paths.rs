@@ -96,6 +96,39 @@ pub fn config_file(name: &str) -> PathBuf {
     layout().config.join(name)
 }
 
+/// Dossier des certificats hors lot, sous le dossier Documents. Pas
+/// `Documents/SecMet` : nom courant d'un clone du dépôt.
+pub const CERTIFICATES_SUBDIR: &str = "SecMet-Certificats";
+
+/// Certificats hors lot (PDF et version signée .json). Sur un poste : dans
+/// les Documents de l'utilisateur, visibles (`~/Documents/
+/// SecMet-Certificats`) ; sur la clé (dossier dédié) : `logs/certificates`, copiés
+/// ensuite sur la partition d'export.
+pub fn certificates_dir() -> PathBuf {
+    let l = layout();
+    if l.dedicated {
+        return l.logs.join("certificates");
+    }
+    visible_certificates_dir(dirs::document_dir().as_deref(), dirs::home_dir().as_deref())
+}
+
+/// Ancien emplacement des certificats d'un poste (`~/.secmet_logs/
+/// certificates`, jusqu'à la 0.5.1) : laissé en place, seulement signalé.
+pub fn legacy_certificates_dir() -> Option<PathBuf> {
+    let l = layout();
+    (!l.dedicated).then(|| l.logs.join("certificates"))
+}
+
+/// Résolution pure : dossier Documents (XDG), sinon `~/Documents`.
+pub fn visible_certificates_dir(documents: Option<&Path>, home: Option<&Path>) -> PathBuf {
+    let base = documents.map(Path::to_path_buf).unwrap_or_else(|| {
+        home.map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("Documents")
+    });
+    base.join(CERTIFICATES_SUBDIR)
+}
+
 /// Racine des journaux, rapports et certificats.
 pub fn logs_dir() -> PathBuf {
     layout().logs.clone()
@@ -258,6 +291,21 @@ mod tests {
         assert_eq!(l.config, PathBuf::from("/home/u/.config/secmet"));
         assert_eq!(l.logs, PathBuf::from("/home/u/.secmet_logs"));
         assert_eq!(l.lots, PathBuf::from("/home/u/.secmet_logs/lots"));
+    }
+
+    #[test]
+    fn certificates_go_to_the_documents_folder() {
+        assert_eq!(
+            visible_certificates_dir(
+                Some(Path::new("/home/u/Dokumente")),
+                Some(Path::new("/home/u"))
+            ),
+            PathBuf::from("/home/u/Dokumente/SecMet-Certificats")
+        );
+        assert_eq!(
+            visible_certificates_dir(None, Some(Path::new("/home/u"))),
+            PathBuf::from("/home/u/Documents/SecMet-Certificats")
+        );
     }
 
     #[test]

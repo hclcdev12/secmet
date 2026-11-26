@@ -59,7 +59,7 @@ Avec `SECMET_DATA_DIR=/chemin` (clé live, annexe M), `~/.config/secmet/` devien
 |-------------|---------|
 | `~/.secmet_logs/sessions/<SEC-…>/` | `journal.log`, `<disque>.log`, journaux TestDisk (0700/0600) |
 | `~/.secmet_logs/session_report_<date>.json` | Rapport de session |
-| `~/.secmet_logs/certificates/` | `<SEC-…>.pdf`, `<SEC-…>-<disque>.json` (attestation signée), `…-lot.pdf/json` |
+| `~/Documents/SecMet-Certificats/` (`paths::certificates_dir`, dossier Documents XDG ; `logs/certificates/` avec `SECMET_DATA_DIR` ; ancien `~/.secmet_logs/certificates/` laissé en place) | `<SEC-…>.pdf`, `<SEC-…>-<disque>.json` (attestation signée), `…-lot.pdf/json` |
 | `~/.config/secmet/` | `settings.json`, `pdf-logo.jpg`, `attestation-key.hex` (0600), `attestation-key.pub` (affichée dans les Réglages, copiée à chaque clôture de lot sous `cle-publique-secmet-<key_id>.pub`), `key-history.json` (clés créées par l'application), `trusted-keys`, `update-state.json` (dernière vérification des mises à jour) ; `release-key.hex` sur le poste du responsable des versions seulement |
 | `/var/lib/secmet/ata-security/` (root) | Mots de passe ATA posés par SecMet, le temps d'un SECURITY ERASE ; `SECMET-DATA/vault/` (root 0700) dès que la clé est montée et que sa racine appartient à root (`secmet-helper::vault::resolve_dir`) |
 | `/run/secmet/` (root) | Socket du helper, journaux TestDisk temporaires |

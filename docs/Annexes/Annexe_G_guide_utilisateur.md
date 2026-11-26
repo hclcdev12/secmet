@@ -77,7 +77,7 @@ Les journaux et certificats sont écrits en lecture seule pour les autres utilis
 
 1. Terminer **tous** les effacements de la session (succès ou échec ; un arrêt manuel compte comme **Échec**).
 2. Cliquer **Générer le PDF**, saisir le **nom de l'opérateur** (pré-rempli s'il est enregistré dans les Réglages, §8), choisir le format (**une page par disque** ou **certificat groupé**), cocher les disques, valider.
-3. Les fichiers sont créés sous `~/.secmet_logs/certificates/` : `<SEC-…>.pdf` et une **attestation JSON signée** par disque (`<SEC-…>-<disque>.json`), ou `…-lot.pdf` / `…-lot.json` pour le format groupé.
+3. Les fichiers sont créés sous `~/Documents/SecMet-Certificats/` (dans le dossier Documents ; ceux d'avant la 0.5.2 restent dans `~/.secmet_logs/certificates/`, signalé une fois au démarrage) : `<SEC-…>.pdf` et une **attestation JSON signée** par disque (`<SEC-…>-<disque>.json`), ou `…-lot.pdf` / `…-lot.json` pour le format groupé.
 4. **Ouvrir le PDF** lance le lecteur par défaut ; **Ouvrir le dossier** le gestionnaire de fichiers.
 
 **Langue du certificat** : le PDF est rédigé dans la langue de l'interface au moment de la génération (français, anglais ou allemand) : libellés, dates, méthode, réserves et statut de vérification. Les textes libres de l'attestation JSON signée (libellé de la méthode, réserves, statut de vérification, mentions « non disponible » et « inconnu ») sont écrits dans la même langue ; les éléments vérifiables (code de méthode, catégorie NIST, empreinte des preuves, seed, signature) ne dépendent pas de la langue. Pour obtenir un certificat dans une autre langue, changer la langue dans les Réglages avant de cliquer **Générer le PDF**.

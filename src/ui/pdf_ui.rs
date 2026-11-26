@@ -370,3 +370,57 @@ pub(super) fn show_pdf_created_dialog(
     });
     dialog.present();
 }
+
+/// Marqueur : l'avis sur le nouvel emplacement des certificats a été vu.
+const CERTIFICATES_NOTICE_MARKER: &str = "certificates-location-notice";
+
+/// Une seule fois, sur un poste qui a des certificats d'avant la 0.5.2 dans
+/// `~/.secmet_logs/certificates` : dit où vont les nouveaux et où restent
+/// les anciens (laissés en place).
+pub(super) fn notice_certificates_location(window: &ApplicationWindow) {
+    let Some(legacy) = crate::paths::legacy_certificates_dir() else {
+        return;
+    };
+    let marker = crate::paths::config_file(CERTIFICATES_NOTICE_MARKER);
+    if marker.exists() {
+        return;
+    }
+    let has_old = std::fs::read_dir(&legacy)
+        .map(|entries| {
+            entries
+                .flatten()
+                .any(|e| e.path().extension().is_some_and(|x| x == "pdf"))
+        })
+        .unwrap_or(false);
+    if !has_old {
+        return;
+    }
+    if let Some(parent) = marker.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&marker, b"");
+    let message = trf(
+        "Les certificats sont désormais enregistrés dans :\n{new}\n\n\
+         Ceux produits avant cette version restent dans un dossier caché :\n{old}",
+        &[
+            (
+                "new",
+                &crate::paths::certificates_dir().display().to_string(),
+            ),
+            ("old", &legacy.display().to_string()),
+        ],
+    );
+    let window_for_open = window.clone();
+    super::dialogs::confirm_choice(
+        window,
+        &tr("Nouvel emplacement des certificats"),
+        &message,
+        (&tr("Ouvrir l'ancien dossier"), &tr("Fermer")),
+        move || {
+            if let Err(e) = certificate::open_folder(&legacy) {
+                show_error_dialog(&window_for_open, &tr("Ouvrir le dossier"), &e);
+            }
+        },
+        || {},
+    );
+}

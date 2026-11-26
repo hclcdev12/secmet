@@ -119,7 +119,7 @@ La progression de chaque disque est relayée en temps réel par le helper : éta
 
 ### Certificat PDF
 
-Quand **tous** les jobs de la session sont terminés : **Générer le PDF**. Saisir le nom de l'opérateur, cocher les disques ; un **seul PDF multi-pages** est créé sous `~/.secmet_logs/certificates/`, avec l'attestation JSON signée à côté. Exemples : [certificat d'un disque](docs/exemple_pdf.pdf) · [certificat de lot](docs/exemple_lot.pdf).
+Quand **tous** les jobs de la session sont terminés : **Générer le PDF**. Saisir le nom de l'opérateur, cocher les disques ; un **seul PDF multi-pages** est créé sous `~/Documents/SecMet-Certificats/`, avec l'attestation JSON signée à côté. Exemples : [certificat d'un disque](docs/exemple_pdf.pdf) · [certificat de lot](docs/exemple_lot.pdf).
 
 ### Réglages
 
