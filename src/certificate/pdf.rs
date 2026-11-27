@@ -17,7 +17,7 @@ use crate::i18n::{self, tr_in, Lang};
 
 use super::labels::method_label_in;
 use super::{
-    certificates_dir, disk_certificate_id, lot_certificate_id, pdf_filename, pdf_filename_grouped,
+    disk_certificate_id, lot_certificate_id, pdf_filename, pdf_filename_grouped,
     CertificatePdfMode, DiskOperationRecord, SessionReport,
 };
 
@@ -117,11 +117,6 @@ fn open_folder_in_file_manager(path: &Path) -> Result<(), String> {
     }
 
     xdg_open(path)
-}
-
-/// Ouvre le dossier des certificats dans un gestionnaire de fichiers.
-pub fn open_certificates_folder() -> Result<(), String> {
-    open_folder_in_file_manager(&certificates_dir())
 }
 
 /// Ouvre `path` dans le gestionnaire de fichiers (dossier d'un lot, export).
@@ -229,24 +224,8 @@ pub(crate) fn pdf_lang(lang: Lang) -> secmet_attest::lang::Lang {
 }
 
 /// Génère un certificat PDF signé (individuel ou groupé selon le mode),
-/// rédigé dans la langue courante de l'interface.
-pub fn render_pdf_bundle(
-    session: &SessionReport,
-    selected_disk_names: &[String],
-    operator_name: &str,
-    mode: CertificatePdfMode,
-) -> Result<export::Exported, String> {
-    render_pdf_bundle_in(
-        &certificates_dir(),
-        session,
-        selected_disk_names,
-        operator_name,
-        mode,
-    )
-}
-
-/// Comme [`render_pdf_bundle`], dans le dossier `dir`, en rendant les
-/// enveloppes signées (lots : empreintes pour le journal et le manifeste).
+/// rédigé dans la langue courante de l'interface, dans le dossier `dir`,
+/// en rendant les enveloppes signées (lots : empreintes pour le journal et le manifeste).
 pub fn render_pdf_bundle_in(
     dir: &Path,
     session: &SessionReport,

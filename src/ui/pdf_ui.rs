@@ -221,13 +221,24 @@ pub(super) fn show_pdf_generation_dialog(
         // Sans lot sur la clé, le certificat part aussi sur la partition
         // d'export, dans un dossier au nom de la session (avec un lot, il
         // est exporté à la clôture ; sur un poste installé, jamais).
-        let export_mount = if lot::active_dir().is_none() {
+        let no_lot = lot::active_dir().is_none();
+        let export_mount = if no_lot {
             lot::export_mount_on_key()
         } else {
             None
         };
+        // Sans lot sur un poste : directement dans le dossier de sortie
+        // (choisi dans les Réglages, sinon `~/Documents/SecMet-Certificats`).
+        let to_output = no_lot && crate::output::applies();
         std::thread::spawn(move || {
-            let result = certificate::render_pdf_bundle(
+            let output = to_output.then(crate::output::resolve);
+            let dir = match &output {
+                Some(o) => o.dir.clone(),
+                None => certificate::certificates_dir(),
+            };
+            let fallback = output.as_ref().and_then(|o| o.fallback_note());
+            let result = certificate::render_pdf_bundle_in(
+                &dir,
                 &session_for_thread,
                 &selected,
                 &operator_trimmed,
@@ -240,7 +251,7 @@ pub(super) fn show_pdf_generation_dialog(
                     files.extend(exported.lot_json.iter().cloned());
                     lot::copy_to_export(&mount, &session_for_thread.certificate_id, &files)
                 });
-                (exported.pdf, export)
+                (exported.pdf, export, fallback)
             });
             let _ = tx.send((result, selected.len(), pdf_mode));
         });
@@ -253,7 +264,7 @@ pub(super) fn show_pdf_generation_dialog(
         glib::timeout_add_local(std::time::Duration::from_millis(150), move || {
             let _pdf = &pdf_guard;
             match rx.try_recv() {
-                Ok((Ok((path, export)), disk_count, mode)) => {
+                Ok((Ok((path, export, fallback)), disk_count, mode)) => {
                     global_status_for_poll.set_text("");
                     let export_note = export.map(|r| match r {
                         Ok(dir) => trf(
@@ -265,12 +276,16 @@ pub(super) fn show_pdf_generation_dialog(
                             &[("error", &e)],
                         ),
                     });
+                    let note = match (fallback, export_note) {
+                        (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
+                        (a, b) => a.or(b),
+                    };
                     show_pdf_created_dialog(
                         &parent_for_poll,
                         &path,
                         disk_count,
                         mode,
-                        export_note.as_deref(),
+                        note.as_deref(),
                     );
                     glib::ControlFlow::Break
                 }
@@ -360,7 +375,13 @@ pub(super) fn show_pdf_created_dialog(
                 }
             }
             ResponseType::Reject => {
-                if let Err(e) = certificate::open_certificates_folder() {
+                // Le dossier où le PDF a vraiment été écrit (lot, dossier
+                // choisi, ou dossier par défaut après un repli).
+                let folder = pdf_path_owned
+                    .parent()
+                    .map(std::path::Path::to_path_buf)
+                    .unwrap_or_else(crate::output::display_dir);
+                if let Err(e) = certificate::open_folder(&folder) {
                     show_error_dialog(&parent_for_errors, &tr("Ouverture du dossier"), &e);
                 }
             }
@@ -403,10 +424,7 @@ pub(super) fn notice_certificates_location(window: &ApplicationWindow) {
         "Les certificats sont désormais enregistrés dans :\n{new}\n\n\
          Ceux produits avant cette version restent dans un dossier caché :\n{old}",
         &[
-            (
-                "new",
-                &crate::paths::certificates_dir().display().to_string(),
-            ),
+            ("new", &crate::output::display_dir().display().to_string()),
             ("old", &legacy.display().to_string()),
         ],
     );

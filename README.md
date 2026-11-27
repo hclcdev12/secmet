@@ -119,7 +119,7 @@ La progression de chaque disque est relayée en temps réel par le helper : éta
 
 ### Certificat PDF
 
-Quand **tous** les jobs de la session sont terminés : **Générer le PDF**. Saisir le nom de l'opérateur, cocher les disques ; un **seul PDF multi-pages** est créé sous `~/Documents/SecMet-Certificats/`, avec l'attestation JSON signée à côté. Exemples : [certificat d'un disque](docs/exemple_pdf.pdf) · [certificat de lot](docs/exemple_lot.pdf).
+Quand **tous** les jobs de la session sont terminés : **Générer le PDF**. Saisir le nom de l'opérateur, cocher les disques ; un **seul PDF multi-pages** est créé dans le dossier des certificats (`~/Documents/SecMet-Certificats/` par défaut, ou celui choisi dans les Réglages), avec l'attestation JSON signée à côté. Exemples : [certificat d'un disque](docs/exemple_pdf.pdf) · [certificat de lot](docs/exemple_lot.pdf).
 
 ### Réglages
 
@@ -129,10 +129,11 @@ Icône engrenage dans la barre de titre.
 - **Logo des certificats** : image PNG, JPEG, GIF, BMP, WebP ou TIFF, convertie en JPEG sur fond blanc dans `~/.config/secmet/pdf-logo.jpg` et placée en haut à gauche de chaque page jusqu'au retour au logo par défaut.
 - **Opérateur** : nom pré-rempli dans le dialogue **Générer le PDF**.
 - **Clé de signature des certificats** : identifiant (`key_id`) et clé publique du poste ou de la clé USB, en lecture seule avec un bouton **Copier**, à inscrire dans la liste de confiance du client (`trusted-keys`) ; rien n'est créé tant qu'aucun certificat n'a été signé. La même clé publique est jointe aux livrables de chaque lot clôturé (`cle-publique-secmet-<key_id>.pub`).
-- **Lots** (poste installé) : case **Mode lot**, qui regroupe les effacements en lots comme sur la clé ; les livrables d'un lot clôturé restent dans `~/.secmet_logs/archive/`.
+- **Dossier des certificats** (poste installé) : `~/Documents/SecMet-Certificats/` par défaut (privé, 0700), ou un dossier choisi (**Choisir un dossier…**, retour par **Dossier par défaut**) : clé USB, partage réseau… SecMet ne crée pas le dossier choisi et y laisse les droits habituels. Refusé s'il fait partie des données internes de SecMet ou n'est pas accessible en écriture ; avertissement pour un dossier de développement. S'il est indisponible au moment d'écrire (supprimé, support démonté, écriture impossible), le certificat va dans le dossier par défaut et la fenêtre de fin le dit. Sur la clé USB, la sortie est toujours la partition `SECMET-EXP`.
+- **Lots** (poste installé) : case **Mode lot**, qui regroupe les effacements en lots comme sur la clé ; le lot travaille dans `~/.secmet_logs/lots/` puis `archive/`, et ses livrables sont copiés à la clôture dans `<dossier des certificats>/<lot>/`.
 - **Mises à jour** : version installée, dernière vérification, nouvelle version et ses notes si le canal en annonce une (`latest.json` signé par la clé de version intégrée, sinon ignoré), bouton **Vérifier maintenant** et lien vers la page de téléchargement. Quand une version plus récente est annoncée et que le poste dispose d'`apt` ou de `dnf` (hors AppImage : note « téléchargez la nouvelle AppImage et remplacez le fichier »), le bouton **Installer la mise à jour** télécharge le paquet, vérifie `SHA256SUMS` signé, l'installe via `pkexec`, puis propose **Relancer SecMet** ; sur la clé USB, le paquet est en plus déposé dans le magasin `app/<version>/` de la partition de données, que la clé déploie à chaque démarrage. Le bouton est masqué tant qu'une opération est en cours (effacement, analyse, TestDisk, liste des disques, PDF, clôture, déverrouillage, dé-frozen) ou qu'un lot est ouvert : la raison s'affiche, avec un bouton **Clôturer le lot…** ; l'état est relu en continu et revérifié au clic, et la fenêtre ne se ferme pas pendant l'installation. Un lot n'est ainsi traité que par une seule version. La vérification automatique (une requête HTTPS par jour, sans donnée personnelle) se désactive par une case. Un **point jaune** sur l'engrenage signale une version plus récente.
 
-Les réglages sont persistants dans `~/.config/secmet/settings.json` (`check_updates`, `update_url` pour un miroir interne) ; `SECMET_UPDATE_URL` remplace l'adresse pour les essais.
+Les réglages sont persistants dans `~/.config/secmet/settings.json` (`check_updates`, `update_url` pour un miroir interne, `certificates_output`) ; `SECMET_UPDATE_URL` remplace l'adresse pour les essais.
 
 ### Lots et clé USB
 

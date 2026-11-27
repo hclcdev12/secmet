@@ -42,7 +42,7 @@ Pour contrôler qu’aucune partition n’est récupérable après un effacement
 4. Cochez les disques à inclure → **Générer le PDF**.
 5. Attendez : une boîte de dialogue s’ouvre pour ouvrir le PDF ou le dossier.
 
-Le fichier se trouve dans `~/Documents/SecMet-Certificats/` (dossier Documents de l'utilisateur ; jusqu'à la 0.5.1 : `~/.secmet_logs/certificates/`, laissé en place).
+Le fichier se trouve dans le **dossier des certificats** : `~/Documents/SecMet-Certificats/` par défaut, ou le dossier choisi dans les Réglages (s'il est indisponible, le certificat est enregistré dans le dossier par défaut et la fenêtre de fin le signale). Jusqu'à la 0.5.1 : `~/.secmet_logs/certificates/`, laissé en place.
 
 ## Sur la clé USB SecMet
 
@@ -53,11 +53,11 @@ Le fichier se trouve dans `~/Documents/SecMet-Certificats/` (dossier Documents d
 3. Éteignez la machine et passez à la suivante.
 4. En fin de série, **Clôturer** produit le certificat groupé et le manifeste signé, copiés sur la partition `SECMET-EXP` (lisible sous Windows). Un lot sans disque effacé peut être abandonné (**Abandonner le lot**).
 
-Sur un poste installé, la case **Mode lot** des Réglages active le même regroupement en lots.
+Sur un poste installé, la case **Mode lot** des Réglages active le même regroupement en lots ; à la clôture, les livrables sont copiés dans `<dossier des certificats>/<lot>/`.
 
 ## Réglages et mises à jour
 
-Icône engrenage : langue, logo des certificats, nom de l’opérateur, mode lot, mises à jour. Un **point jaune** sur l’engrenage signale une nouvelle version : **Installer la mise à jour** (poste avec `apt` ou `dnf`, hors AppImage, aucune opération en cours et aucun lot ouvert : sinon la raison s’affiche, avec **Clôturer le lot…**) puis **Relancer SecMet**. Section **Clé de signature des certificats** : identifiant (`key_id`) et clé publique du poste, à copier pour la liste de confiance du client.
+Icône engrenage : langue, logo des certificats, nom de l’opérateur, dossier des certificats (poste installé : **Choisir un dossier…** / **Dossier par défaut**), mode lot, mises à jour. Un **point jaune** sur l’engrenage signale une nouvelle version : **Installer la mise à jour** (poste avec `apt` ou `dnf`, hors AppImage, aucune opération en cours et aucun lot ouvert : sinon la raison s’affiche, avec **Clôturer le lot…**) puis **Relancer SecMet**. Section **Clé de signature des certificats** : identifiant (`key_id`) et clé publique du poste, à copier pour la liste de confiance du client.
 
 ## Bouton « i » (couleur)
 

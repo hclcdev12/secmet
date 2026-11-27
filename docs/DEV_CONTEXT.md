@@ -42,6 +42,7 @@ Règles de la base de code : `panic = "abort"` en release, clippy avec `unwrap_u
 | `src/certificate/` | Session, enregistrements, construction de l'attestation, export PDF/JSON |
 | `src/i18n/` | Tables `(fr, en, de)` ; tests de complétude et de marqueurs `{nom}` ; les journaux restent en français ; les certificats suivent la langue de l'interface (libellés fixes : `secmet-attest::lang`, textes libres : `src/i18n/certificate.rs`) |
 | `src/settings.rs`, `src/pdf_logo.rs` | `~/.config/secmet/settings.json`, logo personnalisé `pdf-logo.jpg` |
+| `src/output.rs` | Dossier de sortie des certificats sur un poste : réglage, contrôle au choix (`validate_choice`), résolution avec repli hors du fil GTK (`resolve`), point de montage (`mount_point_of`) |
 | `src/ui/lot_ui.rs` | Lots côté interface : dialogue au démarrage, bandeau, contrôle de doublon (`check_before_erase`), `register_start` / `register_end` (certificats automatiques dans le lot), clôture (`close_lot_work` : PDF groupé, manifeste, export `SECMET-EXP`, archivage) ; actif si `paths::dedicated_data_dir()` (clé, lots de machines) ou si `settings.lots_enabled` (poste installé, « Mode lot » des Réglages, lots de disques, sans export sur une clé branchée) |
 | `src/clock.rs`, `src/ui/clock_ui.rs` | Seule source d'heure (`clock::now()` / `stamp()`), décalage manuel, contrôle au démarrage en mode clé (NTP, références : exécutable, lots), réserve sur les certificats (`caveat_key`) |
 | `src/lot.rs` | Lot persistant (annexe M) : `lots/<LOT-ID>/{lot.json,journal.ndjson,certificates,sessions}`, journal chaîné SHA-256, écritures tmp+fsync+rename, reprise, doublons, clôture et archivage ; pur, testé avec `tempfile` |
@@ -59,7 +60,7 @@ Avec `SECMET_DATA_DIR=/chemin` (clé live, annexe M), `~/.config/secmet/` devien
 |-------------|---------|
 | `~/.secmet_logs/sessions/<SEC-…>/` | `journal.log`, `<disque>.log`, journaux TestDisk (0700/0600) |
 | `~/.secmet_logs/session_report_<date>.json` | Rapport de session |
-| `~/Documents/SecMet-Certificats/` (`paths::certificates_dir`, dossier Documents XDG ; `logs/certificates/` avec `SECMET_DATA_DIR` ; ancien `~/.secmet_logs/certificates/` laissé en place) | `<SEC-…>.pdf`, `<SEC-…>-<disque>.json` (attestation signée), `…-lot.pdf/json` |
+| `~/Documents/SecMet-Certificats/` ou dossier choisi (`output::resolve`, défaut `paths::certificates_dir`, dossier Documents XDG ; lots clôturés copiés dans `<LOT>/` ; `logs/certificates/` avec `SECMET_DATA_DIR` ; ancien `~/.secmet_logs/certificates/` laissé en place) | `<SEC-…>.pdf`, `<SEC-…>-<disque>.json` (attestation signée), `…-lot.pdf/json` |
 | `~/.config/secmet/` | `settings.json`, `pdf-logo.jpg`, `attestation-key.hex` (0600), `attestation-key.pub` (affichée dans les Réglages, copiée à chaque clôture de lot sous `cle-publique-secmet-<key_id>.pub`), `key-history.json` (clés créées par l'application), `trusted-keys`, `update-state.json` (dernière vérification des mises à jour) ; `release-key.hex` sur le poste du responsable des versions seulement |
 | `/var/lib/secmet/ata-security/` (root) | Mots de passe ATA posés par SecMet, le temps d'un SECURITY ERASE ; `SECMET-DATA/vault/` (root 0700) dès que la clé est montée et que sa racine appartient à root (`secmet-helper::vault::resolve_dir`) |
 | `/run/secmet/` (root) | Socket du helper, journaux TestDisk temporaires |

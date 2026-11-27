@@ -255,6 +255,30 @@ fn cleanup_section(parent: &ApplicationWindow, content: &GtkBox) {
     });
 }
 
+/// Message sous le choix du dossier : discret, ou en rouge pour un refus.
+fn set_folder_status(label: &Label, text: &str, error: bool) {
+    label.set_text(text);
+    if error {
+        label.remove_css_class("dim-label");
+        label.add_css_class("status-error");
+    } else {
+        label.remove_css_class("status-error");
+        label.add_css_class("dim-label");
+    }
+}
+
+/// Dossier de sortie choisi, enregistré au clic sur Valider.
+#[derive(Default)]
+enum PendingFolder {
+    /// Rien ne change.
+    #[default]
+    Keep,
+    /// Dossier choisi et contrôlé.
+    Custom(crate::output::Choice),
+    /// Retour à `~/Documents/SecMet-Certificats`.
+    Default,
+}
+
 /// Choix de logo en attente de validation.
 #[derive(Default)]
 enum PendingLogo {
@@ -585,14 +609,100 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
     folder_title.set_xalign(0.0);
     folder_title.set_margin_top(6);
     content.append(&folder_title);
-    let folder_note = Label::new(Some(&tr(
-        "Certificats PDF et attestations signées déjà produits : lot en cours, ou lots \
-         clôturés et certificats du poste.",
-    )));
+    let folder_note = Label::new(Some(&if crate::output::applies() {
+        tr(
+            "Les certificats PDF et leur version signée (.json) sont enregistrés dans ce \
+            dossier. Un lot clôturé y est copié dans un sous-dossier à son nom ; pendant le \
+            lot, ses certificats restent dans le dossier du lot.",
+        )
+    } else {
+        tr(
+            "Certificats PDF et attestations signées déjà produits : lot en cours, ou lots \
+            clôturés et certificats du poste.",
+        )
+    }));
     folder_note.set_wrap(true);
     folder_note.set_xalign(0.0);
     folder_note.add_css_class("dim-label");
     content.append(&folder_note);
+    // Poste : dossier de sortie au choix (pas sur la clé : SECMET-EXP).
+    let pending_folder: Rc<RefCell<PendingFolder>> = Rc::new(RefCell::new(PendingFolder::Keep));
+    if crate::output::applies() {
+        let output_path = Label::new(Some(&crate::output::display_dir().display().to_string()));
+        output_path.set_xalign(0.0);
+        output_path.set_wrap(true);
+        output_path.set_selectable(true);
+        content.append(&output_path);
+        let output_row = GtkBox::new(Orientation::Horizontal, 8);
+        let choose_folder_btn = Button::with_label(&tr("Choisir un dossier…"));
+        let default_folder_btn = Button::with_label(&tr("Dossier par défaut"));
+        output_row.append(&choose_folder_btn);
+        output_row.append(&default_folder_btn);
+        content.append(&output_row);
+        let output_status = Label::new(None);
+        output_status.set_xalign(0.0);
+        output_status.set_wrap(true);
+        output_status.add_css_class("dim-label");
+        content.append(&output_status);
+        {
+            let dialog = dialog.clone();
+            let output_path = output_path.clone();
+            let output_status = output_status.clone();
+            let pending = pending_folder.clone();
+            choose_folder_btn.connect_clicked(move |_| {
+                let chooser = FileChooserDialog::new(
+                    Some(&tr("Dossier des certificats")),
+                    Some(&dialog),
+                    FileChooserAction::SelectFolder,
+                    &[
+                        (&tr("Annuler"), ResponseType::Cancel),
+                        (&tr("Choisir"), ResponseType::Accept),
+                    ],
+                );
+                let output_path = output_path.clone();
+                let output_status = output_status.clone();
+                let pending = pending.clone();
+                chooser.connect_response(move |chooser, response| {
+                    if response == ResponseType::Accept {
+                        if let Some(path) = chooser.file().and_then(|f| f.path()) {
+                            match crate::output::validate_choice(&path) {
+                                Ok(choice) => {
+                                    output_path.set_text(&choice.dir.display().to_string());
+                                    let mut text = tr("Cliquez Valider pour l'enregistrer.");
+                                    if let Some(w) = &choice.warning {
+                                        text = format!("{w}\n{text}");
+                                    }
+                                    set_folder_status(&output_status, &text, false);
+                                    *pending.borrow_mut() = PendingFolder::Custom(choice);
+                                }
+                                Err(e) => set_folder_status(
+                                    &output_status,
+                                    &trf("Dossier refusé : {error}", &[("error", &e)]),
+                                    true,
+                                ),
+                            }
+                        }
+                    }
+                    chooser.close();
+                });
+                chooser.show();
+            });
+        }
+        {
+            let output_path = output_path.clone();
+            let output_status = output_status.clone();
+            let pending = pending_folder.clone();
+            default_folder_btn.connect_clicked(move |_| {
+                output_path.set_text(&crate::paths::certificates_dir().display().to_string());
+                set_folder_status(
+                    &output_status,
+                    &tr("Cliquez Valider pour l'enregistrer."),
+                    false,
+                );
+                *pending.borrow_mut() = PendingFolder::Default;
+            });
+        }
+    }
     let folder_row = GtkBox::new(Orientation::Horizontal, 8);
     let folder_btn = Button::with_label(&tr("Ouvrir le dossier des certificats"));
     folder_row.append(&folder_btn);
@@ -1063,6 +1173,17 @@ pub(super) fn show_settings_dialog(parent: &ApplicationWindow, operations_active
             saved.operator_name = operator_entry.text().trim().to_string();
             saved.check_updates = update_check.is_active();
             saved.lots_enabled = lots_check.is_active();
+            match std::mem::take(&mut *pending_folder.borrow_mut()) {
+                PendingFolder::Keep => {}
+                PendingFolder::Custom(choice) => {
+                    saved.certificates_output = Some(choice.dir);
+                    saved.certificates_output_mount = choice.mount;
+                }
+                PendingFolder::Default => {
+                    saved.certificates_output = None;
+                    saved.certificates_output_mount = None;
+                }
+            }
             settings::save(&saved);
             super::update_ui::refresh_indicator();
             dialog.close();

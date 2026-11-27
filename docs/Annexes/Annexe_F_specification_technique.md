@@ -137,7 +137,7 @@ flowchart TB
 | **UC-05** | Déverrouiller un disque ATA | Mot de passe connu | SECURITY UNLOCK puis DISABLE PASSWORD |
 | **UC-06** | Arrêter un effacement | Écriture hôte ou sanitize en cours | Arrêt entre deux blocs ou deux sondages ; firmware bloquant non interrompu |
 | **UC-07** | Consulter l'état d'un disque | Scan effectué | Identité, capacités, SMART, verdict |
-| **UC-08** | Générer le certificat | Tous les jobs terminés | PDF et attestations signées sous `~/Documents/SecMet-Certificats/` (sur la clé : `logs/certificates/`) |
+| **UC-08** | Générer le certificat | Tous les jobs terminés | PDF et attestations signées dans le dossier de sortie : `~/Documents/SecMet-Certificats/` ou dossier choisi, repli sur le défaut s'il est indisponible (sur la clé : `logs/certificates/`, copiés sur `SECMET-EXP`) |
 | **UC-09** | Vérifier un certificat | JSON ou QR, clé de confiance | `secmet-verify` : signature et confiance de la clé |
 | **UC-10** | Valider par TestDisk | Au moins un succès | Verdict dans le dialogue, journal archivé |
 | **UC-11** | Régler langue, logo et opérateur | Aucune opération en cours | Fenêtre reconstruite ; PDF suivants rédigés dans la langue choisie, avec le logo choisi ; nom de l'opérateur pré-rempli |
@@ -200,6 +200,7 @@ flowchart TB
 | **EF-26** | Nom de l'opérateur par défaut enregistré dans les réglages | Pré-rempli dans le dialogue « Générer le PDF », modifiable à chaque génération |
 | **EF-27** | Vérifier le canal de publication (`latest.json` signé par une clé de version intégrée) au démarrage et toutes les 24 h, hors ligne non bloquant, désactivable | Point jaune sur Réglages et section Mises à jour si une version plus récente est annoncée ; annonce non signée ou clé inconnue ignorée |
 | **EF-28** | Installer une mise à jour depuis les Réglages : télécharger `SHA256SUMS` et sa signature, vérifier la signature, télécharger le paquet du poste, comparer son empreinte, installer sous `pkexec` ; bouton visible seulement si `apt-get`/`dpkg` ou `dnf`/`rpm` est présent et qu'aucune opération n'est en cours | Rien n'est exécuté sans empreinte vérifiée ; **Relancer SecMet** après succès ; sur la clé, paquet rangé dans `SECMET-DATA/app/<version>/` |
+| **EF-29** | Dossier de sortie des certificats au choix sur un poste installé (`output.rs`) : PDF et attestations hors lot, copie des livrables d'un lot à la clôture dans `<sortie>/<LOT>/` ; dossier jamais créé par SecMet ; refusé s'il est dans les données internes ou non inscriptible ; repli sur `~/Documents/SecMet-Certificats` si absent, démonté (point de montage retenu au choix) ou non inscriptible ; sans objet sur la clé (sortie `SECMET-EXP`) | Repli signalé dans la fenêtre de fin ; « Ouvrir le dossier » ouvre le dossier réellement écrit ; tests `output::tests` |
 
 ### 4.5 Lots, clé USB et sort du support
 
@@ -439,12 +440,13 @@ Badges affichés : `INACTIF`, `ANALYSE…` (identification en cours), `EN ATTENT
 ├── certificates/                   # clé (SECMET_DATA_DIR/logs) ; sur un poste, certificats d'avant la 0.5.2
 ├── lots/<LOT-ID>/                  # mode lot : lot ouvert (lot.json, journal.ndjson, certificates/, sessions/)
 └── archive/<LOT-ID>/               # lots clôturés ou abandonnés
-~/Documents/SecMet-Certificats/     # poste, hors lot (dossier Documents XDG, 0700)
+~/Documents/SecMet-Certificats/     # poste : dossier de sortie par défaut (Documents XDG, 0700) ou dossier choisi
 ├── <SEC-…>.pdf                     # une page par disque
 ├── <SEC-…>-<disque>.json           # attestation signée
 └── <SEC-…>-lot.pdf / -lot.json     # format groupé
+    <LOT-ID>/                       # livrables d'un lot clôturé (copie)
 ~/.config/secmet/                   # ou SECMET_DATA_DIR/config (clé live) ; ~/.secmet_logs devient SECMET_DATA_DIR/logs
-├── settings.json                   # hdd_passes, language, pdf_logo, operator_name, check_updates, update_url, lots_enabled
+├── settings.json                   # hdd_passes, language, pdf_logo, operator_name, check_updates, update_url, lots_enabled, certificates_output(_mount)
 ├── update-state.json               # dernière vérification des mises à jour, dernier latest.json valide
 ├── pdf-logo.jpg
 ├── attestation-key.hex (0600)      # graine Ed25519

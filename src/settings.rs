@@ -36,6 +36,15 @@ pub struct Settings {
     /// particuliers : miroir interne) ; `None` : canal par défaut.
     #[serde(default)]
     pub update_url: Option<String>,
+    /// Dossier de sortie des certificats choisi sur un poste installé
+    /// (voir [`crate::output`]) ; `None` : `~/Documents/SecMet-Certificats`.
+    /// Ignoré sur la clé live.
+    #[serde(default)]
+    pub certificates_output: Option<PathBuf>,
+    /// Point de montage de ce dossier au moment du choix : un autre point
+    /// de montage plus tard signale un support démonté.
+    #[serde(default)]
+    pub certificates_output_mount: Option<PathBuf>,
 }
 
 fn default_true() -> bool {
@@ -63,6 +72,8 @@ impl Default for Settings {
             lots_enabled: false,
             check_updates: true,
             update_url: None,
+            certificates_output: None,
+            certificates_output_mount: None,
         }
     }
 }

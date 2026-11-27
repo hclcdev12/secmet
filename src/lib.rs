@@ -15,6 +15,7 @@ pub mod logger;
 pub mod logo;
 pub mod lot;
 pub mod migrate;
+pub mod output;
 pub mod paths;
 pub mod pdf_logo;
 pub mod pkexec_gate;

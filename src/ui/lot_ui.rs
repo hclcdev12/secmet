@@ -63,19 +63,21 @@ fn units_text(lot: &Lot) -> String {
 }
 
 /// Dossier à ouvrir pour « voir les certificats » : le lot en cours, sinon
-/// sur la clé les lots clôturés (`archive/`), sinon les certificats du
-/// poste.
+/// sur la clé les lots clôturés (`archive/`), sur un poste le dossier de
+/// sortie (certificats et lots clôturés).
 pub(super) fn certificates_folder() -> PathBuf {
     if let Some(dir) = with_active(|lot| lot.certificates_dir()) {
         return dir;
     }
-    if enabled() {
+    if !crate::output::applies() {
         let archive = paths::archive_dir();
         if archive.is_dir() {
             return archive;
         }
+        return certificate::certificates_dir();
     }
-    certificate::certificates_dir()
+    // Poste : le dossier de sortie, où arrivent aussi les lots clôturés.
+    crate::output::display_dir()
 }
 
 /// Nombre de certificats déjà enregistrés au lot pour cette session
@@ -774,12 +776,22 @@ struct ClosureReport {
     archived: PathBuf,
     exported_to: Option<PathBuf>,
     export_error: Option<String>,
+    /// Poste : dossier choisi indisponible, livrables copiés dans le
+    /// dossier par défaut.
+    output_fallback: Option<String>,
 }
 
 /// Travail de clôture, hors du fil GTK. Rend le lot en cas d'échec pour
 /// qu'il redevienne actif.
 fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, String)>> {
-    let result = (|| -> Result<(PathBuf, PathBuf, Option<PathBuf>, Option<String>), String> {
+    type Done = (
+        PathBuf,
+        PathBuf,
+        Option<PathBuf>,
+        Option<String>,
+        Option<String>,
+    );
+    let result = (|| -> Result<Done, String> {
         let dir = lot.certificates_dir();
         let mut signed: Vec<SignedAttestation> = Vec::new();
         for r in lot.certificates() {
@@ -854,26 +866,37 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
                 .push(dir.join(format!("{}.json", export::safe_filename(&p.certificate_id))));
             deliverables.push(dir.join(format!("{}.pdf", export::safe_filename(&p.session_id))));
         }
-        // Livrables sur la partition d'export de la clé, seulement quand
-        // l'application tourne depuis la clé (non bloquant). Sur un poste
-        // installé, une clé SecMet branchée n'est qu'un disque parmi
-        // d'autres : les livrables restent dans l'archive du poste.
-        let (exported_to, export_error) = match lot::export_mount_on_key() {
-            None => (None, None),
-            Some(mount) => {
-                let mut files = deliverables;
-                files.push(manifest_path.clone());
-                files.push(key_file);
-                match lot::copy_to_export(&mount, &lot_id, &files) {
-                    Ok(target) => (Some(target), None),
-                    Err(e) => (None, Some(e)),
-                }
-            }
+        deliverables.push(manifest_path.clone());
+        deliverables.push(key_file);
+        // Livrables copiés dans `<sortie>/<LOT>/` (non bloquant) :
+        // - depuis la clé, sur sa partition d'export (absente : rien) ; une
+        //   clé SecMet branchée sur un poste n'est qu'un disque parmi
+        //   d'autres ;
+        // - sur un poste, dans le dossier de sortie des certificats.
+        let (target, output_fallback) = if crate::output::applies() {
+            let output = crate::output::resolve();
+            let note = output.fallback_note();
+            (Some(output.dir), note)
+        } else {
+            (lot::export_mount_on_key(), None)
         };
-        Ok((exported.pdf, manifest_path, exported_to, export_error))
+        let (exported_to, export_error) = match target {
+            None => (None, None),
+            Some(mount) => match lot::copy_to_export(&mount, &lot_id, &deliverables) {
+                Ok(target) => (Some(target), None),
+                Err(e) => (None, Some(e)),
+            },
+        };
+        Ok((
+            exported.pdf,
+            manifest_path,
+            exported_to,
+            export_error,
+            output_fallback,
+        ))
     })();
     match result {
-        Ok((pdf, manifest_path, exported_to, export_error)) => {
+        Ok((pdf, manifest_path, exported_to, export_error, output_fallback)) => {
             let old_dir = lot.dir().to_path_buf();
             match lot.archive(&paths::archive_dir()) {
                 Ok(archived) => {
@@ -891,6 +914,7 @@ fn close_lot_work(mut lot: Lot) -> Result<ClosureReport, Box<(Option<Lot>, Strin
                         archived,
                         exported_to,
                         export_error,
+                        output_fallback,
                     })
                 }
                 // Clôturé sur disque mais pas archivé : le lot est rechargé tel quel
@@ -957,11 +981,19 @@ pub(super) fn close_dialog(window: &ApplicationWindow, after: Option<Box<dyn FnO
     };
     let (id, units, certificates, failed, interrupted) = summary;
     let (dialog, content, buttons) = dialog_frame(window, &tr("Clôturer le lot"));
-    content.append(&note(&trf(
+    let key = if paths::dedicated_data_dir() {
         "Lot {id} : {units}, {certificates}, {failed} en échec, \
          {interrupted}.\n\nLa clôture produit le certificat groupé et le \
          manifeste signé, copie les livrables sur la partition d'export si elle est présente, \
-         puis archive le lot. Plus rien ne pourra y être ajouté.",
+         puis archive le lot. Plus rien ne pourra y être ajouté."
+    } else {
+        "Lot {id} : {units}, {certificates}, {failed} en échec, \
+         {interrupted}.\n\nLa clôture produit le certificat groupé et le \
+         manifeste signé, copie les livrables dans le dossier des certificats, \
+         puis archive le lot. Plus rien ne pourra y être ajouté."
+    };
+    content.append(&note(&trf(
+        key,
         &[
             ("id", &id),
             ("units", &units),
@@ -1187,8 +1219,10 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
         match result {
             Ok(report) => {
                 set_active(None);
-                let retry = report.export_error.is_some().then(|| report.lot_id.clone());
-                let mut text = trf(
+                let on_key = paths::dedicated_data_dir();
+                let retry =
+                    (on_key && report.export_error.is_some()).then(|| report.lot_id.clone());
+                let details = trf(
                     "Certificat groupé : {pdf}\nManifeste signé : {manifest}\nArchive : {dir}",
                     &[
                         ("pdf", &report.pdf.display().to_string()),
@@ -1196,8 +1230,21 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
                         ("dir", &report.archived.display().to_string()),
                     ],
                 );
-                text.push_str("\n\n");
-                text.push_str(&match (&report.exported_to, &report.export_error) {
+                // Sur un poste, l'endroit où récupérer les livrables d'abord ;
+                // les chemins internes (archive cachée) ensuite.
+                let mut text = String::new();
+                if let Some(note) = &report.output_fallback {
+                    text.push_str(note);
+                    text.push_str("\n\n");
+                }
+                let copy_line = match (&report.exported_to, &report.export_error) {
+                    (Some(dir), _) if !on_key => trf(
+                        "Livrables copiés dans : {dir}",
+                        &[("dir", &dir.display().to_string())],
+                    ),
+                    (None, Some(e)) if !on_key => {
+                        trf("Copie des livrables impossible : {error}", &[("error", e)])
+                    }
                     (Some(dir), _) => trf(
                         "Copié sur la partition d'export : {dir}",
                         &[("dir", &dir.display().to_string())],
@@ -1206,11 +1253,20 @@ fn run_closure(window: &ApplicationWindow, lot: Lot, after: Done) {
                         "Copie sur la partition d'export impossible : {error}",
                         &[("error", e)],
                     ),
-                    (None, None) if paths::dedicated_data_dir() => {
+                    (None, None) if on_key => {
                         tr("Partition d'export absente (SECMET-EXP) : rien n'a été copié.")
                     }
                     (None, None) => tr("Livrables dans l'archive du lot."),
-                });
+                };
+                if on_key {
+                    text.push_str(&details);
+                    text.push_str("\n\n");
+                    text.push_str(&copy_line);
+                } else {
+                    text.push_str(&copy_line);
+                    text.push_str("\n\n");
+                    text.push_str(&details);
+                }
                 let folder = report
                     .exported_to
                     .clone()

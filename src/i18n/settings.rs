@@ -202,4 +202,74 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "No signing key yet ({file} missing): it is created when the first certificate is signed.",
         "Noch kein Signaturschlüssel ({file} fehlt): Er wird bei der ersten Signatur eines Zertifikats erstellt.",
     ),
+    (
+        "Les certificats PDF et leur version signée (.json) sont enregistrés dans ce dossier. Un lot clôturé y est copié dans un sous-dossier à son nom ; pendant le lot, ses certificats restent dans le dossier du lot.",
+        "PDF certificates and their signed version (.json) are saved in this folder. A closed batch is copied into a subfolder named after it; while the batch is open, its certificates stay in the batch folder.",
+        "PDF-Zertifikate und ihre signierte Fassung (.json) werden in diesem Ordner gespeichert. Eine abgeschlossene Charge wird in einen nach ihr benannten Unterordner kopiert; solange die Charge offen ist, bleiben ihre Zertifikate im Chargenordner.",
+    ),
+    (
+        "Choisir un dossier…",
+        "Choose a folder…",
+        "Ordner auswählen…",
+    ),
+    (
+        "Dossier par défaut",
+        "Default folder",
+        "Standardordner",
+    ),
+    (
+        "Choisir",
+        "Choose",
+        "Auswählen",
+    ),
+    (
+        "Cliquez Valider pour l'enregistrer.",
+        "Click Apply to save it.",
+        "Klicken Sie auf Übernehmen, um ihn zu speichern.",
+    ),
+    (
+        "Dossier refusé : {error}",
+        "Folder refused: {error}",
+        "Ordner abgelehnt: {error}",
+    ),
+    (
+        "Ce dossier fait partie des données internes de SecMet : choisissez-en un autre.",
+        "This folder is part of SecMet's internal data: choose another one.",
+        "Dieser Ordner gehört zu den internen Daten von SecMet: Wählen Sie einen anderen.",
+    ),
+    (
+        "Ce dossier semble être un dossier de développement (dépôt git ou projet Rust) : les certificats s'y mêleront aux sources.",
+        "This folder looks like a development folder (git repository or Rust project): certificates will mix with the sources.",
+        "Dieser Ordner scheint ein Entwicklungsordner zu sein (Git-Repository oder Rust-Projekt): Die Zertifikate vermischen sich dort mit den Quellen.",
+    ),
+    (
+        "Dossier choisi indisponible ({reason}) : enregistré dans {dir}",
+        "Chosen folder unavailable ({reason}): saved in {dir}",
+        "Gewählter Ordner nicht verfügbar ({reason}): gespeichert in {dir}",
+    ),
+    (
+        "dossier introuvable",
+        "folder not found",
+        "Ordner nicht gefunden",
+    ),
+    (
+        "support non monté",
+        "drive not mounted",
+        "Datenträger nicht eingehängt",
+    ),
+    (
+        "écriture impossible : {error}",
+        "cannot write: {error}",
+        "Schreiben nicht möglich: {error}",
+    ),
+    (
+        "Livrables copiés dans : {dir}",
+        "Deliverables copied to: {dir}",
+        "Lieferdateien kopiert nach: {dir}",
+    ),
+    (
+        "Copie des livrables impossible : {error}",
+        "Could not copy the deliverables: {error}",
+        "Lieferdateien konnten nicht kopiert werden: {error}",
+    ),
 ];

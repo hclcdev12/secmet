@@ -16,7 +16,7 @@ pub(crate) use pdf::{
     create_signing_key, pdf_lang, render_pdf_bundle_in, signing_identity,
     signing_key_needs_operator, signing_public_key_hex,
 };
-pub use pdf::{open_certificates_folder, open_folder, open_pdf, render_pdf_bundle};
+pub use pdf::{open_folder, open_pdf};
 
 use crate::app_identity::{CERT_ID_PREFIX, PKG_NAME};
 use crate::disk::Disk;

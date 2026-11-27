@@ -134,6 +134,11 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Charge {id}: {units}, {certificates}, {failed} fehlgeschlagen, {interrupted}.\n\nDer Abschluss erzeugt das Sammelzertifikat und das signierte Manifest, kopiert die Ergebnisse auf die Exportpartition, falls vorhanden, und archiviert die Charge. Danach kann nichts mehr hinzugefügt werden.",
     ),
     (
+        "Lot {id} : {units}, {certificates}, {failed} en échec, {interrupted}.\n\nLa clôture produit le certificat groupé et le manifeste signé, copie les livrables dans le dossier des certificats, puis archive le lot. Plus rien ne pourra y être ajouté.",
+        "Batch {id}: {units}, {certificates}, {failed} failed, {interrupted}.\n\nClosing produces the grouped certificate and the signed manifest, copies the deliverables to the certificates folder, then archives the batch. Nothing more can be added to it.",
+        "Charge {id}: {units}, {certificates}, {failed} fehlgeschlagen, {interrupted}.\n\nDer Abschluss erzeugt das Sammelzertifikat und das signierte Manifest, kopiert die Ergebnisse in den Zertifikatsordner und archiviert die Charge. Danach kann nichts mehr hinzugefügt werden.",
+    ),
+    (
         "{count} interrompue",
         "{count} interrupted",
         "{count} unterbrochen",

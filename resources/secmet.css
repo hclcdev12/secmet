@@ -401,6 +401,15 @@ label.testdisk-idle {
     color: #f87171;
 }
 
+/* ── Message refusé (Réglages) ────────────────────────────────── */
+label.status-error {
+    color: #b91c1c;
+    font-weight: bold;
+}
+.secmet-theme-dark label.status-error {
+    color: #f87171;
+}
+
 /* ── Cases à cocher sélection disques ───────────────────────── */
 checkbutton.disk-checkbox label {
     color: @theme_fg_color;
