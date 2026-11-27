@@ -1,0 +1,30 @@
+[package]
+name = "secmet-consolidate"
+version = "0.5.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.95"
+publish = false
+description = "SecMet Regroupement : regroupe les lots clôturés de plusieurs clés SecMet en un seul livrable (Linux, Windows)."
+
+[[bin]]
+name = "secmet-consolidate"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+# Polices emoji monochromes embarquées (✔ ✖ ⚠ de l'interface).
+egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
+secmet-attest = { path = "../secmet-attest" }
+rfd = { version = "0.18", default-features = false, features = ["xdg-portal"] }
+dirs = "5.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+
+[target.'cfg(windows)'.dependencies]
+# Rendu wgpu sur Direct3D 12 (repli logiciel WARP), comme SecMet Clé USB :
+# le pilote d'affichage de base de Windows n'offre qu'OpenGL 1.1.
+eframe = { version = "0.37", default-features = false, features = ["wgpu_no_default_features"] }
+wgpu = { version = "30", default-features = false, features = ["dx12", "std", "wgsl"] }
+
+[dev-dependencies]
+tempfile = "3"

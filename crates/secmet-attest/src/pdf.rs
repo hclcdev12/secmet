@@ -17,6 +17,8 @@ use crate::qr::{self, QrMatrix};
 use crate::sign::SignedAttestation;
 use crate::Result;
 
+pub mod grouped;
+
 /// Largeur A4 en points.
 pub const PAGE_W: f64 = 595.28;
 /// Hauteur A4 en points.

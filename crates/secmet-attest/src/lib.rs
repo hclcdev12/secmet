@@ -14,6 +14,7 @@
 //! | [`export`]    | Du contenu au PDF + JSON signé sur disque, et vérification hors ligne |
 //! | [`release`]   | Versions publiées : `SHA256SUMS` et `latest.json` signés (clé de version) |
 //! | [`manifest`]  | Manifeste de lot signé : liste des certificats et empreintes (Annexe M) |
+//! | [`consolidation`] | Regroupement de lots clôturés de plusieurs clés (non signé, phase 1) |
 //! | [`system_image`] | Auto-contrôle du système de la clé USB : `SYSTEM.sums` signé (clé de version) |
 //!
 //! Chaîne de confiance : la charge utile ([`model::Attestation`]) est
@@ -25,6 +26,7 @@
 
 pub mod base45;
 pub mod canonical;
+pub mod consolidation;
 pub mod export;
 pub mod keystore;
 pub mod lang;

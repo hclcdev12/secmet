@@ -3133,6 +3133,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "secmet-consolidate"
+version = "0.5.1"
+dependencies = [
+ "chrono",
+ "dirs",
+ "eframe",
+ "egui",
+ "rfd",
+ "secmet-attest",
+ "tempfile",
+ "wgpu",
+]
+
+[[package]]
 name = "secmet-core"
 version = "0.5.1"
 dependencies = [
