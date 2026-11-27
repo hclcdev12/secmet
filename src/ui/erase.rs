@@ -262,14 +262,17 @@ fn find_widget(widgets: &Rc<RefCell<Vec<DiskWidget>>>, disk_name: &str) -> Optio
         .cloned()
 }
 
-/// Étape en cours, en mots (le helper envoie des noms techniques).
-fn phase_label(phase: &str) -> String {
+/// Étape en cours, en mots (le helper envoie des noms techniques). Pendant
+/// la commande d'effacement du disque, le nom de la méthode, tel qu'il figure
+/// sur le certificat (« ATA Security Erase (enhanced) », « NVMe Sanitize
+/// Block Erase »…) : l'opérateur voit ce que SecMet a choisi.
+fn phase_label(phase: &str, method: &str) -> String {
     if let Some(rest) = phase.strip_prefix("pass ") {
         return trf("Passe {n}", &[("n", rest)]);
     }
     match phase {
         "canaries" => tr("Préparation des témoins"),
-        "firmware" => tr("Commande du disque"),
+        "firmware" => certificate::method_label(method),
         "zero" => tr("Passe de zéros"),
         "verify" => tr("Vérification"),
         "signatures" => tr("Recherche de données résiduelles"),
@@ -280,7 +283,7 @@ fn phase_label(phase: &str) -> String {
 /// Ligne de progression : l'étape et les chiffres. La méthode, longue,
 /// reste dans le récapitulatif ; le code interne n'est plus affiché.
 fn progress_text(p: &Progress) -> String {
-    let mut text = phase_label(&p.phase);
+    let mut text = phase_label(&p.phase, &p.method);
     if p.bytes_total > 0 || p.percent > 0 {
         text.push_str(&format!(" · {} %", p.percent));
     }
@@ -1006,4 +1009,21 @@ pub(super) fn update_retry_button_state(
         .values()
         .any(|record| record.status == JobState::FailedOther);
     retry_button.set_sensitive(has_failed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::phase_label;
+
+    #[test]
+    fn firmware_phase_shows_the_method_name() {
+        assert_eq!(
+            phase_label("firmware", "ATA_SECURITY_ERASE_ENHANCED"),
+            "ATA Security Erase (enhanced)"
+        );
+        assert_eq!(
+            phase_label("firmware", "NVME_SANITIZE_BLOCK_ERASE"),
+            "NVMe Sanitize Block Erase"
+        );
+    }
 }

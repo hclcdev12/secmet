@@ -30,11 +30,6 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
         "Vorbereitung der Prüfmarken",
     ),
     (
-        "Commande du disque",
-        "Disk command",
-        "Datenträgerbefehl",
-    ),
-    (
         "Passe de zéros",
         "Zero pass",
         "Nulldurchlauf",
