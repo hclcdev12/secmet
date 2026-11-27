@@ -1,4 +1,4 @@
-.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe install-deb test build release publish live live-image live-dist live-dist-check live-sb-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check test-live-scripts test-docs
+.PHONY: help deps dev run clean deb rpm appimage key-writer key-writer-appimage key-writer-exe consolidate consolidate-appimage consolidate-exe install-deb test build release publish live live-image live-dist live-dist-check live-sb-check live-test live-key fix-pkexec verify-polkit fuzz-check licenses licenses-check test-live-scripts test-docs
 
 SHELL := /bin/bash
 PREFIX ?= /usr/local
@@ -65,6 +65,15 @@ key-writer-appimage: ## AppImage de SecMet Clé USB dist/secmet-key-writer_<vers
 
 key-writer-exe: ## .exe Windows de SecMet Clé USB dist/secmet-key-writer_<version>_x86_64.exe (croisé : MinGW sur la machine, sinon conteneur Ubuntu 24.04)
 	@./packaging/build_key_writer_exe.sh
+
+consolidate: ## Compile SecMet Regroupement (regroupement des lots de plusieurs clés, crates/secmet-consolidate)
+	@cargo build --release -p secmet-consolidate
+
+consolidate-appimage: ## AppImage de SecMet Regroupement dist/secmet-consolidate_<version>_x86_64.AppImage (conteneur Ubuntu 24.04)
+	@./packaging/build_consolidate_appimage.sh
+
+consolidate-exe: ## .exe Windows de SecMet Regroupement dist/secmet-consolidate_<version>_x86_64.exe (croisé : MinGW sur la machine, sinon conteneur Ubuntu 24.04)
+	@./packaging/build_consolidate_exe.sh
 
 rpm: ## Construit un .rpm (Fedora : rpm-build, gtk4-devel, testdisk requis)
 	@./packaging/build_rpm.sh

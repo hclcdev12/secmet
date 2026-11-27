@@ -10,12 +10,15 @@
 //! ```
 //! Chaque chemin est le dossier d'un lot clôturé (`SECMET-EXP/<LOT>/`) ou
 //! la partition d'export d'une clé entière (ses lots sont pris).
+//! `--licenses` : mentions légales et avis de licences tierces
+//! ([`about`]) ; `--version`.
 //!
 //! Windows : exécutable sans console ; la ligne de commande s'attache à la
 //! console du parent.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+mod about;
 mod gui;
 mod job;
 
@@ -36,6 +39,9 @@ fn main() -> ExitCode {
         };
     }
     attach_console();
+    if args[0] == "--licenses" {
+        return about::print_licenses();
+    }
     if args[0] == "--version" {
         println!("secmet-consolidate {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;

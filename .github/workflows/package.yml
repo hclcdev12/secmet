@@ -426,6 +426,91 @@ jobs:
           path: dist/secmet-key-writer_*.exe
           if-no-files-found: error
 
+  consolidate:
+    name: SecMet Regroupement (AppImage, conteneur Ubuntu 24.04)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Construction (docker)
+        run: |
+          ./packaging/build_consolidate_appimage.sh
+          ls -la dist/
+
+      - name: Fumée (extraction sans FUSE, glibc requise, --version, --licenses)
+        run: |
+          cd "$(mktemp -d)"
+          "$GITHUB_WORKSPACE"/dist/secmet-consolidate_*.AppImage --appimage-extract >/dev/null
+          test -x squashfs-root/usr/bin/secmet-consolidate
+          max=$(objdump -T squashfs-root/usr/bin/secmet-consolidate | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)
+          echo "glibc max requise : $max"
+          test "$(printf '%s\n%s\n' "$max" GLIBC_2.39 | sort -V | tail -1)" = GLIBC_2.39
+          squashfs-root/usr/bin/secmet-consolidate --version
+          squashfs-root/usr/bin/secmet-consolidate --licenses | grep -q "SIL OPEN FONT LICENSE"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: consolidate
+          path: dist/secmet-consolidate_*.AppImage
+          if-no-files-found: error
+
+  consolidate-windows:
+    name: SecMet Regroupement (.exe Windows)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Toolchain Rust stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: consolidate-windows
+
+      - name: Construction
+        shell: bash
+        run: |
+          cargo build --release -p secmet-consolidate
+          version="$(grep -m1 '^version' crates/secmet-consolidate/Cargo.toml | sed -E 's/version = "([^"]+)"/\1/')"
+          mkdir -p dist
+          cp target/release/secmet-consolidate.exe "dist/secmet-consolidate_${version}_x86_64.exe"
+          ls -la dist/
+
+      # Comme SecMet Clé USB : aucune DLL du runtime Visual C++ (absent d'un
+      # Windows neuf).
+      - name: Aucune dépendance au runtime Visual C++
+        shell: bash
+        run: |
+          for exe in dist/secmet-consolidate_*.exe; do
+            if grep -a -i -o -E 'VCRUNTIME[0-9]+(_[0-9]+)?\.dll|MSVCP[0-9]+\.dll' "$exe" | sort -u | grep .; then
+              echo "ERREUR: $exe dépend du runtime Visual C++ (DLL ci-dessus), absent d'un Windows neuf" >&2
+              exit 1
+            fi
+          done
+          echo "aucune DLL du runtime Visual C++ importée"
+
+      - name: Fumée (--version, --licenses)
+        shell: bash
+        run: |
+          ./dist/secmet-consolidate_*.exe --version | tee version.txt
+          grep -q "^secmet-consolidate " version.txt
+          ./dist/secmet-consolidate_*.exe --licenses | grep -q "SIL OPEN FONT LICENSE"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: consolidate-windows
+          path: dist/secmet-consolidate_*.exe
+          if-no-files-found: error
+
   live-mode:
     name: Cadence de l'image de la clé USB
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -518,8 +603,8 @@ jobs:
     name: Signature et release GitHub
     # « live » est sauté quand l'image est reprise : on attend chaque travail
     # explicitement plutôt que de laisser le saut se propager.
-    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.deb-install.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
-    needs: [deb, deb-install, rpm, appimage, key-writer, key-writer-windows, live-mode, live]
+    if: ${{ !cancelled() && (startsWith(github.ref, 'refs/tags/v') || inputs.tag != '') && needs.deb.result == 'success' && needs.deb-install.result == 'success' && needs.rpm.result == 'success' && needs.appimage.result == 'success' && needs.key-writer.result == 'success' && needs.key-writer-windows.result == 'success' && needs.consolidate.result == 'success' && needs.consolidate-windows.result == 'success' && needs.live-mode.result == 'success' && (needs.live.result == 'success' || (needs.live.result == 'skipped' && needs.live-mode.outputs.mode == 'reuse')) }}
+    needs: [deb, deb-install, rpm, appimage, key-writer, key-writer-windows, consolidate, consolidate-windows, live-mode, live]
     runs-on: ubuntu-latest
     # Seul travail qui lit la clé de version et écrit la release.
     environment: release
@@ -551,7 +636,7 @@ jobs:
       - name: Assemblage et noms publiés (convention GitHub, « ~ » → « . »)
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' -o -name 'secmet-key_*.packages.tar' -o -name 'secmet-verify_*_x86_64' -o -name 'secmet-release_*_x86_64' \) -exec mv {} release/ \;
+          find artifacts -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name 'secmet-key-writer_*.exe' -o -name 'secmet-consolidate_*.exe' -o -name 'secmet-live_*.tar' -o -name 'secmet-key_*.img.xz' -o -name 'secmet-key_*.packages.tar' -o -name 'secmet-verify_*_x86_64' -o -name 'secmet-release_*_x86_64' \) -exec mv {} release/ \;
           for f in release/secmet_*~*_amd64.deb; do [ -f "$f" ] && mv "$f" "${f/\~/.}"; done
           ls -la release/
 
@@ -639,7 +724,7 @@ jobs:
 
       # Ce qui est publié est exactement ce qui est signé : les fichiers de
       # SHA256SUMS (2e colonne) plus SHA256SUMS, SHA256SUMS.sig et
-      # latest.json ; chacun des 12 livrables attendus doit y être.
+      # latest.json ; chacun des 14 livrables attendus doit y être.
       - name: Liste des fichiers publiés (tirée de SHA256SUMS)
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -649,6 +734,7 @@ jobs:
                    "secmet-${v}-1.fc44.x86_64.rpm" "secmet-${v}-1.fc42.x86_64.rpm" \
                    "SecMet_${v}_x86_64.AppImage" \
                    "secmet-key-writer_${v}_x86_64.AppImage" "secmet-key-writer_${v}_x86_64.exe" \
+                   "secmet-consolidate_${v}_x86_64.AppImage" "secmet-consolidate_${v}_x86_64.exe" \
                    "secmet-verify_${v}_x86_64" "secmet-release_${v}_x86_64" \
                    "secmet-live_${v}_x86_64.tar" "secmet-key_${v}_x86_64.img.xz" \
                    "secmet-key_${v}_x86_64.packages.tar"; do
@@ -672,6 +758,7 @@ jobs:
             # Texte générique dans un heredoc : il contient des apostrophes.
             cat <<NOTES
           Paquets .deb, .rpm, AppImage, image de la clé USB prête à écrire (secmet-key_${v}_x86_64.img.xz) et SecMet Clé USB pour l'écrire (secmet-key-writer_${v}_x86_64.AppImage sous Linux, secmet-key-writer_${v}_x86_64.exe sous Windows : vérifie la signature de l'image puis l'écrit sur la clé et la relit ; sinon Raspberry Pi Imager, Rufus ou dd, voir docs/Fabriquer_sa_cle.md) et livrable de fabrication (secmet-live_${v}_x86_64.tar : image, secmet-make-key.sh, secmet-release) ; paquets du système de la clé (basé sur Debian 13) : secmet-key_${v}_x86_64.packages.tar.
+          SecMet Regroupement, pour réunir les lots clôturés de plusieurs clés en un seul livrable (synthèse PDF non signée, fichiers d'origine joints) : secmet-consolidate_${v}_x86_64.AppImage sous Linux, secmet-consolidate_${v}_x86_64.exe sous Windows.
           Fedora : secmet-${v}-1.fc44.x86_64.rpm (Fedora 44 et 45) ; secmet-${v}-1.fc42.x86_64.rpm reste publié le temps de la transition.
           Outils en ligne de commande, binaires Linux autonomes (chmod +x) : secmet-verify_${v}_x86_64 (certificats et manifestes de lot) et secmet-release_${v}_x86_64 (vérification d'une release) ; aussi dans l'AppImage (./SecMet_${v}_x86_64.AppImage verify …, … release …) et dans les paquets.
           Empreintes et notes signées : SHA256SUMS.sig, latest.json (clé de version ${key_id}).

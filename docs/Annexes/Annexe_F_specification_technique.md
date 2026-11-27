@@ -83,6 +83,7 @@ Les journaux de `shred-graphique` sont migrés automatiquement vers `~/.secmet_l
 - Clé USB SecMet : image publiée à chaque release, partitions `SECMET-DATA` (données, clé de signature propre à la clé) et `SECMET-EXP` (livrables), mise à jour de SecMet au démarrage depuis le magasin `app/`, contrôle de l'horloge du poste (`src/clock.rs`), nettoyage de la clé (`src/key_cleanup.rs`).
 - Mises à jour : vérification de `latest.json` signé, puis **Installer la mise à jour** (téléchargement, vérification de `SHA256SUMS` signé et de l'empreinte, installation du `.deb` ou du `.rpm` sous `pkexec`, `src/update_install.rs` ; `.rpm` choisi parmi les `fcN` de `SHA256SUMS` selon la Fedora du poste) et **Relancer SecMet** ; bloquée pendant toute opération et tant qu'un lot est ouvert (`src/busy.rs`), absente dans une AppImage ([Annexe N](Annexe_N_mises_a_jour.md)).
 - SecMet Clé USB (`crates/secmet-key-writer`) : écriture de l'image de la clé sous Linux et Windows, après vérification de la signature de la release puis de l'empreinte de l'image.
+- SecMet Regroupement (`crates/secmet-consolidate`) : regroupement des lots clôturés de plusieurs clés en un livrable, sous Linux et Windows (Annexe M §M.12).
 - Réglages : langue (fr, en, de), logo des certificats, nom de l'opérateur par défaut, passes HDD, mode lot, vérification automatique des mises à jour ; sur la clé, recopie des lots clôturés sur l'export et nettoyage.
 - Journalisation sous `~/.secmet_logs/` (0700/0600), migration depuis `shred-graphique`.
 - Distribution : paquets `.deb` (Ubuntu 24.04 et 22.04) et `.rpm` (construit pour Fedora 44, et pour Fedora 42 le temps de la transition en 0.4.1), AppImage (composant système installé au premier lancement ; contient aussi `secmet-verify` et `secmet-release`), binaires Linux autonomes `secmet-verify` et `secmet-release`, image de la clé SecMet (`.img.xz`), livrable de fabrication de la clé (`.tar`), SecMet Clé USB (AppImage Linux et `.exe` Windows) ; `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` signés avec la clé de version.
@@ -212,6 +213,7 @@ flowchart TB
 | **EF-32** | Sort du support signé dans l'attestation (`disposition`, `disposition_reasons`) et imprimé ; « Marquer à détruire » pour un disque verrouillé sans mot de passe ou en lecture seule | Badge **À DÉTRUIRE**, bordereau de destruction dans le PDF de lot |
 | **EF-33** | Mode clé (`SECMET_DATA_DIR`) : données, clé de signature et coffre ATA sur `SECMET-DATA` ; contrôle de l'horloge ; nettoyage de la clé en trois groupes, refusé tant qu'un lot est ouvert ou qu'un lot clôturé n'a pas sa copie sur l'export | `config/`, `app/`, `vault/` et `logs/system` jamais touchés par le nettoyage |
 | **EF-34** | SecMet Clé USB : vérifier la signature de la release puis l'empreinte de l'image avant toute écriture ; ne proposer que des disques amovibles de 12 Go ou plus, sans partition système montée ; compléter la GPT (copie de secours au bout de la clé) pendant l'écriture | Image non signée ou modifiée refusée ; clé démarrable avec sa table GPT complète |
+| **EF-35** | SecMet Regroupement : regrouper les lots clôturés de plusieurs clés ; refuser un lot sans manifeste, falsifié ou incomplet ; compter un disque repassé une fois (dernier succès) ; recopier les fichiers d'origine à l'identique ; synthèse PDF et index non signés (Annexe M §M.12) | Tests `consolidation` et `pdf::grouped` ; R-48, R-49 |
 
 ---
 
@@ -228,7 +230,7 @@ flowchart TB
 | **ENF-07** | Performance | Écriture hôte par blocs de 4 Mio alignés, débit affiché ; release LTO |
 | **ENF-08** | Robustesse | Délais sur chaque commande firmware (30 s IDENTIFY, durée annoncée pour SECURITY ERASE), fil GTK jamais bloqué par une invite Polkit |
 | **ENF-09** | Robustesse | Décodage borné des réponses (sense, journaux NVMe, TestDisk), listes et chaînes du PDF tronquées |
-| **ENF-10** | Maintenabilité | Six crates (dont `secmet-key-writer`, construite à part), environ 310 tests unitaires, clippy strict, `cargo fmt`, intégration continue GitHub Actions (tests, audit, fuzzing de neuf décodeurs, paquets) |
+| **ENF-10** | Maintenabilité | Sept crates (dont `secmet-key-writer` et `secmet-consolidate`, construites à part), environ 310 tests unitaires, clippy strict, `cargo fmt`, intégration continue GitHub Actions (tests, audit, fuzzing de neuf décodeurs, paquets) |
 | **ENF-11** | Accessibilité | Interface et certificats en français, anglais, allemand ; avertissements explicites |
 | **ENF-12** | Autonomie | Aucun outil externe hors TestDisk (optionnel, embarqué) |
 
@@ -240,7 +242,7 @@ flowchart TB
 
 | Couche | Technologie |
 |--------|-------------|
-| Langage | Rust 2021 (rust-version 1.80 ; 1.95 pour `secmet-key-writer`) |
+| Langage | Rust 2021 (rust-version 1.80 ; 1.95 pour `secmet-key-writer` et `secmet-consolidate`) |
 | Interface graphique | GTK 4 (`gtk4` 0.9, `glib` 0.20) ; SecMet Clé USB : `egui`/`eframe` 0.37 (OpenGL sous Linux, `wgpu` sur Direct3D 12 sous Windows) |
 | Accès matériel | `libc` (ioctl `SG_IO`, `NVME_IOCTL_ADMIN_CMD`), sysfs |
 | Cryptographie | `chacha20` (canaris), `sha2`, `ed25519-dalek`, `zeroize` |
@@ -328,6 +330,7 @@ flowchart TB
 | `secmet-verify` | Vérification d'attestations et de manifestes de lot | `/usr/bin/secmet-verify` (`.deb`, `.rpm`) ; `usr/bin/secmet-verify` de l'AppImage (`./SecMet_<version>_x86_64.AppImage verify …`) ; binaire autonome `secmet-verify_<version>_x86_64` de la release |
 | `secmet-release` | Clé de version, signature et vérification d'une release (`keygen`, `sign`, `verify`) ; utilisé au démarrage de la clé pour vérifier le magasin `app/` | `/usr/bin/secmet-release` (`.deb` et `.rpm`) ; `usr/bin/secmet-release` de l'AppImage (`./SecMet_<version>_x86_64.AppImage release …`) ; binaire autonome `secmet-release_<version>_x86_64` de la release |
 | `secmet-key-writer` | SecMet Clé USB, écriture de l'image de la clé | Livrable séparé : `secmet-key-writer_<version>_x86_64.AppImage`, `secmet-key-writer_<version>_x86_64.exe` |
+| `secmet-consolidate` | SecMet Regroupement, regroupement des lots de plusieurs clés | Livrable séparé : `secmet-consolidate_<version>_x86_64.AppImage`, `secmet-consolidate_<version>_x86_64.exe` |
 | `testdisk` embarqué | Validation optionnelle | `/usr/lib/secmet/bin/testdisk`, bibliothèques sous `/usr/lib/secmet/lib/` |
 | Policy | PolicyKit | `/usr/share/polkit-1/actions/secmet.policy` |
 
@@ -529,6 +532,8 @@ make live-dist           # dist/secmet-key_<version>_x86_64.img.xz
 make live-bundle         # dist/secmet-live_<version>_x86_64.tar
 make key-writer-appimage # dist/secmet-key-writer_<version>_x86_64.AppImage
 make key-writer-exe      # dist/secmet-key-writer_<version>_x86_64.exe (compilation croisée)
+make consolidate-appimage # dist/secmet-consolidate_<version>_x86_64.AppImage
+make consolidate-exe     # dist/secmet-consolidate_<version>_x86_64.exe (compilation croisée)
 make release             # dist/release/<version>/ : paquets fumés en conteneurs, SHA256SUMS(.sig), latest.json signés (Annexe N)
 ```
 
@@ -584,6 +589,7 @@ La clé USB SecMet, les lots persistants, les mises à jour signées avec instal
 | EF-32 | `secmet-core::disposition`, `src/ui/erase.rs` |
 | EF-33 | `src/paths.rs`, `src/clock.rs`, `src/ui/clock_ui.rs`, `src/key_cleanup.rs`, `secmet-helper::vault` |
 | EF-34 | `crates/secmet-key-writer` (`gui`, `worker`, `gpt`, `image`, `release`) |
+| EF-35 | `secmet-attest::consolidation`, `secmet-attest::pdf::grouped`, `crates/secmet-consolidate` (`gui`, `job`, `about`) |
 | ENF-01 à ENF-03 | `src/pkexec_gate.rs`, `secmet-helper::polkit`, `session`, `isolation`, `secmet.policy` |
 
 ## F.B — Glossaire technique

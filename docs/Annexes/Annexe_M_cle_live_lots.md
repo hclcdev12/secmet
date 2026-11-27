@@ -161,7 +161,7 @@ Les mises à jour suivent deux chemins pour une même release ([Annexe N](Annexe
 
 ## M.10 Hors périmètre v1
 
-- Plusieurs clés USB sur un même lot, fusion de lots (parallélisme) : à concevoir après validation de la v1.
+- Plusieurs clés USB sur un même lot (lot partagé entre clés). Le regroupement après coup des lots de plusieurs clés est réalisé : §M.12.
 - Phrase de passe sur la clé de signature.
 - Synchronisation réseau des lots ou des certificats.
 
@@ -179,6 +179,32 @@ Scénarios de recette de la clé et des lots ; ils sont repris et complétés da
 | Clôture | PDF groupé avec « Machines traitées : 3 » et séries par ligne ; manifeste valide avec `secmet-verify` |
 | Attestation retirée du lot après clôture | Manifeste en désaccord, détecté par `secmet-verify` |
 | Clé branchée sur un PC Windows | Partition d'export lisible ; proposition de formatage refusée par **Annuler**, clé intacte ensuite |
+
+## M.12 Regroupement des lots de plusieurs clés (réalisé 2026-11-27, phase 1)
+
+**Besoin.** Pour aller plus vite, un atelier traite une même mission avec plusieurs clés (par exemple 100 portables avec 5 clés, un lot ouvert sur chacune). Le client veut un seul livrable, pas cinq PDF.
+
+**Outil.** **SecMet Regroupement** (`secmet-consolidate`, crate `crates/secmet-consolidate`, egui) est un outil séparé, pour Linux (AppImage) et Windows (`.exe`), comme SecMet Clé USB ; le cœur est dans `secmet_attest::consolidation` et le PDF dans `secmet_attest::pdf::grouped`. On lui donne les dossiers des lots clôturés (`SECMET-EXP/<LOT-ID>/`) ou la partition `SECMET-EXP` d'une clé entière (ses lots sont pris, les dossiers de certificats hors lot ignorés). Ligne de commande : `secmet-consolidate --out <dossier> [--lang fr|en|de] <lot ou partition>...`.
+
+**Contrôles, lot par lot** (un lot refusé l'est avec sa raison) :
+- lot clôturé seulement : sans manifeste (lot ouvert, dossier quelconque), refus ;
+- signature du manifeste, signature de chaque attestation, même clé pour le manifeste et ses attestations ;
+- confrontation au manifeste (`manifest::reconcile`) : aucune attestation manquante, modifiée ou en trop.
+
+**Règles de regroupement** (décidées le 2026-11-27) :
+- un même lot ajouté deux fois (même clé, même identifiant, même signature) n'est compté qu'une fois ; deux copies divergentes sont refusées ; un même certificat dans deux lots est refusé ;
+- **disque repassé** sur une autre clé (même modèle et même numéro de série dans plusieurs lots) : le dernier effacement **réussi** compte, à défaut le dernier passage ; les autres certificats sont listés comme « repassé (remplacé par … ) » et ne sont pas comptés. Un disque sans numéro de série ne peut pas être rapproché (avertissement) ;
+- les lots sont reliés par la **référence client** déjà signée dans le manifeste : références différentes, ou absentes sur plusieurs lots, donnent un avertissement, pas un refus. Pas d'identifiant de mission, pas de changement de format du manifeste ;
+- politiques de classement différentes selon les lots : avertissement.
+
+**Livrable.** Un dossier `R-<AAAAMMJJ>-<code>` (le code est une empreinte des manifestes regroupés : le même jeu de lots donne le même nom, et un regroupement existant n'est jamais écrasé). Il est construit sous un nom temporaire puis renommé : complet ou absent.
+- `sources/<key_id>/<LOT-ID>/` : tous les fichiers de chaque lot, **recopiés tels quels**, empreinte contrôlée après copie ; chaque lot y reste vérifiable par `secmet-verify --manifest` ;
+- `R-….json` : index non signé (lots, empreinte de chaque fichier recopié, certificats et statut compté ou repassé, avertissements) ;
+- `R-….pdf` : synthèse de quelques pages (3 pour 40 disques, 6 pour 100 sur 5 clés), en français, anglais ou allemand : bilan (disques uniques, réussis, échecs, repassés, à détruire), référence, période, opérateurs, tableau des lots (clé, opérateur, clôture), une ligne par disque (modèle, série, taille, méthode, résultat, lot, certificat), empreintes des manifestes, PDF de lot et clés publiques. Le détail par disque reste dans les PDF et attestations d'origine.
+
+**Pas de signature (phase 1).** Le regroupement ne ré-atteste rien : la synthèse le dit sur chaque page, et la preuve reste celle des lots (manifestes et attestations signés par chaque clé). Une signature de l'index garantirait en plus qu'aucun lot n'a été retiré du regroupement ; elle est à décider avec le client, et ajoutable sans casser ce format.
+
+**Limite connue.** Rien de signé n'indique si un lot a été fait sur une clé live ou sur un poste installé : le regroupement ne peut pas refuser le mélange des deux.
 
 ---
 

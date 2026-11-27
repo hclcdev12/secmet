@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SecMet Regroupement
+Name[en]=SecMet Lot Grouping
+Comment=Regroupe les lots clôturés de plusieurs clés SecMet en un seul livrable
+Comment[en]=Groups closed lots from several SecMet keys into a single deliverable
+Exec=secmet-consolidate
+Icon=secmet-consolidate
+Terminal=false
+Categories=Office;Utility;

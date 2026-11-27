@@ -15,6 +15,9 @@
 #   key-writer-linux.txt    SecMet Clé USB Linux (crates + polices egui)
 #   key-writer-windows.txt  SecMet Clé USB Windows (crates + polices egui +
 #                           runtime MinGW) ; intégré au .exe (include_str!)
+#   consolidate-linux.txt   SecMet Regroupement Linux (crates + polices egui)
+#   consolidate-windows.txt SecMet Regroupement Windows (crates + polices egui +
+#                           runtime MinGW) ; intégré au .exe (include_str!)
 #   fonts-egui.txt          textes des polices d'egui, copiés du registre
 #                           cargo avec contrôle sha256
 #   appimage-runtime.txt    runtime des deux AppImage (joint à l'installation)
@@ -60,6 +63,9 @@ complete_check() {
     missing "$HERE/key-writer-linux.txt" crates/secmet-key-writer/Cargo.toml x86_64-unknown-linux-gnu
     missing "$HERE/key-writer-windows.txt" crates/secmet-key-writer/Cargo.toml \
         x86_64-pc-windows-msvc x86_64-pc-windows-gnu
+    missing "$HERE/consolidate-linux.txt" crates/secmet-consolidate/Cargo.toml x86_64-unknown-linux-gnu
+    missing "$HERE/consolidate-windows.txt" crates/secmet-consolidate/Cargo.toml \
+        x86_64-pc-windows-msvc x86_64-pc-windows-gnu
 }
 
 if [[ "$CHECK" == 2 ]]; then
@@ -94,6 +100,8 @@ about() { # <manifeste> <config> <sortie>
 about Cargo.toml about-linux.toml "$WORK/secmet-crates.txt"
 about crates/secmet-key-writer/Cargo.toml about-linux.toml "$WORK/key-writer-linux-crates.txt"
 about crates/secmet-key-writer/Cargo.toml about-windows.toml "$WORK/key-writer-windows-crates.txt"
+about crates/secmet-consolidate/Cargo.toml about-linux.toml "$WORK/consolidate-linux-crates.txt"
+about crates/secmet-consolidate/Cargo.toml about-windows.toml "$WORK/consolidate-windows-crates.txt"
 
 # --- 2. Polices d'egui, copiées du registre cargo -----------------------------
 # epaint_default_fonts déclare « (MIT OR Apache-2.0) AND OFL-1.1 AND
@@ -124,8 +132,8 @@ done
 [[ -n "$fonts_dir" ]] || die "sources de epaint_default_fonts-$FONTS_VERSION absentes du registre cargo (cargo fetch)"
 {
     echo "=============================================================================="
-    echo "Polices intégrées par egui (epaint_default_fonts $FONTS_VERSION, SecMet Clé USB)"
-    echo "Fonts embedded by egui (epaint_default_fonts $FONTS_VERSION, SecMet Clé USB)"
+    echo "Polices intégrées par egui (epaint_default_fonts $FONTS_VERSION, outils egui de SecMet)"
+    echo "Fonts embedded by egui (epaint_default_fonts $FONTS_VERSION, SecMet egui tools)"
     echo "=============================================================================="
     for f in UFL.txt OFL.txt Hack-Regular.txt emoji-icon-font-mit-license.txt; do
         sum="$(sha256sum "$fonts_dir/$f" | cut -d' ' -f1)"
@@ -172,8 +180,12 @@ mpl_note() {
     > "$OUT/key-writer-linux.txt"
 { cat "$WORK/key-writer-windows-crates.txt"; mpl_note "$WORK/key-writer-windows-crates.txt"; echo; cat "$OUT/fonts-egui.txt"; echo; cat "$OUT/windows-mingw.txt"; } \
     > "$OUT/key-writer-windows.txt"
+{ cat "$WORK/consolidate-linux-crates.txt"; mpl_note "$WORK/consolidate-linux-crates.txt"; echo; cat "$OUT/fonts-egui.txt"; } \
+    > "$OUT/consolidate-linux.txt"
+{ cat "$WORK/consolidate-windows-crates.txt"; mpl_note "$WORK/consolidate-windows-crates.txt"; echo; cat "$OUT/fonts-egui.txt"; echo; cat "$OUT/windows-mingw.txt"; } \
+    > "$OUT/consolidate-windows.txt"
 
-GENERATED=(secmet-linux.txt key-writer-linux.txt key-writer-windows.txt fonts-egui.txt appimage-runtime.txt windows-mingw.txt)
+GENERATED=(secmet-linux.txt key-writer-linux.txt key-writer-windows.txt consolidate-linux.txt consolidate-windows.txt fonts-egui.txt appimage-runtime.txt windows-mingw.txt)
 
 if [[ "$CHECK" == 0 ]]; then
     echo "Avis régénérés dans $HERE : ${GENERATED[*]}"

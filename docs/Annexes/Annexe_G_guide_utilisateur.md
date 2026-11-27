@@ -163,6 +163,17 @@ Sur la clé, les machines traitées successivement sont regroupées en **lots** 
 
 Les lots vivent sous `lots/` puis `archive/` sur la clé ; le journal `journal.ndjson` de chaque lot est chaîné : une ligne supprimée ou modifiée se détecte.
 
+### Regrouper les lots de plusieurs clés
+
+Quand une mission est traitée avec plusieurs clés (un lot par clé), l'outil **SecMet Regroupement** (Linux ou Windows) en fait un seul livrable :
+
+1. Brancher les clés une à une, ou recopier leurs dossiers de lots, sur le poste qui regroupe.
+2. **Ajouter des dossiers…** : choisir les dossiers des lots clôturés (`SECMET-EXP/<LOT>`) ou directement la partition `SECMET-EXP` d'une clé (tous ses lots sont pris). On peut aussi déposer les dossiers dans la fenêtre. Un lot non clôturé, incomplet ou modifié est refusé en rouge, avec la raison.
+3. Lire le **bilan** : nombre de lots, de clés et de disques, réussis, échecs, **repassés** (un portable effacé sur deux clés n'est compté qu'une fois : le dernier succès). Les avertissements (références client différentes, disques sans numéro de série) s'affichent en orange.
+4. Choisir la langue du PDF et la destination (par défaut `Documents/SecMet-Regroupements`), puis **Regrouper**. Le dossier `R-<date>-<code>` contient le PDF de synthèse, un index et, dans `sources/`, les fichiers d'origine des lots recopiés à l'identique. **Ouvrir le PDF** et **Ouvrir le dossier** y mènent.
+
+La synthèse n'est pas signée : chaque lot reste prouvé par son manifeste signé, joint dans `sources/`, et se vérifie comme avant (§5). Remettre au client le dossier entier, pas le PDF seul.
+
 ### Nettoyer la clé
 
 Réglages > **Nettoyer la clé…** libère de la place : trois groupes à cocher (lots archivés, livrables de la partition d'export, certificats hors lot avec leurs journaux), avec le nombre de fichiers et la taille, puis confirmation. Le nettoyage est refusé tant qu'un lot est ouvert, et le groupe « lots archivés » tant qu'un lot clôturé n'a pas sa copie sur l'export (l'archive serait alors la seule copie signée). Les réglages, la clé de signature et les mises à jour téléchargées ne sont jamais touchés.

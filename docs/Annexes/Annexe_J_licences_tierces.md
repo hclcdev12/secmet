@@ -14,7 +14,7 @@
 
 | Élément | Licence |
 |---|---|
-| Code source (`secmet`, `secmet-device`, `secmet-core`, `secmet-helper`, `secmet-attest`, `secmet-verify`, `secmet-release`, `secmet-key-writer` — SecMet Clé USB) | **GPL-3.0-or-later** — voir [LICENSE](../../LICENSE) |
+| Code source (`secmet`, `secmet-device`, `secmet-core`, `secmet-helper`, `secmet-attest`, `secmet-verify`, `secmet-release`, `secmet-key-writer` — SecMet Clé USB, `secmet-consolidate` — SecMet Regroupement) | **GPL-3.0-or-later** — voir [LICENSE](../../LICENSE) |
 | Scripts de construction (`packaging/`, `packaging/live/`, `Makefile`, workflows) | **GPL-3.0-or-later** (même projet) |
 | Documentation du projet (hors tiers) | **GPL-3.0-or-later** (même projet) |
 | Nom « SecMet » et logo (lion) | Nom et logo **réservés**, tous droits réservés (marque non déposée à ce jour) — voir [content/LICENSE](../../content/LICENSE) |
@@ -28,7 +28,7 @@ SecMet est un logiciel libre sous **GNU GPL version 3 ou ultérieure** (décisio
 
 ### 1.1 Livrables couverts
 
-Une release publie 15 fichiers. Ce document couvre les douze livrables (onze logiciels et la liste des paquets de l'image de la clé) :
+Une release publie 17 fichiers. Ce document couvre les quatorze livrables (treize logiciels et la liste des paquets de l'image de la clé) :
 
 | Livrable | Contenu | Sections |
 |---|---|---|
@@ -37,6 +37,7 @@ Une release publie 15 fichiers. Ce document couvre les douze livrables (onze log
 | `secmet-verify_<v>_x86_64`, `secmet-release_<v>_x86_64` | outils en ligne de commande seuls (construits sous Ubuntu 22.04), crates Rust liées statiquement, aucune bibliothèque embarquée (glibc de l'hôte seulement) ; licence GPL-3.0 et avis des crates : ceux du dépôt (`LICENSE`, §2) | §2 |
 | `secmet-key-writer_<v>_x86_64.AppImage` | SecMet Clé USB pour Linux (egui), aucune bibliothèque embarquée | §2, §3.3, §6.2 |
 | `secmet-key-writer_<v>_x86_64.exe` | SecMet Clé USB pour Windows (egui, wgpu/Direct3D 12, Schannel) | §2, §3.4, §6.2 |
+| `secmet-consolidate_<v>_x86_64.AppImage`, `secmet-consolidate_<v>_x86_64.exe` | SecMet Regroupement pour Linux et Windows (egui ; wgpu/Direct3D 12 sous Windows), aucune bibliothèque embarquée | §2, §6.2 |
 | `secmet-key_<v>_x86_64.img.xz`, `secmet-live_<v>_x86_64.tar`, `secmet-key_<v>_x86_64.packages.tar` | image de la clé USB : système SecMet Live basé sur Debian 13 (Ubuntu 24.04 jusqu'à la 0.4.1), plus le `.deb` SecMet ; liste de ses paquets | §7 |
 
 `SHA256SUMS`, `SHA256SUMS.sig` et `latest.json` sont des données produites par SecMet (empreintes, signature, description de la version) : aucune licence tierce.
@@ -50,8 +51,10 @@ Une release publie 15 fichiers. Ce document couvre les douze livrables (onze log
 | `secmet-linux.txt` | crates de `secmet`, `secmet-helper`, `secmet-verify`, `secmet-release` (Linux) | intégré à l'application (« À propos ») ; `.deb` et `.rpm`, `/usr/share/doc/secmet/THIRD_PARTY_LICENSES.txt` (0.5.0) ; AppImage SecMet, même chemin, avec `appimage-runtime.txt` |
 | `key-writer-linux.txt` | crates de SecMet Clé USB (Linux) et textes des polices d'egui | AppImage SecMet Clé USB, `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
 | `key-writer-windows.txt` | crates de SecMet Clé USB (Windows MSVC et MinGW), polices d'egui, runtime MinGW (`windows-mingw.txt`) | **intégré au `.exe`** : fenêtre « À propos », option `--licenses`, bouton « Enregistrer… » |
-| `fonts-egui.txt` | `UFL.txt`, `OFL.txt`, `Hack-Regular.txt`, `emoji-icon-font-mit-license.txt` de `epaint_default_fonts`, copiés du registre cargo avec contrôle sha256 (§6.2) | dans les deux avis de SecMet Clé USB |
-| `appimage-runtime.txt` | type2-runtime (MIT), libfuse 3 (LGPL-2.1, lié statiquement au runtime), squashfuse (BSD-2-Clause), zstd (BSD-3-Clause), zlib, linuxdeploy-plugin-gtk (MIT) | les deux AppImage |
+| `consolidate-linux.txt` | crates de SecMet Regroupement (Linux) et textes des polices d'egui | AppImage SecMet Regroupement, `usr/share/doc/secmet-consolidate/THIRD_PARTY_LICENSES.txt`, avec `appimage-runtime.txt` |
+| `consolidate-windows.txt` | crates de SecMet Regroupement (Windows MSVC et MinGW), polices d'egui, runtime MinGW | **intégré au `.exe`** : fenêtre « À propos », option `--licenses`, bouton « Enregistrer… » |
+| `fonts-egui.txt` | `UFL.txt`, `OFL.txt`, `Hack-Regular.txt`, `emoji-icon-font-mit-license.txt` de `epaint_default_fonts`, copiés du registre cargo avec contrôle sha256 (§6.2) | dans les avis de SecMet Clé USB et de SecMet Regroupement |
+| `appimage-runtime.txt` | type2-runtime (MIT), libfuse 3 (LGPL-2.1, lié statiquement au runtime), squashfuse (BSD-2-Clause), zstd (BSD-3-Clause), zlib, linuxdeploy-plugin-gtk (MIT) | les AppImage |
 
 `make licenses` régénère ces fichiers ; `make licenses-check` (et le travail `licenses` de la CI) lance `cargo deny --workspace --locked check licenses` (liste blanche et exceptions de `deny.toml` : `option-ext` MPL-2.0, `webpki-roots` CDLA-Permissive-2.0, `epaint_default_fonts` OFL-1.1 et UFL ; pas de GPL autorisée de façon générale, les crates du dépôt sont `publish = false`), vérifie que les avis commités sont à jour, puis que chaque crate de `cargo tree` (dépendances normales, par cible) y figure. Une mise à jour de `Cargo.lock` demande donc `make licenses`.
 
@@ -113,10 +116,11 @@ Liste complète, par livrable et par cible (graphe réellement compilé) :
 ```bash
 # Application et helper (Linux)
 cargo tree --locked -e normal,no-proc-macro --prefix none --format '{p} {l}' \
-  --workspace --exclude secmet-key-writer --target x86_64-unknown-linux-gnu \
+  --workspace --exclude secmet-key-writer --exclude secmet-consolidate --target x86_64-unknown-linux-gnu \
   | sed 's/ (\*)$//' | grep -v "$PWD" | sort -u
-# SecMet Clé USB : même commande avec -p secmet-key-writer, une fois avec
-# --target x86_64-unknown-linux-gnu, une fois avec --target x86_64-pc-windows-msvc
+# SecMet Clé USB et SecMet Regroupement : même commande avec -p secmet-key-writer
+# ou -p secmet-consolidate, une fois avec --target x86_64-unknown-linux-gnu, une
+# fois avec --target x86_64-pc-windows-msvc
 ```
 
 `cargo license --all-features` ou `cargo metadata` sans filtre de cible ne conviennent pas : ils unifient les fonctionnalités et les cibles et font apparaître des crates qui ne sont pas compilées (`openssl`, `clipboard-win`). Les fichiers d'avis complets (textes des licences) sont produits de la même façon, par cible, par `cargo about generate` (§1.1).
@@ -358,6 +362,8 @@ Aucun de ces points n'est réalisé en 0.4.0.
 | AppImage SecMet Clé USB | `usr/share/doc/secmet-key-writer/LICENSE` | Licence GPL-3.0 SecMet |
 | | `usr/share/doc/secmet-key-writer/THIRD_PARTY_LICENSES.txt` | Avis des crates, des polices d'egui et du runtime AppImage (`key-writer-linux.txt` + `appimage-runtime.txt`), affiché par « À propos » et `--licenses` |
 | `.exe` SecMet Clé USB | (dans l'exécutable) | Avis `key-writer-windows.txt` et `LICENSE` intégrés : fenêtre « À propos » (bouton « Enregistrer… »), `secmet-key-writer.exe --licenses` |
+| AppImage SecMet Regroupement | `usr/share/doc/secmet-consolidate/LICENSE`, `usr/share/doc/secmet-consolidate/THIRD_PARTY_LICENSES.txt` | Licence GPL-3.0 SecMet ; avis `consolidate-linux.txt` + `appimage-runtime.txt`, affiché par « À propos » et `--licenses` |
+| `.exe` SecMet Regroupement | (dans l'exécutable) | Avis `consolidate-windows.txt` et `LICENSE` intégrés : fenêtre « À propos », `secmet-consolidate.exe --licenses` |
 | Image de clé, `.tar` | `/usr/share/doc/*/copyright` et `/usr/share/doc/secmet-live/` dans le système ; `/usr/share/doc/secmet/` (paquet SecMet installé) ; `LICENCES/` sur la partition de démarrage et dans le `.tar`, `LICENSE` à la racine du `.tar` | Avis des paquets Debian ; résumé, offre de sources, manifeste, textes GPL et `copyright` des composants de démarrage et des micrologiciels (§7.1) |
 
 **Une seule liste (0.5.0, décision D18).** Le `.deb`, le `.rpm` (`packaging/stage-tree.sh`) et l'AppImage (`build_appimage.sh`) installent la documentation par le même script, `packaging/install-docs.sh <dossier> <version> [--appimage]`. Les liens relatifs des documents installés sont réécrits : vers le fichier installé quand il l'est (`../../LICENSE` devient `../LICENSE`, `../../content/LICENSE` devient `../content-LICENSE`, les annexes citées par les copies de la racine deviennent `Annexes/…`), sinon vers GitHub **au tag de la version** (`https://github.com/hclcdev12/secmet/blob/v<version>/<chemin>`, par exemple `packaging/live/README.md` ou le `README.md` du dépôt ; adresse prise dans `crates/secmet-attest/src/legal.rs`). Une annexe absente de l'index `docs/Annexes/README.md` ou non versionnée (`git ls-files`, quand git est disponible ; sinon l'index seul) n'est jamais installée. `packaging/check-installed-docs.sh` termine l'installation et fait échouer la construction si `copyright`, `LICENSE` ou `THIRD_PARTY_LICENSES.txt` manque, si l'ancien nom `debian-copyright` reparaît, si une annexe installée est hors index ou non versionnée, ou si un lien relatif ne mène à aucun fichier installé ; il est aussi lancé après l'installation des paquets (`package.yml`, `release.sh`) et sur l'AppImage extraite (`appimage-smoke.sh`). Test sans paquet : `make test-docs` (`packaging/tests/install-docs.sh`, dans `make test` et en CI).

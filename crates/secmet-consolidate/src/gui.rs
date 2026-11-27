@@ -60,6 +60,7 @@ struct App {
     destination: PathBuf,
     writing: Option<Receiver<Result<Written, String>>>,
     result: Option<Result<Written, String>>,
+    about: Option<crate::about::About>,
 }
 
 impl App {
@@ -73,6 +74,7 @@ impl App {
             destination: default_destination(),
             writing: None,
             result: None,
+            about: None,
         }
     }
 
@@ -170,10 +172,21 @@ impl eframe::App for App {
         egui::Panel::bottom("foot").show(root, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.weak(format!("{TITLE} {}", env!("CARGO_PKG_VERSION")));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("À propos").clicked() {
+                        self.about = Some(crate::about::About::new());
+                    }
+                    ui.weak(format!("{TITLE} {}", env!("CARGO_PKG_VERSION")));
+                });
             });
             ui.add_space(4.0);
         });
+
+        if let Some(about) = &mut self.about {
+            if !about.show(&ctx) {
+                self.about = None;
+            }
+        }
 
         egui::CentralPanel::default().show(root, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {

@@ -35,7 +35,7 @@
 | Développement | Releases GitHub du dépôt du code **`hclcdev12/secmet`** (public, GPL-3.0-or-later). Jusqu'à la 0.3.5 le canal était `hclcdev12/secmet-releases` ; sa dernière release ne contient qu'un `latest.json` signé dont `sha256sums_url` et `moved_to` renvoient vers `secmet`, ce qui fait basculer les installations existantes. |
 | Production | Le dépôt `hclcdev12/secmet` est l'emplacement actuel, **provisoire** ; le dépôt définitif de l'entreprise reste à décider au lancement. Le déménagement est prévu par `moved_to` (ci-dessous) |
 
-Chaque release contient **15 fichiers** (11 en 0.4.0, avant le second `.rpm` et les binaires autonomes ; 14 en 0.4.1, avant le manifeste des paquets de l'image) :
+Chaque release contient **17 fichiers** (11 en 0.4.0, avant le second `.rpm` et les binaires autonomes ; 14 en 0.4.1, avant le manifeste des paquets de l'image ; 15 jusqu'à la 0.5.1, avant SecMet Regroupement) :
 
 | Fichier | Rôle |
 |---------|------|
@@ -47,6 +47,7 @@ Chaque release contient **15 fichiers** (11 en 0.4.0, avant le second `.rpm` et 
 | `secmet-live_<version>_x86_64.tar` | Livrable de fabrication de la clé sous Linux (`secmet-make-key.sh`, image, `secmet-release`) |
 | `secmet-key_<version>_x86_64.packages.tar` | Manifeste des paquets du système de la clé (basé sur Debian 13) : un fichier texte `secmet-key_<version>_x86_64.packages.txt`, une ligne par paquet (paquet, version, architecture, paquet source, version source, `Built-Using`, `Static-Built-Using`), chaîne de démarrage comprise ; en `.tar` pour être listé dans `SHA256SUMS` signé. Image reprise d'une release précédente : le même manifeste, avec un en-tête qui le dit |
 | `secmet-key-writer_<version>_x86_64.AppImage`, `secmet-key-writer_<version>_x86_64.exe` | SecMet Clé USB, outil d'écriture de la clé, pour Linux et Windows |
+| `secmet-consolidate_<version>_x86_64.AppImage`, `secmet-consolidate_<version>_x86_64.exe` | SecMet Regroupement, regroupement des lots de plusieurs clés ([Annexe M](Annexe_M_cle_live_lots.md), §M.12), pour Linux et Windows |
 | `SHA256SUMS` | Empreintes de tous les fichiers ci-dessus |
 | `SHA256SUMS.sig` | Signature des empreintes avec la clé de version (§N.4) : JSON `{alg, key_id, public_key, sha256, signature}` |
 | `latest.json` | Annonce signée de la version (ci-dessous) |

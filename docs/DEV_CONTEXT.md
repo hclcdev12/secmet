@@ -12,6 +12,7 @@ Notes courtes pour travailler sur le dépôt (v0.5.1).
 | `secmet-helper` | `crates/secmet-helper` | Daemon privilégié `secmet-helper serve` : sessions, ouverture `O_EXCL | O_DIRECT`, exécution des plans, TestDisk, coffre ATA |
 | `secmet-attest` | `crates/secmet-attest` | Attestation JSON canonique signée Ed25519, QR Base45, PDF natif, binaire `secmet-verify` ; versions signées (`release`, `secmet-release`) ; manifeste de lot signé (`manifest`) |
 | `secmet-key-writer` | `crates/secmet-key-writer` | SecMet Clé USB (egui, Linux et Windows) : vérification de la release signée puis de l'empreinte, écriture de l'image de la clé avec complétion de la GPT pendant l'écriture (attributs GPT qui cachent `SECMET-SYS` et `SECMET-DATA` à Windows, `gpt::windows_attributes`), relecture ; hors `default-members` (`make key-writer`, `cargo build -p secmet-key-writer`), rust-version 1.95 |
+| `secmet-consolidate` | `crates/secmet-consolidate` | SecMet Regroupement (egui, Linux et Windows) : regroupe les lots clôturés de plusieurs clés (Annexe M §M.12) ; cœur `secmet_attest::consolidation` (load_lot, discover, build, write, index non signé), PDF `secmet_attest::pdf::grouped` ; ligne de commande `--out` ; hors `default-members` (`make consolidate`), rust-version 1.95 |
 
 ```bash
 source scripts/env.sh
@@ -72,7 +73,7 @@ make deb        # dist/secmet_<version>_amd64.deb (TestDisk embarqué sous /usr/
 make rpm        # dist/secmet-<version>-1.<distribution>.x86_64.rpm (Fedora)
 make appimage   # dist/SecMet_<version>_x86_64.AppImage, assemblée dans un conteneur Ubuntu 24.04
 make live       # dist/live/ : image de la clé USB SecMet (conteneur Debian 13 privilégié) ; make live-key DEV=/dev/sdX l'écrit
-make release    # dist/release/<version>/ : les 15 fichiers (5 paquets fumés en conteneurs : .deb 24.04 et 22.04, .rpm fc44 et fc42, AppImage ; SecMet Clé USB AppImage et .exe ; secmet-verify et secmet-release autonomes ; .img.xz, .tar et .packages.tar de la clé ; SHA256SUMS(.sig), latest.json signés)
+make release    # dist/release/<version>/ : les 17 fichiers (5 paquets fumés en conteneurs : .deb 24.04 et 22.04, .rpm fc44 et fc42, AppImage ; SecMet Clé USB et SecMet Regroupement, AppImage et .exe ; secmet-verify et secmet-release autonomes ; .img.xz, .tar et .packages.tar de la clé ; SHA256SUMS(.sig), latest.json signés)
 make publish    # idem, puis release GitHub (confirmation) ; n'envoie pas encore .img.xz ni .tar (release.sh, liste assets) ; le push d'un tag vX.Y.Z suffit (package.yml)
 ```
 

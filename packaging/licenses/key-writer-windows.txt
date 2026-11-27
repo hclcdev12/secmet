@@ -4451,8 +4451,8 @@ MPL-2.0 : les sources de option-ext sont sur https://crates.io/crates/option-ext
 (et https://github.com/soc/option-ext).
 
 ==============================================================================
-Polices intégrées par egui (epaint_default_fonts 0.37.0, SecMet Clé USB)
-Fonts embedded by egui (epaint_default_fonts 0.37.0, SecMet Clé USB)
+Polices intégrées par egui (epaint_default_fonts 0.37.0, outils egui de SecMet)
+Fonts embedded by egui (epaint_default_fonts 0.37.0, SecMet egui tools)
 ==============================================================================
 
 ------------------------------------------------------------------------------

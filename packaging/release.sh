@@ -283,6 +283,25 @@ cp dist/*.rpm /out/
     cp -f "$ROOT_DIR/dist/secmet-key-writer_${VERSION}_x86_64.exe" "$OUT_DIR/"
     [[ "$(head -c 2 "$OUT_DIR/secmet-key-writer_${VERSION}_x86_64.exe")" == "MZ" ]] \
         || die "SecMet Clé USB : le .exe n'est pas un exécutable Windows"
+
+    step "SecMet Regroupement (AppImage, conteneur Ubuntu 24.04)"
+    "$PKG_DIR/build_consolidate_appimage.sh" > "$LOG_DIR/consolidate.log" 2>&1 \
+        || die "AppImage de SecMet Regroupement échouée, voir $LOG_DIR/consolidate.log"
+    consolidate="$ROOT_DIR/dist/secmet-consolidate_${VERSION}_x86_64.AppImage"
+    [[ -f "$consolidate" ]] || die "AppImage introuvable : $consolidate"
+    cp -f "$consolidate" "$OUT_DIR/"
+    extract="$(mktemp -d)"
+    ( cd "$extract" && "$OUT_DIR/secmet-consolidate_${VERSION}_x86_64.AppImage" --appimage-extract >/dev/null )
+    "$extract/squashfs-root/usr/bin/secmet-consolidate" --version | grep -q "secmet-consolidate $VERSION" \
+        || die "SecMet Regroupement : mauvaise version"
+    rm -rf "$extract"
+
+    step "SecMet Regroupement (.exe Windows, compilation croisée)"
+    "$PKG_DIR/build_consolidate_exe.sh" > "$LOG_DIR/consolidate-exe.log" 2>&1 \
+        || die "exécutable Windows de SecMet Regroupement échoué, voir $LOG_DIR/consolidate-exe.log"
+    cp -f "$ROOT_DIR/dist/secmet-consolidate_${VERSION}_x86_64.exe" "$OUT_DIR/"
+    [[ "$(head -c 2 "$OUT_DIR/secmet-consolidate_${VERSION}_x86_64.exe")" == "MZ" ]] \
+        || die "SecMet Regroupement : le .exe n'est pas un exécutable Windows"
 fi
 
 # --- 2c. Image de la clé USB --------------------------------------------------
@@ -361,7 +380,7 @@ for f in "$OUT_DIR"/secmet_*~*_amd64.deb; do
 done
 
 # --- 2d. Livrables attendus ---------------------------------------------------
-# Les 12 fichiers signés d'une release (15 publiés avec SHA256SUMS,
+# Les 14 fichiers signés d'une release (17 publiés avec SHA256SUMS,
 # SHA256SUMS.sig et latest.json). Sans image de clé (--skip-live), la
 # release serait incohérente (SecMet Clé USB et la reprise de l'image
 # suivante la cherchent) : --publish la refuse.
@@ -370,6 +389,7 @@ expected=(
     "secmet-${VERSION}-1.fc44.x86_64.rpm" "secmet-${VERSION}-1.fc42.x86_64.rpm"
     "SecMet_${VERSION}_x86_64.AppImage"
     "secmet-key-writer_${VERSION}_x86_64.AppImage" "secmet-key-writer_${VERSION}_x86_64.exe"
+    "secmet-consolidate_${VERSION}_x86_64.AppImage" "secmet-consolidate_${VERSION}_x86_64.exe"
     "secmet-verify_${VERSION}_x86_64" "secmet-release_${VERSION}_x86_64"
     "secmet-live_${VERSION}_x86_64.tar" "secmet-key_${VERSION}_x86_64.img.xz"
     "secmet-key_${VERSION}_x86_64.packages.tar"
